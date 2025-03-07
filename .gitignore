@@ -1,0 +1,8 @@
+*.pyc
+__pycache__/
+*.pyo
+webguild/
+Pc/
+lapworld/
+.env
+data/
