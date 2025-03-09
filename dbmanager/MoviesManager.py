@@ -197,7 +197,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                         next_release_date = COALESCE(?, next_release_date)
                     WHERE title = ?
                 """,
-                    (season, episode, date, title, next_release_date),
+                    (season, episode, date,next_release_date,title),
                 )
             else:
                 # Insert new series
@@ -357,7 +357,7 @@ async def add_or_update_watch_list(user_id, title, date, extra, media_type):
                     if "next_episode_date" in first_value
                     else None
                 )
-                print(title)
+                
 
                 await cursor.execute(
                     f"""

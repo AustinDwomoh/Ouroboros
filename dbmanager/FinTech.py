@@ -150,7 +150,7 @@ def update_payment_status(user_id, payment_name, status):
         conn.commit()
 
 
-@staticmethod
+
 def check_due_dates():
     today = datetime.today().strftime("%Y-%m-%d")
     upcoming_date = (datetime.today() + timedelta(days=7)).strftime("%Y-%m-%d")
@@ -162,7 +162,7 @@ def check_due_dates():
         user_ids = [row[0] for row in c.fetchall()]
         for user_id in user_ids:
             table_name = f'"{user_id}_fintech"'
-            print(user_id)
+           
             try:
 
                 c.execute(
@@ -178,7 +178,7 @@ def check_due_dates():
                 )
 
                 user_reminders = c.fetchall()
-                print(user_reminders)
+                
                 for name, category, amount, due_date, status in user_reminders:
                     reminders.append(
                         {
