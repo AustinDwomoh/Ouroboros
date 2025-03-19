@@ -140,7 +140,7 @@ class Finance(commands.Cog):
         frequency="Set payment frequency",
         due_date="Select due date format YYYY-MMM-DD",
     )
-    async def add_payment(self,interaction: discord.Interaction,name: str,category: str,amount: int,status: str,frequency: str,due_date: str,
+    async def add_payment(self,interaction: discord.Interaction,name: str,amount: int,status: str=None,frequency: str=None,due_date: str=None,category:str=None
     ):
         await interaction.response.defer()
         if not await self.is_dm(interaction):
@@ -217,6 +217,7 @@ class Finance(commands.Cog):
 
     @tasks.loop(hours=168)
     async def payment_reminder_loop(self):
+        print("here")
         try:
             upcoming_payments = FinTech.check_due_dates()
             for reminder in upcoming_payments:
