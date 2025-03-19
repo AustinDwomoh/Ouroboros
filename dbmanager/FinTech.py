@@ -88,14 +88,13 @@ def update_table(
     table_name = f'"{user_id}_fintech"'
     create_money_table(user_id)
     update_user_ids(user_id)
-    new_due_date = calculate_next_due_date(due_date, frequency)
+    
 
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(f"SELECT * FROM {table_name} WHERE name = ?", (name,))
         existing = c.fetchone()
         if existing:
-            print(existing)
             existing_due_date = existing[6]
             existing_last_paid = existing[7]
             new_due_date = calculate_next_due_date(
@@ -125,6 +124,7 @@ def update_table(
             )
         else:
             # Insert new record
+            new_due_date = calculate_next_due_date(due_date, frequency)
             c.execute(
                 f"""
                 INSERT INTO {table_name} 
@@ -149,7 +149,8 @@ def update_payment_status(user_id, payment_name, status):
         )
         conn.commit()
 
-
+#Fix the logic here it mkes no sense
+# 1 if its reminded chnage it to reminded but when they make an update change to active till they decide to shut it down 
 
 def check_due_dates():
     today = datetime.today().strftime("%Y-%m-%d")
@@ -161,10 +162,8 @@ def check_due_dates():
         c.execute("SELECT DISTINCT user_id FROM user_payments")
         user_ids = [row[0] for row in c.fetchall()]
         for user_id in user_ids:
-            table_name = f'"{user_id}_fintech"'
-           
+            table_name = f'"{user_id}_fintech"'  
             try:
-
                 c.execute(
                     f"""
                 SELECT name, category, amount, due_date, status
