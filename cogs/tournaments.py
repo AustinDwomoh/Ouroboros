@@ -9,6 +9,7 @@ from settings import *
 from datetime import datetime, timedelta
 from dbmanager import Games, ServerStatManager
 
+errorHandler = ErrorHandler()
 
 ServerStatManager = ServerStatManager.ServerStatManager()
 # ============================================================================ #
@@ -142,7 +143,7 @@ class MatchView(ui.View):
                         f"Unable to send a DM to <@{opponent_id}>. Please ensure their DMs are open.",
                         delete_after=300,
                     )
-                    ErrorHandler.handle_exception(e)
+                    errorHandler.handle_exception(e)
 
             await interaction.message.edit(view=self)
         else:
@@ -409,7 +410,7 @@ class DailyTournament(commands.Cog):
             await self.prepare_registration(signup_channel)
 
         except (discord.Forbidden,discord.HTTPException) as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
 
     async def send_guidelines(self, chat_channel, interaction):
@@ -596,7 +597,7 @@ class DailyTournament(commands.Cog):
                 await chat_channel.send(embed=embed)
                 await self.run_round(signup_channel)
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
     async def run_round(self, signup_channel):
         """Creates fixtures and sends fixtures and handles unmantched players as well the fixtures get sent to the fixtures channel"""
@@ -651,7 +652,7 @@ class DailyTournament(commands.Cog):
                 match_view.message = message
                 await asyncio.sleep(match_view.timeout)
             except Exception as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
 
             # Handle players who couldn't be paired
             if len(tournament_data["registered_players"]) > 0:
@@ -784,7 +785,7 @@ class DailyTournament(commands.Cog):
                     await self.declare_winner(fixtures_channel)
 
             except Exception as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
 
             except FileNotFoundError:
                 pass
@@ -856,7 +857,7 @@ class DailyTournament(commands.Cog):
             await self.prepare_next_round(fixtures_channel)
 
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
     async def declare_winner(self, fixtures_channel):
         tournament_data = load_tournament_data(fixtures_channel.guild.id)
@@ -1066,7 +1067,7 @@ class DailyTournament(commands.Cog):
                 await self.prepare_registration(signup_channel)
 
         except Exception as e:
-           ErrorHandler.handle_exception(e)
+           errorHandler.handle_exception(e)
     @daily_tournament_loop.before_loop
     async def before_daily_tournament_loop(self):
         await self.client.wait_until_ready()

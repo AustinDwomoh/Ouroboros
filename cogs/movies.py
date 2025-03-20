@@ -4,10 +4,10 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import MoviesManager
 from tabulate import tabulate
-from datetime import date
+from datetime import date,datetime
 
 logger = logging.getLogger(__name__)
-
+errorHandler = ErrorHandler()
 
 class MediaListPaginationView(discord.ui.View):
     def __init__(self, data, media_type, sep=10, timeout=60, watchlist=False):
@@ -269,7 +269,7 @@ class Movies(commands.Cog):
                 else:
                     await interaction.followup.send("No records found to delete")
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
     # ============================================================================ #
     #                               INSERT MEDIA  CMD                              #
@@ -465,7 +465,7 @@ class Movies(commands.Cog):
             )
         except Exception as e:
             await interaction.followup.send(f"Error updating watchlist: {e}")
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
 
     # ============================================================================ #
@@ -627,7 +627,7 @@ class Movies(commands.Cog):
                 user = self.client.get_user(reminder["user_id"])
                 if user:
                     embed = discord.Embed(
-                        title=f"🔔 **Media Reminder:** \n{reminder['name']} coming up on {reminder['next_release_date']}",
+                        title=f"🔔 **Media Reminder:** \n{reminder['name']} coming up on  <t:{int(datetime.strptime(reminder['next_release_date'], "%Y-%m-%d").timestamp())}:D>",
                         description=f"**Media Details**",
                         color=discord.Color.blue(),  # You can choose any color
                     )
@@ -638,7 +638,7 @@ class Movies(commands.Cog):
                         )
                         embed.add_field(
                             name="Release_date",
-                            value=reminder["release_date"],
+                            value=f"<t:{int(datetime.strptime({reminder["release_date"]}, "%Y-%m-%d").timestamp())}:D>",
                             inline=False,
                         )
                     else:
@@ -648,14 +648,9 @@ class Movies(commands.Cog):
                             value=f"S{reminder['season']} E{reminder['episode']}",
                             inline=False,
                         )
-                    embed.add_field(
-                        name="next_release_date",
-                        value=reminder["next_release_date"],
-                        inline=False,
-                    )
                     await user.send(embed=embed)
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
     # ============================================================================ #
     #                                 AUTOCOMPLETE                                 #
@@ -682,10 +677,10 @@ class Movies(commands.Cog):
             # Ignore the "Unknown interaction" error
             return []
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             return []
         except discord.errors.HTTPException as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             if "Interaction has already been acknowledged" in str(e):
                 pass
 
@@ -726,10 +721,10 @@ class Movies(commands.Cog):
             # Ignore the "Unknown interaction" error
             return []
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             return []
         except discord.errors.HTTPException as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             if "Interaction has already been acknowledged" in str(e):
                 pass
 

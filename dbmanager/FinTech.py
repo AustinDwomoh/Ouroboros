@@ -19,12 +19,24 @@ def create_money_table(user_id=None):
         name TEXT NOT NULL,
         category TEXT,
         amount REAL NOT NULL,
-        status TEXT CHECK( status IN ('active', 'paid', 'overdue') ) NOT NULL DEFAULT 'active',
+        total_paid REAL,
+        status TEXT NOT NULL,
         frequency TEXT NOT NULL,
         due_date TEXT NOT NULL,
         last_paid_date TEXT
     )"""
         )
+        cursor.execute(f'PRAGMA table_info("{user_id}_fintech")')
+        columns = [row[1] for row in cursor.fetchall()]  # Get column names
+
+        if "total_paid" not in columns:
+            cursor.execute(
+                f"""
+                ALTER TABLE "{user_id}_fintech"
+                ADD COLUMN total_paid REAL DEFAULT 0
+            """
+            )
+            conn.commit()
         cursor.execute(
             f"""
     CREATE TABLE IF NOT EXISTS user_payments (  
@@ -82,9 +94,7 @@ def fintech_list(user_id):
         return c.fetchall()
 
 
-def update_table(
-    user_id, name, category, amount, due_date, status, frequency="One-Time"
-):
+def update_table(user_id, name, category, amount, due_date, status, frequency="One-Time"):
     table_name = f'"{user_id}_fintech"'
     create_money_table(user_id)
     update_user_ids(user_id)
@@ -102,19 +112,14 @@ def update_table(
             )
 
             # Check if the payment is overdue
-            today = datetime.today().strftime("%Y-%m-%d")
-            if existing_due_date < today and status != "paid":
-                status = "Overdue"
-            last_paid_date = None
-            if status == "paid":
-                last_paid_date = today
+            last_paid_date = datetime.today().strftime("%Y-%m-%d")
 
             # Update existing record
             c.execute(
                 f"""
                     UPDATE {table_name}
                     SET category = COALESCE(?, category),
-                        amount = COALESCE(amount + ?, amount),
+                        total_paid = COALESCE(total_paid, 0) + ?,
                         due_date = COALESCE(?, due_date),
                         last_paid_date = COALESCE(?, last_paid_date),
                         status = COALESCE(?, status)
@@ -149,8 +154,6 @@ def update_payment_status(user_id, payment_name, status):
         )
         conn.commit()
 
-#Fix the logic here it mkes no sense
-# 1 if its reminded chnage it to reminded but when they make an update change to active till they decide to shut it down 
 
 def check_due_dates():
     today = datetime.today().strftime("%Y-%m-%d")
@@ -191,7 +194,8 @@ def check_due_dates():
                     )
 
             except sqlite3.OperationalError as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler = ErrorHandler()
+                errorHandler.handle_exception(e)
             
 
     

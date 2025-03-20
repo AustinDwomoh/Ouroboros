@@ -6,7 +6,7 @@ from discord.ext import commands
 from dbmanager import ServerStatManager
 
 ServerStatManager = ServerStatManager.ServerStatManager()  # it works leave it alone
-
+errorHandler = ErrorHandler()
 img_dir = IMGS_DIR
 
 
@@ -59,7 +59,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 avatar = Image.open(avatar_bytes).convert("RGB").resize((167, 167))
             except Exception as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 return
 
             # Apply circular mask to avatar
@@ -72,7 +72,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 banner = Image.open(img_dir / "default.png").convert("RGBA")
             except Exception as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 return
 
             overlay = Image.new("RGBA", banner.size, (0, 0, 0, 0))
@@ -86,7 +86,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 font = ImageFont.truetype("arial.ttf", 60)
             except IOError as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 font = ImageFont.load_default()
 
             main_color = "white"  # Primary text color
@@ -108,7 +108,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             await channel.send(file=discord.File(welcome_file_path))
 
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
         finally:
             # Ensure cleanup of the banner file
@@ -126,7 +126,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 avatar = Image.open(avatar_bytes).convert("RGB").resize((167, 167))
             except Exception as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 return
 
             # Apply circular mask to avatar
@@ -139,7 +139,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 banner = Image.open(img_dir / "default.png").convert("RGBA")
             except Exception as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 return
 
             overlay = Image.new("RGBA", banner.size, (0, 0, 0, 0))
@@ -153,7 +153,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 font = font = ImageFont.truetype("arial.ttf", 60)
             except IOError as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 font = ImageFont.load_default()
             # Define text and shadow colors
             main_color = "white"  # Primary text color
@@ -176,7 +176,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             await channel.send(file=discord.File(goodbye_file_path))
 
         except Exception as e:
-           ErrorHandler.handle_exception(e)
+           errorHandler.handle_exception(e)
 
         finally:
             # Ensure cleanup of the banner file

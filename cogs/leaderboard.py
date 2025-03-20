@@ -83,7 +83,7 @@ class LeaderboardPaginationView(discord.ui.View):
         self.current_page = self.get_total_pages()
         await self.update_message(interaction)
 
-
+errorHandler =ErrorHandler()
 # ============================================================================ #
 #                              LEADERBOARD COG                                 #
 # ============================================================================ #
@@ -118,7 +118,7 @@ class Leaderboard(commands.Cog):
                 rows = c.fetchall()
             except Exception as e:
                 await interaction.followup.send("No Leaderboard available.")
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 return
         leaderboard_data = []
         for idx, (player_id, score) in enumerate(rows, start=1):
@@ -156,9 +156,9 @@ class Leaderboard(commands.Cog):
                     [app_commands.Choice(name="No matches found", value="none")]
                 )
         except discord.errors.NotFound as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
     # ================================ RANK SCRIPT =============================== #
     async def fetch_player_score(self, cursor, table_name, player_id):
@@ -171,7 +171,7 @@ class Leaderboard(commands.Cog):
             score_row = cursor.fetchone()
             return score_row[0] if score_row else 0
         except Games.sqlite3.OperationalError as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             return 0
 
     @app_commands.guild_only()
@@ -213,7 +213,7 @@ class Leaderboard(commands.Cog):
                         break
                 rank = player_position
             except Games.sqlite3.OperationalError as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 rank = 0
             # banner making code
             banner_path = IMGS_DIR / "default.png"
@@ -227,7 +227,7 @@ class Leaderboard(commands.Cog):
                 font = ImageFont.truetype("arial.ttf", 40)
                 bold_font = ImageFont.truetype("arialbd.ttf", 60)
             except IOError as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 return
             player_name = member.display_name
             pvp_text = f"PvP: {pvp_score}pts"

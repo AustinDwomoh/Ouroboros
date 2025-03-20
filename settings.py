@@ -1,4 +1,4 @@
-import os, logging, pathlib, discord
+import os, logging, pathlib, discord,traceback
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -39,7 +39,7 @@ class ErrorHandler:
         self.log_file = log_file
         self.logger = logging.getLogger("Ouroboros")
         self.logger.setLevel(logging.INFO)
-        
+
         if not self.logger.hasHandlers():  # Prevents duplicate handlers
             # Create a file handler
             file_handler = logging.FileHandler(self.log_file)
@@ -58,21 +58,17 @@ class ErrorHandler:
             self.logger.addHandler(file_handler)
             self.logger.addHandler(console_handler)
 
-
-    
-    def log_error(self, error_message):
-        """
-        Logs an error message to the file and console.
-        :param error_message: The error message to be logged.
-        """
-        self.logger.error(error_message)
-    
     def handle_exception(self, exception):
         """
-        Handles exceptions by logging the error message.
+        Handles exceptions by logging the error message along with traceback.
         :param exception: The exception instance to be logged.
         """
-        self.logger.error(f"Exception occurred: {exception}")
+        error_message = f"Exception occurred: {exception}\n{traceback.format_exc()}"
+    
+        with open(self.log_file, "a") as log_file:
+            log_file.write(error_message + "\n")
+        self.logger.error(error_message)
+
     
 
     

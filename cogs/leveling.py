@@ -173,6 +173,7 @@ class Levelling(commands.Cog):
         try:
             os.remove(output_path)
         except FileNotFoundError as e:
+            errorHandler = ErrorHandler()
             ErrorHandler.handle_exception(e)
             pass
 

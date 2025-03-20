@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import notifmanager
 
-
+errorHandler = ErrorHandler()
 
 # ============================================================================ #
 #                             YOUTUBE NOTIFICATION                             #
@@ -123,7 +123,7 @@ class YoutubeNotif(commands.Cog):  # WORKS ALLRIGHT NEED TO STRESS TEST
             embed.set_footer(text="YouTube Notifications")
             await interaction.followup.send(embed=embed)
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
     @tasks.loop(minutes=10)
     async def check_new_videos(self):
@@ -176,7 +176,7 @@ class YoutubeNotif(commands.Cog):  # WORKS ALLRIGHT NEED TO STRESS TEST
                                 f"@everyone \n**{video_title}**\n{latest_video.link}"
                             )
         except (discord.HTTPException, googleapiclient.errors.HttpError, KeyError, Exception) as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
         
 
 

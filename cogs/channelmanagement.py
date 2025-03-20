@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 from settings import *
 
-
+errorHandler = ErrorHandler()
 # ============================================================================
 #                              CHANNEL MANAGEMENT COG                        =
 # ============================================================================
@@ -80,15 +80,15 @@ class ChannelManagement(commands.Cog):
                 f"I do not have permission to delete the channel {channels.name}.",
                 ephemeral=True,
             )
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
         except discord.HTTPException as e:
             await interaction.followup.send(
                 f"An error occurred while trying to delete the channel {channels.name}.",
                 ephemeral=True,
             )
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
     # ============================================================================
     #                             DELETE CATEGORIES COMMAND                      =
@@ -145,15 +145,15 @@ class ChannelManagement(commands.Cog):
                 f"I do not have permission to delete the category {category.name}.",
                 ephemeral=True,
             )
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
         except discord.HTTPException as e:
             await interaction.followup.send(
                 f"An error occurred while trying to delete the category {category.name}.",
                 ephemeral=True,
             )
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
     # ============================================================================
     #                             CLEAR MESSAGES COMMAND                         =
     # ============================================================================
@@ -204,13 +204,13 @@ class ChannelManagement(commands.Cog):
                     f"Deleted {deleted_count} messages from {channel.mention}."
                 )
             except discord.Forbidden as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 await interaction.followup.send(
                     f"I do not have permission to clear messages in {channel.mention}.",
                     ephemeral=True,
                 )
             except Exception as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
 
     @app_commands.command(name="hi", description="To esatblish a dm connection")
     @app_commands.guild_only()
@@ -255,10 +255,10 @@ class ChannelManagement(commands.Cog):
                 inline=False,
             )
             error_embed.set_footer(text="Once updated, try using /hi again!")
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
    
     @app_commands.command( name="help", description="Displays a list of commands and their descriptions")
     async def help(self, interaction: discord.Interaction):

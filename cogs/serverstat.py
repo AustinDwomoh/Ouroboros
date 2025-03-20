@@ -4,12 +4,13 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import ServerStatManager
 
-ServerStatManager = ServerStatManager.ServerStatManager()  # it works leave it alone
+ServerStatManager = ServerStatManager.ServerStatManager()  # it works leave it alone 
+#i get it now it hasnt been initialized yet is why
 # ============================================================================ #
 #                                     fixes                                    #
 # ============================================================================ #
 #the import is like that since unlik the order db classes this one  has an actual class and its causing the issues
-
+errorHandler = ErrorHandler()
 class ServerStat(commands.Cog):
     def __init__(self, client):
         self.client = client
@@ -35,7 +36,7 @@ class ServerStat(commands.Cog):
                     try:
                         category = await guild.create_category(category_name)
                     except Exception as e:
-                        ErrorHandler.handle_exception(e)
+                        errorHandler.handle_exception(e)
                         continue  # Skip if category creation fails
                 else:
                     category = existing_category
@@ -45,7 +46,7 @@ class ServerStat(commands.Cog):
                     try:
                         await channel.delete()
                     except Exception as e:
-                        ErrorHandler.handle_exception(e)
+                        errorHandler.handle_exception(e)
 
                 # Define permission overwrites
                 overwrites = {
@@ -67,7 +68,7 @@ class ServerStat(commands.Cog):
                             name, category=category, overwrites=overwrites
                         )
                     except Exception as e:
-                        ErrorHandler.handle_exception(e)
+                        errorHandler.handle_exception(e)
 
     @update_stats.before_loop
     async def before_update_stats(self):

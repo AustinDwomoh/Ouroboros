@@ -7,9 +7,7 @@ from discord.ext import commands
 from settings import *
 from discord.ui import Button, View
 
-# ============================================================================ #
-#                                LOGGING_CONFIG                                #
-# ============================================================================ #
+errorHandler =ErrorHandler()
 
 
 
@@ -123,7 +121,7 @@ class Coinflip(commands.Cog):
                             )
                         )
                     except Exception as e:
-                        ErrorHandler.handle_exception(e)
+                       errorHandler.handle_exception(e)
             embed = discord.Embed(
                 title="Coin Flip",
                 description="Please choose Heads or Tails:",
@@ -131,7 +129,7 @@ class Coinflip(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, view=CoinFlipView())
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+           errorHandler.handle_exception(e)
 
 # ============================================================================ #
 #                                     SETUP                                    #

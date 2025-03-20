@@ -78,7 +78,8 @@ class Update(commands.Cog):
             # Ignore the "Unknown interaction" error
             return []
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler = ErrorHandler()
+            errorHandler.handle_exception(e)
             return []
         except discord.errors.HTTPException as e:
             if "Interaction has already been acknowledged" in str(e):#this helps avoid it keep calling it self which it keeps doing for some reason

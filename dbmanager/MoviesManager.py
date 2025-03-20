@@ -44,6 +44,7 @@ async def create_user_tables(user_id=None):
                     )
                 """
                 )
+                #added later on 
                 await cursor.execute(f"PRAGMA table_info({table_name_series})")
                 columns = [row[1] for row in await cursor.fetchall()]  # Get column names
 
@@ -186,6 +187,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                 if "next_episode_date" in first_value
                 else None
             )
+            print(next_release_date)
             if existing:
                 # Update existing series
                 await cursor.execute(
@@ -546,7 +548,7 @@ async def search_hianime(keyword):
     return results
 
 
-@staticmethod
+
 async def check_upcoming_dates():
     today = datetime.today().strftime("%Y-%m-%d")
     upcoming_date = (datetime.today() + timedelta(days=7)).strftime("%Y-%m-%d")

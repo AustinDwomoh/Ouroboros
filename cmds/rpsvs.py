@@ -260,7 +260,8 @@ class Rpvp(commands.Cog):
                     "Please tag a valid player using the correct mention format."
                 )
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler = ErrorHandler()
+            errorHandler.handle_exception(e)
 
 
 # ============================================================================ #

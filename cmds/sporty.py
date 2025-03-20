@@ -198,7 +198,8 @@ class Sporty(commands.Cog):
             view=GameSelectionView(interaction.user, self.client),
         )
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler = ErrorHandler()
+            errorHandler.handle_exception(e)
 
 
 # ============================================================================ #

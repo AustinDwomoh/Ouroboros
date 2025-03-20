@@ -4,9 +4,9 @@ from discord import app_commands
 from dbmanager import FinTech
 from tabulate import tabulate
 from discord.ext import commands, tasks
-from datetime import datetime,timedelta
+from datetime import datetime
 
-
+errorHandler = ErrorHandler()
 
 class FinTechListPaginationView(discord.ui.View):
     """Class responsible for the pagination used in the fintech class
@@ -38,7 +38,7 @@ class FinTechListPaginationView(discord.ui.View):
 
                 table_data_2.append([str(item[3]), item[6], item[7]])
             except IndexError as e:
-                ErrorHandler.handle_exception(e)
+                errorHandler.handle_exception(e)
                 continue
 
         table_1 = tabulate(table_data_1, headers=headers_1, tablefmt="grid")
@@ -132,7 +132,7 @@ class Finance(commands.Cog):
         # Fetch the message object after it is sent
         finPaginationView.message = await interaction.original_response()
 
-    @app_commands.command( name="add_payment", description="Add a new payment record to watch")
+    @app_commands.command( name="add_payment", description="For a new record fill everthing to avoid unexpected errors")
     @app_commands.describe(
         category="Select a category",
         amount="payment amount",
@@ -140,7 +140,7 @@ class Finance(commands.Cog):
         frequency="Set payment frequency",
         due_date="Select due date format YYYY-MMM-DD",
     )
-    async def add_payment(self,interaction: discord.Interaction,name: str,amount: int,status: str=None,frequency: str=None,due_date: str=None,category:str=None
+    async def add_payment(self,interaction: discord.Interaction,name: str,amount: int,status: str='active',frequency: str=None,due_date: str=None,category:str=None
     ):
         await interaction.response.defer()
         if not await self.is_dm(interaction):
@@ -148,7 +148,16 @@ class Finance(commands.Cog):
                 "This command can only be used in DMs!", ephemeral=True
             )
             return
-        FinTech.update_table( interaction.user.id, name=name, category=category, amount=amount, due_date=due_date, status=status, frequency=frequency,)
+        choices = []
+        titles = FinTech.fintech_list(interaction.user.id)
+        for item in titles:
+            choices.append(item[1])
+        if name not in choices and (category is None or due_date is None or frequency is None):
+            await interaction.response.send_message(
+                "New records require category, due_date, frequency", ephemeral=True
+            )
+            return
+        FinTech.update_table(interaction.user.id, name=name, category=category, amount=amount, due_date=due_date, status=status, frequency=frequency,)
         await interaction.followup.send(f"Payment {name} has been added to your watch list")
 
     # ============================================================================ #
@@ -170,13 +179,13 @@ class Finance(commands.Cog):
             ][:25]
             return filtered_choices
         except discord.errors.NotFound as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             return []
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             return []
         except discord.errors.HTTPException as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
             if "Interaction has already been acknowledged" in str(e):
                 pass
 
@@ -215,53 +224,36 @@ class Finance(commands.Cog):
             if current.lower() in freq.lower()
         ]
 
-    @tasks.loop(hours=168)
+    @tasks.loop(seconds=168)
     async def payment_reminder_loop(self):
-        print("here")
         try:
             upcoming_payments = FinTech.check_due_dates()
             for reminder in upcoming_payments:
                 user = self.client.get_user(reminder["user_id"])
+                print("fintech here")
                 if user:
-                    # Calculate if the payment is overdue (one week after the due date)
-                    due_date = datetime.strptime(
-                        reminder["due_date"], "%Y-%m-%d"
-                    )  # Format depending on your data
-                    one_week_later = due_date + timedelta(weeks=1)
-
-                    # Check if payment status is "Due" and if a week has passed
-                    if reminder["status"] != "Paid" and datetime.now() > one_week_later:
-                        # Update status to "Overdue" if a week has passed and payment hasn't been marked as paid
-                        FinTech.update_payment_status(
-                            reminder["user_id"], reminder["name"], "Overdue"
+                    if reminder["status"] == "reminded" :
+                        FinTech.update_payment_status(reminder["user_id"], reminder["name"], "overdue"
                         )
+                    unix_timestamp = int(datetime.strptime(reminder['due_date'], "%Y-%m-%d").timestamp())
                     embed = discord.Embed(
-                        title=f"🔔 **Reminder:** {reminder['name']} Due on {reminder['due_date']}",
+                        title=f"🔔 **Reminder:** {reminder['name']} Due on <t:{unix_timestamp}:D>",
                         description=f"**Payment Details**",
                         color=discord.Color.blue(),  # You can choose any color
                     )
-
                     # Add fields to the embed
-                    embed.add_field(
-                        name="⚠️ Status", value=reminder["status"], inline=False
-                    )
-                    embed.add_field(
-                        name="💰 Amount Due",
-                        value=f"${reminder['amount']}",
-                        inline=True,
-                    )
-                    embed.add_field(
-                        name="📅 Due Date", value=reminder["due_date"], inline=True
-                    )
-                    embed.add_field(
-                        name="📍 Category", value=reminder["category"], inline=True
-                    )
+                    embed.add_field(name="⚠️ Status", value=reminder["status"], inline=False)
+                    
+                    embed.add_field(name="💰 Amount Due",value=f"${reminder['amount']:.2f}",inline=True,)
 
-                    # Send the embed to the user
+                    embed.add_field(name="📍 Category", value=reminder["category"], inline=True)
+                    #set status to reminder and chnages when the user calls add_payment to show payments been made
+                    FinTech.update_payment_status(reminder["user_id"], reminder["name"], "reminded"
+                        )
                     await user.send(embed=embed)
 
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler.handle_exception(e)
 
 
 async def setup(client):

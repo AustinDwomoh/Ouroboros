@@ -112,7 +112,8 @@ class RPSView(ui.View):
                         interaction.guild.id, interaction.user.id, self.player_score, "pvb"
                     )
         except Exception as e:
-            ErrorHandler.handle_exception(e)
+            errorHandler = ErrorHandler()
+            errorHandler.handle_exception(e)
 
     # ================================ UI BUTTONS ================================ #
     @ui.button(label="Rock", style=discord.ButtonStyle.primary)
