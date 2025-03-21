@@ -1,7 +1,7 @@
 from discord import app_commands
 from discord.ext import commands
 import os, discord, typing
-from settings import *
+from settings import ErrorHandler
 
 DATA_DIR = "data"
 

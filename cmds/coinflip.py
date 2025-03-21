@@ -4,7 +4,7 @@
 import random, discord, asyncio
 from discord import app_commands, ButtonStyle
 from discord.ext import commands
-from settings import *
+from settings import ErrorHandler
 from discord.ui import Button, View
 
 errorHandler =ErrorHandler()

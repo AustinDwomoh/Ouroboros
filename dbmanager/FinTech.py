@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from settings import ErrorHandler
 
 
+
 def create_connection(db_path="data/finance.db"):
     return sqlite3.connect(db_path)
 
@@ -14,37 +15,42 @@ def create_money_table(user_id=None):
         if user_id:
             cursor.execute(
             f"""
-    CREATE TABLE IF NOT EXISTS "{user_id}_fintech" (  
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        category TEXT,
-        amount REAL NOT NULL,
-        total_paid REAL,
-        status TEXT NOT NULL,
-        frequency TEXT NOT NULL,
-        due_date TEXT NOT NULL,
-        last_paid_date TEXT
-    )"""
-        )
-        cursor.execute(f'PRAGMA table_info("{user_id}_fintech")')
-        columns = [row[1] for row in cursor.fetchall()]  # Get column names
+                    CREATE TABLE IF NOT EXISTS "{user_id}_fintech" (  
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        category TEXT,
+                        amount REAL NOT NULL,
+                        total_paid REAL,
+                        status TEXT NOT NULL,
+                        frequency TEXT NOT NULL,
+                        due_date TEXT NOT NULL,
+                        last_paid_date TEXT
+                    )"""
+                    )
+            cursor.execute(f'PRAGMA table_info("{user_id}_fintech")')
+            columns = [row[1] for row in cursor.fetchall()]  # Get column names
 
-        if "total_paid" not in columns:
+            if "total_paid" not in columns:
+                cursor.execute(
+                    f"""
+                    ALTER TABLE "{user_id}_fintech"
+                    ADD COLUMN total_paid REAL DEFAULT 0
+                """
+                )
+                conn.commit()
+            
             cursor.execute(
                 f"""
-                ALTER TABLE "{user_id}_fintech"
-                ADD COLUMN total_paid REAL DEFAULT 0
-            """
-            )
+                CREATE TABLE IF NOT EXISTS user_payments (  
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER  NOT NULL
+                )"""
+                    )
+            
             conn.commit()
-        cursor.execute(
-            f"""
-    CREATE TABLE IF NOT EXISTS user_payments (  
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER  NOT NULL
-    )"""
-        )
-        conn.commit()
+
+
+
 
 
 def calculate_next_due_date(
@@ -110,7 +116,9 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
             new_due_date = calculate_next_due_date(
                 existing_due_date, frequency, existing_last_paid
             )
-
+# ============================================================================ #
+#             TEST this the due date is getting assinged frequency             #
+# ============================================================================ #
             # Check if the payment is overdue
             last_paid_date = datetime.today().strftime("%Y-%m-%d")
 
@@ -142,11 +150,12 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
 
 
 def update_payment_status(user_id, payment_name, status):
+    table_name = f'"{user_id}_fintech"'
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(
             f"""
-            UPDATE {user_id}_fintech 
+            UPDATE {table_name} 
             SET status = ? 
             WHERE name = ?
         """,

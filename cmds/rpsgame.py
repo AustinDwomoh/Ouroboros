@@ -1,10 +1,10 @@
 # ============================================================================ #
 #                                    IMPORT                                    #
 # ============================================================================ #
-import random
+import random,discord
 from discord import app_commands, ui
 from discord.ext import commands
-from settings import *
+from settings import ErrorHandler
 from dbmanager import Games  # for database connection
 
 

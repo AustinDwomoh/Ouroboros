@@ -5,12 +5,12 @@ from discord import app_commands
 from discord.ext import commands
 from dbmanager import ServerStatManager
 
-ServerStatManager = ServerStatManager.ServerStatManager()  # it works leave it alone
 errorHandler = ErrorHandler()
 img_dir = IMGS_DIR
 
 
 class WelcomeGoodbyeCog(commands.Cog):
+    
     def __init__(self, client):
         self.client = client
         self.welcome_messages = [

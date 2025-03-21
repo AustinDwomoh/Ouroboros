@@ -1,4 +1,4 @@
-from settings import *  # for Dir
+from settings import ErrorHandler# for Dir
 import discord, typing
 from discord import app_commands
 from dbmanager import FinTech
@@ -230,11 +230,15 @@ class Finance(commands.Cog):
             upcoming_payments = FinTech.check_due_dates()
             for reminder in upcoming_payments:
                 user = self.client.get_user(reminder["user_id"])
-                print("fintech here")
                 if user:
-                    if reminder["status"] == "reminded" :
+                    if reminder["status"] == "reminded":
+                        print('here')
+                        reminder["status"] = "overdue"
+                        #set status to reminder and changes when the user calls add_payment to show payments been made
                         FinTech.update_payment_status(reminder["user_id"], reminder["name"], "overdue"
                         )
+                    else:
+                        FinTech.update_payment_status(reminder["user_id"], reminder["name"], "reminded")
                     unix_timestamp = int(datetime.strptime(reminder['due_date'], "%Y-%m-%d").timestamp())
                     embed = discord.Embed(
                         title=f"🔔 **Reminder:** {reminder['name']} Due on <t:{unix_timestamp}:D>",
@@ -247,9 +251,9 @@ class Finance(commands.Cog):
                     embed.add_field(name="💰 Amount Due",value=f"${reminder['amount']:.2f}",inline=True,)
 
                     embed.add_field(name="📍 Category", value=reminder["category"], inline=True)
-                    #set status to reminder and chnages when the user calls add_payment to show payments been made
-                    FinTech.update_payment_status(reminder["user_id"], reminder["name"], "reminded"
-                        )
+                    
+                    
+                   
                     await user.send(embed=embed)
 
         except Exception as e:

@@ -8,7 +8,7 @@ from discord.ext import commands
 from dbmanager import Games
 from tabulate import tabulate
 from discord.ext import commands
-from settings import *
+from settings import ErrorHandler,IMGS_DIR
 
 
 
@@ -217,7 +217,6 @@ class Leaderboard(commands.Cog):
                 rank = 0
             # banner making code
             banner_path = IMGS_DIR / "default.png"
-            logging.info(f"Opening banner image from: {banner_path}")
             banner = Image.open(banner_path).convert("RGBA")
             blurred_banner = banner.filter(ImageFilter.GaussianBlur(10))
             overlay = Image.new("RGBA", blurred_banner.size, (0, 0, 0, 0))

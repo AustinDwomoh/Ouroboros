@@ -1,4 +1,5 @@
 import os, logging, pathlib, discord,traceback
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -63,7 +64,7 @@ class ErrorHandler:
         Handles exceptions by logging the error message along with traceback.
         :param exception: The exception instance to be logged.
         """
-        error_message = f"Exception occurred: {exception}\n{traceback.format_exc()}"
+        error_message = f"Exception occurred on {datetime.now()}: {exception}\n{traceback.format_exc()}"
     
         with open(self.log_file, "a") as log_file:
             log_file.write(error_message + "\n")

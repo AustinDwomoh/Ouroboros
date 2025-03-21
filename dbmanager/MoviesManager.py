@@ -46,16 +46,6 @@ async def create_user_tables(user_id=None):
                 )
                 #added later on 
                 await cursor.execute(f"PRAGMA table_info({table_name_series})")
-                columns = [row[1] for row in await cursor.fetchall()]  # Get column names
-
-                if "next_release_date" not in columns:
-                    await cursor.execute(
-                        f"""
-                        ALTER TABLE {table_name_series}
-                        ADD COLUMN next_release_date TEXT DEFAULT 'N/A'
-                    """
-                    )
-                    await conn.commit()
 
                 await cursor.execute(
                     f"""

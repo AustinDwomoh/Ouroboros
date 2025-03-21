@@ -4,12 +4,13 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import ServerStatManager
 
-ServerStatManager = ServerStatManager.ServerStatManager()  # it works leave it alone 
+  # it works leave it alone 
 #i get it now it hasnt been initialized yet is why
 # ============================================================================ #
 #                                     fixes                                    #
 # ============================================================================ #
 #the import is like that since unlik the order db classes this one  has an actual class and its causing the issues
+#fixed the serverstats i think
 errorHandler = ErrorHandler()
 class ServerStat(commands.Cog):
     def __init__(self, client):

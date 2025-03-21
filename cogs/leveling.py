@@ -2,7 +2,7 @@ import discord, os, requests
 from discord import app_commands
 from discord.ext import commands
 from dbmanager import LevelinManager
-from settings import *
+from settings import ErrorHandler,IMGS_DIR
 from tabulate import tabulate
 from PIL import Image, ImageDraw, ImageFont
 

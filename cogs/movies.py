@@ -1,12 +1,12 @@
-from settings import *  # for Dir
-import discord, typing, logging
+from settings import ErrorHandler  # for Dir
+import discord, typing
 from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import MoviesManager
 from tabulate import tabulate
 from datetime import date,datetime
 
-logger = logging.getLogger(__name__)
+
 errorHandler = ErrorHandler()
 
 class MediaListPaginationView(discord.ui.View):

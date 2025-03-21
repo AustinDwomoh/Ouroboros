@@ -5,13 +5,12 @@ import discord,json,random,os,asyncio
 from discord import app_commands
 from discord.ext import commands, tasks
 from discord import ui
-from settings import *
+from settings import ErrorHandler
 from datetime import datetime, timedelta
 from dbmanager import Games, ServerStatManager
 
 errorHandler = ErrorHandler()
 
-ServerStatManager = ServerStatManager.ServerStatManager()
 # ============================================================================ #
 #                                    ISSUES                                    #
 # ============================================================================ #

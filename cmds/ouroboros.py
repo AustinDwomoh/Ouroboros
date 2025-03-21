@@ -3,7 +3,6 @@
 # ============================================================================ #
 
 import random, discord
-from settings import *
 from discord import app_commands
 from discord.ext import commands
 
