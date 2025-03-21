@@ -45,11 +45,6 @@ class Update(commands.Cog):
             interaction (discord.Interaction): from discord
             version (str, optional): the version the user wants to check. Defaults to None. and uses the current version number
         """
-        if not version:
-            await interaction.response.send_message(
-                "Please provide a version number.", ephemeral=True
-            )
-            return
 #mock data but will use this for now till it gets too large
         data = {
             "ver_1.0": {

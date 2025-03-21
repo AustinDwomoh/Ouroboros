@@ -261,7 +261,9 @@ class Rpvp(commands.Cog):
                 )
         except Exception as e:
             errorHandler = ErrorHandler()
+            embed = errorHandler.help_embed()
             errorHandler.handle_exception(e)
+            await interaction.response.send_message(embed=embed)
 
 
 # ============================================================================ #

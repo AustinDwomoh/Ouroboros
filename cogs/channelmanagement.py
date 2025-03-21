@@ -88,7 +88,10 @@ class ChannelManagement(commands.Cog):
             )
             errorHandler.handle_exception(e)
         except Exception as e:
+            embed = errorHandler.help_embed()
             errorHandler.handle_exception(e)
+            await interaction.response.send_message(embed=embed)
+
 
     # ============================================================================
     #                             DELETE CATEGORIES COMMAND                      =
@@ -153,7 +156,9 @@ class ChannelManagement(commands.Cog):
             )
             errorHandler.handle_exception(e)
         except Exception as e:
+            embed = errorHandler.help_embed()
             errorHandler.handle_exception(e)
+            await interaction.response.send_message(embed=embed)
     # ============================================================================
     #                             CLEAR MESSAGES COMMAND                         =
     # ============================================================================
@@ -210,7 +215,9 @@ class ChannelManagement(commands.Cog):
                     ephemeral=True,
                 )
             except Exception as e:
+                embed = errorHandler.help_embed()
                 errorHandler.handle_exception(e)
+                await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="hi", description="To esatblish a dm connection")
     @app_commands.guild_only()
@@ -258,7 +265,9 @@ class ChannelManagement(commands.Cog):
             errorHandler.handle_exception(e)
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
         except Exception as e:
+            embed = errorHandler.help_embed()
             errorHandler.handle_exception(e)
+            await interaction.response.send_message(embed=embed)
    
     @app_commands.command( name="help", description="Displays a list of commands and their descriptions")
     async def help(self, interaction: discord.Interaction):

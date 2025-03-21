@@ -17,12 +17,14 @@ errorHandler =ErrorHandler()
 class Coinflip(commands.Cog):
     """
     A Discord bot cog that allows users to participate in a coin flip game.
-    Users can choose either "Head" or "Tails," and the bot will simulate three coin flips.
+    Users can choose either "Heads" or "Tails," and the bot will simulate three coin flips.
     After the flips, it will display the outcome to determine the winner based on the majority result.
 
     Attributes:
         client (commands.Bot): The bot client instance.
     """
+    CHOICE_1 = "Heads"
+    CHOICE_2 ="Tails"
 
     def __init__(self, client):
         self.client = client
@@ -51,20 +53,20 @@ class Coinflip(commands.Cog):
                     self.user_choices = {}
 
                 @discord.ui.button(
-                    label="Head", style=ButtonStyle.blurple, custom_id="head"
+                    label=Coinflip.CHOICE_1, style=ButtonStyle.blurple, custom_id=Coinflip.CHOICE_1.lower()
                 )
                 async def head_button(
                     self, interaction: discord.Interaction, button: Button
                 ):
-                    await self.handle_choice(interaction, "Head")
+                    await self.handle_choice(interaction, Coinflip.CHOICE_1)
 
                 @discord.ui.button(
-                    label="Tails", style=ButtonStyle.green, custom_id="tails"
+                    label=Coinflip.CHOICE_2, style=ButtonStyle.green, custom_id=Coinflip.CHOICE_2.lower()
                 )
                 async def tails_button(
                     self, interaction: discord.Interaction, button: Button
                 ):
-                    await self.handle_choice(interaction, "Tails")
+                    await self.handle_choice(interaction, Coinflip.CHOICE_2)
 
                 async def handle_choice(
                     self, interaction: discord.Interaction, user_choice
@@ -90,7 +92,7 @@ class Coinflip(commands.Cog):
                         results = []
                         for i in range(3):
                             await asyncio.sleep(1)  # Simulate loading
-                            result = random.choice(["Head", "Tails"])
+                            result = random.choice([Coinflip.CHOICE_1, Coinflip.CHOICE_2])
                             results.append(result)
                             await interaction.followup.edit_message(
                                 interaction.message.id,
@@ -98,8 +100,8 @@ class Coinflip(commands.Cog):
                             )
 
                         # Count results
-                        head_count = results.count("Head")
-                        tails_count = results.count("Tails")
+                        head_count = results.count(Coinflip.CHOICE_1)
+                        tails_count = results.count(Coinflip.CHOICE_2)
 
                         # Prepare result message with participant tags
                         result_message = (
@@ -121,15 +123,21 @@ class Coinflip(commands.Cog):
                             )
                         )
                     except Exception as e:
+                       embed = errorHandler.help_embed()
                        errorHandler.handle_exception(e)
+                       await interaction.response.send_message(embed=embed)
+
+
             embed = discord.Embed(
                 title="Coin Flip",
-                description="Please choose Heads or Tails:",
+                description=f"Please choose {Coinflip.CHOICE_1} or {Coinflip.CHOICE_2}:",
                 color=discord.Color.green(),
             )
             await interaction.response.send_message(embed=embed, view=CoinFlipView())
         except Exception as e:
-           errorHandler.handle_exception(e)
+            embed = errorHandler.help_embed()
+            errorHandler.handle_exception(e)
+            await interaction.response.send_message(embed=embed)
 
 # ============================================================================ #
 #                                     SETUP                                    #

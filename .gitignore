@@ -7,3 +7,4 @@ lapworld/
 .env
 data/
 ouroboros/
+errors/

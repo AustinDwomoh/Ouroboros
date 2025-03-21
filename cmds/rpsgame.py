@@ -113,7 +113,9 @@ class RPSView(ui.View):
                     )
         except Exception as e:
             errorHandler = ErrorHandler()
+            embed = errorHandler.help_embed()
             errorHandler.handle_exception(e)
+            await interaction.response.send_message(embed=embed)
 
     # ================================ UI BUTTONS ================================ #
     @ui.button(label="Rock", style=discord.ButtonStyle.primary)
