@@ -5,7 +5,7 @@ import discord,json,random,os,asyncio
 from discord import app_commands
 from discord.ext import commands, tasks
 from discord import ui
-from settings import ErrorHandler
+from settings import ErrorHandler,ALLOWED_ID
 from datetime import datetime, timedelta
 from dbmanager import Games, ServerStatManager
 

@@ -1,13 +1,9 @@
 import sqlite3
-from discord.ext import tasks
 from datetime import datetime, timedelta
 from settings import ErrorHandler
 
-
-
 def create_connection(db_path="data/finance.db"):
     return sqlite3.connect(db_path)
-
 
 def create_money_table(user_id=None):
     with create_connection() as conn:
@@ -27,19 +23,19 @@ def create_money_table(user_id=None):
                         last_paid_date TEXT
                     )"""
                     )
-            cursor.execute(f'PRAGMA table_info("{user_id}_fintech")')
-            columns = [row[1] for row in cursor.fetchall()]  # Get column names
-
-            if "total_paid" not in columns:
-                cursor.execute(
-                    f"""
-                    ALTER TABLE "{user_id}_fintech"
-                    ADD COLUMN total_paid REAL DEFAULT 0
-                """
-                )
-                conn.commit()
+            #cursor.execute(f'PRAGMA table_info("{user_id}_fintech")')
+            #columns = [row[1] for row in cursor.fetchall()]  # Get column names
+#
+            #if "total_paid" not in columns:
+            #    cursor.execute(
+            #        f"""
+            #        ALTER TABLE "{user_id}_fintech"
+            #        ADD COLUMN total_paid REAL DEFAULT 0
+            #    """
+            #    )
+            #    conn.commit()
             
-            cursor.execute(
+        cursor.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS user_payments (  
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,15 +43,9 @@ def create_money_table(user_id=None):
                 )"""
                     )
             
-            conn.commit()
+        conn.commit()
 
-
-
-
-
-def calculate_next_due_date(
-    due_date: str, frequency: str, last_paid_date: str = None
-) -> str:
+def calculate_next_due_date(due_date: str, frequency: str, last_paid_date: str = None) -> str:
     """Calculates the next due date based on frequency and last paid date"""
     try:
         date_obj = datetime.strptime(due_date, "%Y-%m-%d")
@@ -77,7 +67,6 @@ def calculate_next_due_date(
         return next_due.strftime("%Y-%m-%d")
     except ValueError:
         return due_date  # Return as-is if date format is incorrect
-
 
 def update_user_ids(user_id):
     with create_connection() as conn:
@@ -105,21 +94,17 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
     create_money_table(user_id)
     update_user_ids(user_id)
     
-
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(f"SELECT * FROM {table_name} WHERE name = ?", (name,))
         existing = c.fetchone()
         if existing:
-            existing_due_date = existing[6]
-            existing_last_paid = existing[7]
+            existing_due_date = existing[7]
+            existing_last_paid = existing[8]
             new_due_date = calculate_next_due_date(
                 existing_due_date, frequency, existing_last_paid
             )
-# ============================================================================ #
-#             TEST this the due date is getting assinged frequency             #
-# ============================================================================ #
-            # Check if the payment is overdue
+
             last_paid_date = datetime.today().strftime("%Y-%m-%d")
 
             # Update existing record
@@ -136,12 +121,10 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
                 (category, amount, new_due_date, last_paid_date, status, name),
             )
         else:
-            # Insert new record
-            new_due_date = calculate_next_due_date(due_date, frequency)
             c.execute(
                 f"""
                 INSERT INTO {table_name} 
-                (name, category, amount,  due_date, frequency,status)
+                (name, category, amount, due_date, frequency,status)
                 VALUES (?, ?, ?, ?, ?, ?)
             """,
                 (name, category, amount, due_date, frequency, status),
@@ -205,7 +188,5 @@ def check_due_dates():
             except sqlite3.OperationalError as e:
                 errorHandler = ErrorHandler()
                 errorHandler.handle_exception(e)
-            
 
-    
     return reminders

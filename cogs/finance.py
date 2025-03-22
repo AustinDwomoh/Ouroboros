@@ -35,8 +35,8 @@ class FinTechListPaginationView(discord.ui.View):
         for idx, item in enumerate(data, start=(self.current_page - 1) * self.sep + 1):
             try:
                 table_data_1.append([str(idx), item[1][:15], item[2], item[4]])
-
-                table_data_2.append([str(item[3]), item[6], item[7]])
+                without_year = "-".join(item[6].split("-")[1:])
+                table_data_2.append([str(item[3]),without_year , item[7]])
             except IndexError as e:
                 errorHandler.handle_exception(e)
                 continue
@@ -138,7 +138,7 @@ class Finance(commands.Cog):
         amount="payment amount",
         status="Set payment status",
         frequency="Set payment frequency",
-        due_date="Select due date format YYYY-MMM-DD",
+        due_date="Select due date format YYYY-MM-DD",
     )
     async def add_payment(self,interaction: discord.Interaction,name: str,amount: int,status: str='active',frequency: str=None,due_date: str=None,category:str=None
     ):
@@ -157,7 +157,7 @@ class Finance(commands.Cog):
                 "New records require category, due_date, frequency", ephemeral=True
             )
             return
-        FinTech.update_table(interaction.user.id, name=name, category=category, amount=amount, due_date=due_date, status=status, frequency=frequency,)
+        FinTech.update_table(interaction.user.id, name=name, category=category, amount=amount, due_date=due_date, status=status, frequency=frequency)
         await interaction.followup.send(f"Payment {name} has been added to your watch list")
 
     # ============================================================================ #

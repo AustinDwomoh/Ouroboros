@@ -39,7 +39,6 @@ class MediaListPaginationView(discord.ui.View):
                     elif isinstance(item, tuple):
                         table_data.append([str(idx), item[1], item[2], item[3]])
                 except IndexError as e:
-                    print(f"Index error for item {item}. Error: {e}")
                     continue
 
             # Generate the table with Tabulate
@@ -80,7 +79,6 @@ class MediaListPaginationView(discord.ui.View):
                                 [str(idx), item[1], f"S{item[2]} E{item[3]}", item[4]]
                             )
                 except IndexError as e:
-                    print(f"Index error for item {item}. Error: {e}")
                     continue
 
             # Generate the table with Tabulate
@@ -269,7 +267,10 @@ class Movies(commands.Cog):
                 else:
                     await interaction.followup.send("No records found to delete")
         except Exception as e:
+            embed = errorHandler.help_embed()
             errorHandler.handle_exception(e)
+            await interaction.followup.send(embed=embed)
+            
 
     # ============================================================================ #
     #                               INSERT MEDIA  CMD                              #
@@ -291,46 +292,50 @@ class Movies(commands.Cog):
         season: str,
         episode: str,
     ):
-        await interaction.response.defer()
-        if not await self.is_dm(interaction):
-            await interaction.response.send_message(
-                "This command can only be used in DMs!", ephemeral=True
-            )
-            return
-
         try:
-            season = int(season)
-            episode = int(episode)
-        except ValueError:
-            await interaction.followup.send("Season and episode must be valid numbers.")
-            return
-        date_watched = date.today()
-        title = title.lower()  # Standardize title for storage
-        if media_type.lower() == "series":
-            await MoviesManager.add_or_update_series(
-                interaction.user.id,
-                title=title,
-                season=season,
-                episode=episode,
-                date=date_watched,
-            )
-            await MoviesManager.delete_from_watchlist(
-                interaction.user.id, title=title, media_type=media_type
-            )
-            await interaction.followup.send(
-                f"Your series '{title}' has been added/updated."
-            )
-        elif media_type.lower() == "movie":
-            await MoviesManager.add_or_update_movie(
-                interaction.user.id, title=title, date=date_watched
-            )
-            await MoviesManager.delete_from_watchlist(
-                interaction.user.id, title=title, media_type=media_type
-            )
-            await interaction.followup.send(
-                f"Your movie '{title}' has been added/updated."
-            )
+            await interaction.response.defer()
+            if not await self.is_dm(interaction):
+                await interaction.response.send_message(
+                    "This command can only be used in DMs!", ephemeral=True
+                )
+                return
 
+            try:
+                season = int(season)
+                episode = int(episode)
+            except ValueError:
+                await interaction.followup.send("Season and episode must be valid numbers.")
+                return
+            date_watched = date.today()
+            title = title.lower()  # Standardize title for storage
+            if media_type.lower() == "series":
+                await MoviesManager.add_or_update_series(
+                    interaction.user.id,
+                    title=title,
+                    season=season,
+                    episode=episode,
+                    date=date_watched,
+                )
+                await MoviesManager.delete_from_watchlist(
+                    interaction.user.id, title=title, media_type=media_type
+                )
+                await interaction.followup.send(
+                    f"Your series '{title}' has been added/updated."
+                )
+            elif media_type.lower() == "movie":
+                await MoviesManager.add_or_update_movie(
+                    interaction.user.id, title=title, date=date_watched
+                )
+                await MoviesManager.delete_from_watchlist(
+                    interaction.user.id, title=title, media_type=media_type
+                )
+                await interaction.followup.send(
+                    f"Your movie '{title}' has been added/updated."
+                )
+        except Exception as e:
+            embed = errorHandler.help_embed()
+            errorHandler.handle_exception(e)
+            await interaction.followup.send(embed=embed)
     # ============================================================================ #
     #                               LOOK UP MEDIA CMD                              #
     # ============================================================================ #
@@ -342,32 +347,38 @@ class Movies(commands.Cog):
         self, interaction: discord.Interaction, title: str, media_type: str
     ):
         """Search for movies or series based on a partial title match."""
-        await interaction.response.defer()
-        if not await self.is_dm(interaction):
-            await interaction.followup.send(
-                "This command can only be used in DMs!", ephemeral=True
+        try:
+            await interaction.response.defer()
+            if not await self.is_dm(interaction):
+                await interaction.followup.send(
+                    "This command can only be used in DMs!", ephemeral=True
+                )
+                return
+            matching_records = await MoviesManager.search_media(
+                interaction.user.id, title.lower(), media_type
             )
-            return
-        matching_records = await MoviesManager.search_media(
-            interaction.user.id, title.lower(), media_type
-        )
 
-        if not matching_records:  # No results found
-            await interaction.followup.send("No matching movies or series found.")
-            return
+            if not matching_records:  # No results found
+                await interaction.followup.send("No matching movies or series found.")
+                return
 
-        # If records are found, proceed to create pagination
-        pagination_view = MediaListPaginationView(
-            matching_records, media_type=media_type
-        )
-        embed = pagination_view.create_embed(
-            pagination_view.get_current_page_data(), pagination_view.get_total_pages()
-        )
-        # Send the embed with pagination view
-        pagination_view.message = await interaction.followup.send(
-            embed=embed, view=pagination_view
-        )
+            # If records are found, proceed to create pagination
+            pagination_view = MediaListPaginationView(
+                matching_records, media_type=media_type
+            )
+            embed = pagination_view.create_embed(
+                pagination_view.get_current_page_data(), pagination_view.get_total_pages()
+            )
+            # Send the embed with pagination view
+            pagination_view.message = await interaction.followup.send(
+                embed=embed, view=pagination_view
+            )
+        except Exception as e:
+            embed = errorHandler.help_embed()
+            errorHandler.handle_exception(e)
+            await interaction.followup.send(embed=embed)
 
+            
     @app_commands.command(name="all_media", description="List Of all movies or series")
     @app_commands.describe(media_type="movie or series")
     async def all_media(self, interaction: discord.Interaction, media_type: str):
