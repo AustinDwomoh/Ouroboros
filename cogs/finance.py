@@ -35,8 +35,7 @@ class FinTechListPaginationView(discord.ui.View):
         for idx, item in enumerate(data, start=(self.current_page - 1) * self.sep + 1):
             try:
                 table_data_1.append([str(idx), item[1][:15], item[2], item[4]])
-                without_year = "-".join(str(item[6]).split("-")[1:])
-                table_data_2.append([str(item[3]),without_year, item[7]])
+                table_data_2.append([str(item[3]),"-".join(str(item[7]).split("-")[1:]), "-".join(str(item[8]).split("-")[1:])])#from YYYY-MM-DD to MM-DD
             except IndexError as e:
                 errorHandler.handle_exception(e)
                 continue
