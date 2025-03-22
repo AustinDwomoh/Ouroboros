@@ -105,7 +105,7 @@ class ErrorHandler:
 
     def get_log_file(self):
         """Generates a log file name based on the current date."""
-        date_str = datetime.now().strftime("%Y-%m-%d")  # Format: YYYY-MM-DD
+        date_str = datetime.now().strftime("%Y-%m-%d")
         return os.path.join(self.log_dir, f"{date_str}.log")
 
     def handle_exception(self, exception):
@@ -121,7 +121,7 @@ class ErrorHandler:
             log_file.write(error_message + "\n")
         
         # Log to console
-        self.logger.error(error_message)
+        #self.logger.error(error_message)
         self.send_error_log(EMAIL_ADDRESS,EMAIL_PASSWORD)
 
     def help_embed(self):
