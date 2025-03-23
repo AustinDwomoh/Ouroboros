@@ -34,7 +34,7 @@ class FinTechListPaginationView(discord.ui.View):
 
         for idx, item in enumerate(data, start=(self.current_page - 1) * self.sep + 1):
             try:
-                table_data_1.append([str(idx), item[1][:15], item[2], item[4]])
+                table_data_1.append([str(idx), item[1][:10], item[2][:10], item[5]])
                 table_data_2.append([str(item[3]),"-".join(str(item[7]).split("-")[1:]), "-".join(str(item[8]).split("-")[1:])])#from YYYY-MM-DD to MM-DD
             except IndexError as e:
                 errorHandler.handle_exception(e)
@@ -231,7 +231,6 @@ class Finance(commands.Cog):
                 user = self.client.get_user(reminder["user_id"])
                 if user:
                     if reminder["status"] == "reminded":
-                        print('here')
                         reminder["status"] = "overdue"
                         #set status to reminder and changes when the user calls add_payment to show payments been made
                         FinTech.update_payment_status(reminder["user_id"], reminder["name"], "overdue"
