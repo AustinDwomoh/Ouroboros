@@ -309,7 +309,7 @@ class Movies(commands.Cog):
             date_watched = date.today()
             title = title.lower()  # Standardize title for storage
             if media_type.lower() == "series":
-                await MoviesManager.add_or_update_series(
+                next_release_date = await MoviesManager.add_or_update_series(
                     interaction.user.id,
                     title=title,
                     season=season,
@@ -319,9 +319,19 @@ class Movies(commands.Cog):
                 await MoviesManager.delete_from_watchlist(
                     interaction.user.id, title=title, media_type=media_type
                 )
-                await interaction.followup.send(
-                    f"Your series '{title}' has been added/updated."
+                embed = discord.Embed(
+                title="Series Updated",
+                description=f"Your series **{title}** has been added/updated.\n📅 Watched on: {date_watched}",
+                color=discord.Color.blue(),
+            )
+                if next_release_date:
+                    embed.add_field(
+                    name="Next Expected Release",
+                    value=f"{next_release_date}",
+                    inline=False,
                 )
+                
+                await interaction.followup.send(embed=embed)
             elif media_type.lower() == "movie":
                 await MoviesManager.add_or_update_movie(
                     interaction.user.id, title=title, date=date_watched
@@ -329,9 +339,13 @@ class Movies(commands.Cog):
                 await MoviesManager.delete_from_watchlist(
                     interaction.user.id, title=title, media_type=media_type
                 )
-                await interaction.followup.send(
-                    f"Your movie '{title}' has been added/updated."
-                )
+
+                embed = discord.Embed(
+                title="Movie Updated",
+                description=f"Your movie **{title}** has been added/updated.\n📅 Watched on: {date_watched}",
+                color=discord.Color.green(),
+            )
+                await interaction.followup.send(embed=embed)
         except Exception as e:
             embed = errorHandler.help_embed()
             errorHandler.handle_exception(e)
@@ -630,7 +644,7 @@ class Movies(commands.Cog):
     # ============================================================================ #
     #                                   reminder                                   #
     # ============================================================================ #
-    @tasks.loop(hours=168)
+    @tasks.loop(hours=24)
     async def media_reminder_loop(self):
         try:
             upcoming_payments = await MoviesManager.check_upcoming_dates()
