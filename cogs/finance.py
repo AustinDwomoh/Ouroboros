@@ -223,7 +223,7 @@ class Finance(commands.Cog):
             if current.lower() in freq.lower()
         ]
 
-    @tasks.loop(hours=168)
+    @tasks.loop(hours=24)
     async def payment_reminder_loop(self):
         try:
             upcoming_payments = FinTech.check_due_dates()
