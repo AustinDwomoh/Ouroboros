@@ -50,10 +50,10 @@ def calculate_next_due_date(due_date: str, frequency: str, last_paid_date: str =
     try:
         date_obj = datetime.strptime(due_date, "%Y-%m-%d")
         # If last_paid_date exists, make sure we aren't updating early
-        if last_paid_date:
-            last_paid_obj = datetime.strptime(last_paid_date, "%Y-%m-%d")
-            if last_paid_obj >= date_obj:
-                return due_date  # No update needed
+        #if last_paid_date:
+            #last_paid_obj = datetime.strptime(last_paid_date, "%Y-%m-%d")
+            #if last_paid_obj >= date_obj:
+                #return due_date  # No update needed
 
         if frequency == "Monthly":
             next_due = date_obj + timedelta(days=30)
