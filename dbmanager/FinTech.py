@@ -93,11 +93,12 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
         c.execute(f"SELECT * FROM {table_name} WHERE name = ?", (name,))
         existing = c.fetchone()
         if existing:
+            frequency = existing[6]
             existing_due_date = existing[7]
+            total_paid = existing[4]
             new_due_date = calculate_next_due_date(
-                existing_due_date, frequency
+                existing_due_date, frequency 
             )
-            print(new_due_date)
             last_paid_date = datetime.today().strftime("%Y-%m-%d")
 
             # Update existing record
@@ -113,6 +114,8 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
                 """,
                 (category, amount, new_due_date, last_paid_date, status, name),
             )
+            conn.commit()
+            return new_due_date,total_paid
         else:
             c.execute(
                 f"""
@@ -123,6 +126,7 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
                 (name, category, amount, due_date, frequency, status),
             )
         conn.commit()
+        return due_date,amount
 
 
 def update_payment_status(user_id, payment_name, status):

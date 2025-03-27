@@ -156,8 +156,20 @@ class Finance(commands.Cog):
                 "New records require category, due_date, frequency", ephemeral=True
             )
             return
-        FinTech.update_table(interaction.user.id, name=name, category=category, amount=amount, due_date=due_date, status=status, frequency=frequency)
-        await interaction.followup.send(f"Payment {name} has been added to your watch list")
+        next_due_date,total_paid = FinTech.update_table(interaction.user.id, name=name, category=category, amount=amount, due_date=due_date, status=status, frequency=frequency)
+
+        embed = discord.Embed(
+                title="Series Updated",
+                description=f"Your payment **{name}** has been added/updated.\n📅 Next due on: {next_due_date}",
+                color=discord.Color.blue(),
+            )
+        if total_paid != amount:
+                    embed.add_field(
+                    name="Total Paid",
+                    value=f"{total_paid}",
+                    inline=False,
+                )
+        await interaction.followup.send(embed = embed)
 
     # ============================================================================ #
     #                                   AUtocomp                                   #
