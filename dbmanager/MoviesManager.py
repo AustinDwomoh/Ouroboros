@@ -551,6 +551,12 @@ async def check_upcoming_dates():
             user_ids = [row[0] for row in await cursor.fetchall()]
             for user_id in user_ids:
                 table_name = f'"{user_id}_Series"'
+                await cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
+                )
+                if not await cursor.fetchone():
+                    continue  # Skip users with no tracking data
+
                 try:
                     await cursor.execute(
                         f"""
