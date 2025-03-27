@@ -177,7 +177,6 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                 if "next_episode_date" in first_value
                 else None
             )
-            print(next_release_date)
             if existing:
                 # Update existing series
                 await cursor.execute(
@@ -201,6 +200,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                     (title, season, episode, date, next_release_date),
                 )
             await conn.commit()
+            return next_release_date
     finally:
         await conn.close()
 

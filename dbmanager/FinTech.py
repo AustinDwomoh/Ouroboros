@@ -45,16 +45,10 @@ def create_money_table(user_id=None):
             
         conn.commit()
 
-def calculate_next_due_date(due_date: str, frequency: str, last_paid_date: str = None) -> str:
+def calculate_next_due_date(due_date: str, frequency: str) -> str:
     """Calculates the next due date based on frequency and last paid date"""
     try:
         date_obj = datetime.strptime(due_date, "%Y-%m-%d")
-        # If last_paid_date exists, make sure we aren't updating early
-        #if last_paid_date:
-            #last_paid_obj = datetime.strptime(last_paid_date, "%Y-%m-%d")
-            #if last_paid_obj >= date_obj:
-                #return due_date  # No update needed
-
         if frequency == "Monthly":
             next_due = date_obj + timedelta(days=30)
         elif frequency == "Bi-Weekly":
@@ -100,11 +94,10 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
         existing = c.fetchone()
         if existing:
             existing_due_date = existing[7]
-            existing_last_paid = existing[8]
             new_due_date = calculate_next_due_date(
-                existing_due_date, frequency, existing_last_paid
+                existing_due_date, frequency
             )
-
+            print(new_due_date)
             last_paid_date = datetime.today().strftime("%Y-%m-%d")
 
             # Update existing record
@@ -163,7 +156,7 @@ def check_due_dates():
                     f"""
                 SELECT name, category, amount, due_date, status
                 FROM {table_name} 
-                WHERE status != 'paid' 
+                WHERE status != 'paid' AND status = 'active'
                 AND due_date IS NOT NULL 
                 AND due_date BETWEEN ? AND ? 
                 ORDER BY due_date ASC
@@ -190,3 +183,4 @@ def check_due_dates():
                 errorHandler.handle_exception(e)
 
     return reminders
+
