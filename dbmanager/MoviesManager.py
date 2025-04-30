@@ -1,7 +1,7 @@
 from settings import *
 import aiohttp, aiosqlite
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,timezone
 
 
 async def create_connection(db_path="data/mediarecords.db"):
@@ -339,17 +339,14 @@ async def add_or_update_watch_list(user_id, title, date, extra, media_type):
                 )
             else:
                 media_data = await get_media_details(media_type, title)
-                first_key = next(iter(media_data), None)
-                first_value = media_data.get(first_key, {})
+                first_value = next(iter(media_data.values()), {})
+
                 title = first_value.get("title", "Unknown")
                 status = first_value.get("status", "Unknown")
                 release_date = first_value.get("release_date", "Unknown")
-                next_release_date = (
-                    first_value.get("next_episode_date", "N/A")
-                    if "next_episode_date" in first_value
-                    else None
-                )
-                
+                next_release_date = first_value.get("next_episode_date", "Unknown")
+
+                                
 
                 await cursor.execute(
                     f"""
@@ -488,7 +485,6 @@ async def get_media_details(media, media_name):
                     }
     return media_data
 
-
 async def search_media_id(media, media_name):
     formatted_name = media_name.replace(" ", "+")
     url = f"{MOVIE_BASE_URL}/search/{media}?query={formatted_name}&api_key={MOVIE_API_KEY}"
@@ -502,7 +498,6 @@ async def search_media_id(media, media_name):
     for data in results:
         ids.append(data["id"])
     return ids
-
 
 async def search_hianime(keyword):
     """Scrape Hianime search results for a given keyword."""
@@ -537,20 +532,29 @@ async def search_hianime(keyword):
             )
     return results
 
-
+async def fetch_reminders(cursor, table_name, columns):
+    try:
+        await cursor.execute(f"SELECT {columns} FROM {table_name}")
+        return await cursor.fetchall()
+    except aiosqlite.OperationalError:
+        return []
 
 async def check_upcoming_dates():
-    today = datetime.today().strftime("%Y-%m-%d")
-    upcoming_date = (datetime.today() + timedelta(days=7)).strftime("%Y-%m-%d")
+    now = datetime.now(timezone.utc)
+    today = now.date().isoformat()
+    upcoming_date = (now + timedelta(days=7)).date().isoformat()
     reminders = []
     conn = await create_connection()
+    
+    errorHandler = ErrorHandler()  # Moved outside of the loop for efficiency
     try:
         async with conn.cursor() as cursor:
             await create_user_tables()
             await cursor.execute("SELECT DISTINCT user_id FROM user_media")
             user_ids = [row[0] for row in await cursor.fetchall()]
+
             for user_id in user_ids:
-                table_name = f'"{user_id}_Series"'
+                table_name =  ErrorHandler.sanitize_table_name(user_id, "Series")
                 await cursor.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
                 )
@@ -560,12 +564,12 @@ async def check_upcoming_dates():
                 try:
                     await cursor.execute(
                         f"""
-                    SELECT title, season, episode, next_release_date
-                    FROM {table_name}  
-                    WHERE next_release_date IS NOT NULL 
-                    AND next_release_date BETWEEN ? AND ? 
-                    ORDER BY next_release_date ASC
-                """,
+                        SELECT title, season, episode, next_release_date
+                        FROM {table_name}  
+                        WHERE next_release_date IS NOT NULL 
+                        AND next_release_date BETWEEN ? AND ? 
+                        ORDER BY next_release_date ASC
+                        """,
                         (today, upcoming_date),
                     )
 
@@ -582,42 +586,21 @@ async def check_upcoming_dates():
                         )
 
                 except aiosqlite.OperationalError as e:
-                    pass
+                    errorHandler.handle_exception(e)
 
-                table_name = f'"{user_id}_watch_list_Movies"'
-                try:
-                    await cursor.execute(f"SELECT * FROM {table_name} ")
-                    user_reminders = await cursor.fetchall()
-                    for item in user_reminders:
-                        reminders.append(
-                            {
-                                "user_id": user_id,
-                                "name": item[1],
-                                "status": item[3],
-                                "release_date": item[4],
-                                "next_release_date": item[6],
-                            }
-                        )
-                except aiosqlite.OperationalError as e:
-                    pass
+                # Process movie and series watch lists
+                for suffix in ["watch_list_Movies", "watch_list_Series"]:
+                    table_name = ErrorHandler.sanitize_table_name(user_id, suffix)
+                    rows = await fetch_reminders(cursor, table_name, "*")
+                    for item in rows:
+                        reminders.append({
+                            "user_id": user_id,
+                            "name": item[1],
+                            "status": item[3],
+                            "release_date": item[4],
+                            "next_release_date": item[6],
+                        })
 
-                table_name = f'"{user_id}_watch_list_Series"'
-                try:
-
-                    await cursor.execute(f"SELECT * FROM {table_name} ")
-                    user_reminders = await cursor.fetchall()
-                    for item in user_reminders:
-                        reminders.append(
-                            {
-                                "user_id": user_id,
-                                "name": item[1],
-                                "status": item[3],
-                                "release_date": item[4],
-                                "next_release_date": item[6],
-                            }
-                        )
-                except aiosqlite.OperationalError as e:
-                    pass
     finally:
         await conn.close()
 
