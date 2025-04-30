@@ -240,8 +240,7 @@ class Movies(commands.Cog):
         self,
         interaction: discord.Interaction,
         title: str = None,
-        media_type: str = None,
-    ):
+        media_type: str = None,):
         """Command for movie recording state management, only usable in DMs."""
         # Check if the command is invoked in a DM
         try:
@@ -321,7 +320,7 @@ class Movies(commands.Cog):
                 )
                 embed = discord.Embed(
                 title="Series Updated",
-                description=f"Your series **{title}** has been added/updated.\n📅 Watched on: {date_watched}",
+                description=f"Your series **{title}** has been added/updated.\n S{season}|| E{episode}\n📅 Watched on: {date_watched}",
                 color=discord.Color.blue(),
             )
                 if next_release_date:

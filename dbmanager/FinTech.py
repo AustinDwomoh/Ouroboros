@@ -115,7 +115,7 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
                 (category, amount, new_due_date, last_paid_date, status, name),
             )
             conn.commit()
-            return new_due_date,total_paid
+            return new_due_date,total_paid + amount
         else:
             c.execute(
                 f"""
