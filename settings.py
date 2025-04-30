@@ -2,6 +2,7 @@ import os, logging, pathlib, discord,traceback,os,smtplib
 from datetime import datetime
 from dotenv import load_dotenv
 from email.message import EmailMessage
+import re
 load_dotenv()
 
 
@@ -81,7 +82,6 @@ LOGGING_CONFIG = {
 
 
 class ErrorHandler:
-
     def __init__(self, log_dir="errors"):
         """
         Initializes the ErrorHandler class.
@@ -94,19 +94,33 @@ class ErrorHandler:
         self.logger = logging.getLogger("Ouroboros")
         self.logger.setLevel(logging.INFO)
 
-        # Prevent duplicate handlers
-        if not self.logger.hasHandlers():
-            # Create a console handler
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+        # Avoid adding duplicate handlers
+        if not self.logger.handlers:
+            # File handler
+            file_handler = logging.FileHandler(self.get_log_file())
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+
+            # Console handler
             console_handler = logging.StreamHandler()
-            console_handler.setLevel(logging.INFO)
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             console_handler.setFormatter(formatter)
             self.logger.addHandler(console_handler)
+
 
     def get_log_file(self):
         """Generates a log file name based on the current date."""
         date_str = datetime.now().strftime("%Y-%m-%d")
         return os.path.join(self.log_dir, f"{date_str}.log")
+    
+    @staticmethod
+    def sanitize_table_name(raw_id: str, suffix: str) -> str:
+        #write better santize code
+        if not re.match(r"^[a-zA-Z0-9_]+$", raw_id):
+            raise ValueError("Invalid user_id for table name.")
+        return f"{raw_id}_{suffix}"
+
 
     def handle_exception(self, exception):
         """

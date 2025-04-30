@@ -25,7 +25,7 @@ def create_money_table(user_id=None):
                     )
             #cursor.execute(f'PRAGMA table_info("{user_id}_fintech")')
             #columns = [row[1] for row in cursor.fetchall()]  # Get column names
-#
+    #
             #if "total_paid" not in columns:
             #    cursor.execute(
             #        f"""
@@ -72,19 +72,17 @@ def update_user_ids(user_id):
                 f""" INSERT INTO user_payments (user_id) VALUES (?) """, (user_id,)
             )
 
-
 def fintech_list(user_id):
     """Retrieves all series from the user's database."""
-    table_name = f'"{user_id}_fintech"'
+    table_name = ErrorHandler.sanitize_table_name(user_id,"fintech")
     create_money_table(user_id)
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(f"SELECT * FROM {table_name}")
         return c.fetchall()
 
-
 def update_table(user_id, name, category, amount, due_date, status, frequency="One-Time"):
-    table_name = f'"{user_id}_fintech"'
+    table_name = ErrorHandler.sanitize_table_name(user_id,"fintech")
     create_money_table(user_id)
     update_user_ids(user_id)
     
@@ -128,9 +126,8 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
         conn.commit()
         return due_date,amount
 
-
 def update_payment_status(user_id, payment_name, status):
-    table_name = f'"{user_id}_fintech"'
+    table_name = ErrorHandler.sanitize_table_name(user_id,"fintech")
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(
@@ -143,7 +140,6 @@ def update_payment_status(user_id, payment_name, status):
         )
         conn.commit()
 
-
 def check_due_dates():
     today = datetime.today().strftime("%Y-%m-%d")
     upcoming_date = (datetime.today() + timedelta(days=7)).strftime("%Y-%m-%d")
@@ -154,7 +150,7 @@ def check_due_dates():
         c.execute("SELECT DISTINCT user_id FROM user_payments")
         user_ids = [row[0] for row in c.fetchall()]
         for user_id in user_ids:
-            table_name = f'"{user_id}_fintech"'  
+            table_name = ErrorHandler.sanitize_table_name(user_id,"fintech")
             try:
                 c.execute(
                     f"""
