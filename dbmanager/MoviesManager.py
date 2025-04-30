@@ -1,5 +1,5 @@
 from settings import *
-import  aiohttp, aiosqlite
+import aiohttp, aiosqlite
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
@@ -60,7 +60,7 @@ async def create_user_tables(user_id=None):
                     )
                 """
                 )
-
+                
                 await cursor.execute(
                     f"""
                     CREATE TABLE IF NOT EXISTS {table_name_watch_list_series} (
