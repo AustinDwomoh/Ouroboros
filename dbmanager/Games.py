@@ -1,13 +1,12 @@
 import sqlite3
-
+from settings import ErrorHandler
 
 def create_connection():
     conn = sqlite3.connect("data/game_records.db")  # Database file
     return conn
 
-
 def create_guild_table(guild_id, game_type):
-    table_name = f"{game_type}_scores_{guild_id}"
+    table_name = f"{game_type}_scores_" + ErrorHandler.sanitize_table_name(guild_id)
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(
@@ -22,7 +21,7 @@ def create_guild_table(guild_id, game_type):
 
 
 def create_leaderboard_table(guild_id):
-    table_name = f"leaderboard_{guild_id}"
+    table_name = f"leaderboard_" +ErrorHandler.sanitize_table_name(guild_id)
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(
@@ -61,12 +60,13 @@ def update_score(table_name, player_id, score):
 
 
 def update_player_score(guild_id, player_id, player_score, game_type):
-    table_name = f"{game_type}_scores_{guild_id}"
-    leaderboard_table = f"leaderboard_{guild_id}"
+    table_name = f"{game_type}_scores_" + ErrorHandler.sanitize_table_name(guild_id)
+    leaderboard_table = f"leaderboard_" + ErrorHandler.sanitize_table_name(guild_id)
 
     create_guild_table(guild_id, game_type)  # Ensure game-specific table exists
     create_leaderboard_table(guild_id)  # Ensure leaderboard table exists
 
+    player_id = ErrorHandler.sanitize_table_name(player_id)
     # Update player score in game-specific table
     update_score(table_name, player_id, player_score)
 
@@ -103,7 +103,7 @@ def save_game_result(guild_id, player_id, player_score, game_type):
 
 def get_player_scores(guild_id, game_type):
     """Get player scores for a specific game type."""
-    table_name = f"{game_type}_scores_{guild_id}"
+    table_name = f"{game_type}_scores_" + ErrorHandler.sanitize_table_name(guild_id)
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(
@@ -114,7 +114,7 @@ def get_player_scores(guild_id, game_type):
 
 def get_leaderboard(guild_id):
     """Get the overall leaderboard for a guild."""
-    leaderboard_table = f"leaderboard_{guild_id}"
+    leaderboard_table = f"leaderboard_" + ErrorHandler.sanitize_table_name(guild_id)
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(

@@ -115,11 +115,11 @@ class ErrorHandler:
         return os.path.join(self.log_dir, f"{date_str}.log")
     
     @staticmethod
-    def sanitize_table_name(raw_id: str, suffix: str) -> str:
+    def sanitize_table_name(raw_id: str) -> str:
         #write better santize code
         if not re.match(r"^[a-zA-Z0-9_]+$", raw_id):
             raise ValueError("Invalid user_id for table name.")
-        return f"{raw_id}_{suffix}"
+        return f"{raw_id}"
 
 
     def handle_exception(self, exception):

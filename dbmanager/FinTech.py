@@ -6,12 +6,13 @@ def create_connection(db_path="data/finance.db"):
     return sqlite3.connect(db_path)
 
 def create_money_table(user_id=None):
+    table_name = ErrorHandler.sanitize_table_name(user_id) + "_fintech"
     with create_connection() as conn:
         cursor = conn.cursor()
         if user_id:
             cursor.execute(
             f"""
-                    CREATE TABLE IF NOT EXISTS "{user_id}_fintech" (  
+                    CREATE TABLE IF NOT EXISTS {table_name} (  
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         name TEXT NOT NULL,
                         category TEXT,
@@ -23,17 +24,6 @@ def create_money_table(user_id=None):
                         last_paid_date TEXT
                     )"""
                     )
-            #cursor.execute(f'PRAGMA table_info("{user_id}_fintech")')
-            #columns = [row[1] for row in cursor.fetchall()]  # Get column names
-    #
-            #if "total_paid" not in columns:
-            #    cursor.execute(
-            #        f"""
-            #        ALTER TABLE "{user_id}_fintech"
-            #        ADD COLUMN total_paid REAL DEFAULT 0
-            #    """
-            #    )
-            #    conn.commit()
             
         cursor.execute(
                 f"""
@@ -74,7 +64,7 @@ def update_user_ids(user_id):
 
 def fintech_list(user_id):
     """Retrieves all series from the user's database."""
-    table_name = ErrorHandler.sanitize_table_name(user_id,"fintech")
+    table_name = ErrorHandler.sanitize_table_name(user_id) +  "_fintech"
     create_money_table(user_id)
     with create_connection() as conn:
         c = conn.cursor()
@@ -82,7 +72,7 @@ def fintech_list(user_id):
         return c.fetchall()
 
 def update_table(user_id, name, category, amount, due_date, status, frequency="One-Time"):
-    table_name = ErrorHandler.sanitize_table_name(user_id,"fintech")
+    table_name = ErrorHandler.sanitize_table_name(user_id) + "_fintech"
     create_money_table(user_id)
     update_user_ids(user_id)
     
@@ -127,7 +117,7 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
         return due_date,amount
 
 def update_payment_status(user_id, payment_name, status):
-    table_name = ErrorHandler.sanitize_table_name(user_id,"fintech")
+    table_name = ErrorHandler.sanitize_table_name(user_id) + "_fintech"
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(
