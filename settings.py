@@ -114,13 +114,6 @@ class ErrorHandler:
         date_str = datetime.now().strftime("%Y-%m-%d")
         return os.path.join(self.log_dir, f"{date_str}.log")
     
-    @staticmethod
-    def sanitize_table_name(raw_id: str) -> str:
-        #write better santize code
-        if not re.match(r"^[a-zA-Z0-9_]+$", raw_id):
-            raise ValueError("Invalid user_id for table name.")
-        return f"{raw_id}"
-
 
     def handle_exception(self, exception):
         """
@@ -135,7 +128,7 @@ class ErrorHandler:
             log_file.write(error_message + "\n")
         
         # Log to console
-        #self.logger.error(error_message)
+        self.logger.error(error_message)
         self.send_error_log(EMAIL_ADDRESS,EMAIL_PASSWORD)
 
     def help_embed(self):

@@ -646,33 +646,39 @@ class Movies(commands.Cog):
     @tasks.loop(hours=24)
     async def media_reminder_loop(self):
         try:
-            upcoming_payments = await MoviesManager.check_upcoming_dates()
-            for reminder in upcoming_payments:
+            upcoming = await MoviesManager.check_upcoming_dates()
+            for reminder in upcoming:
                 user = self.client.get_user(reminder["user_id"])
                 if user:
-                    embed = discord.Embed(
-                        title=f"🔔 **Media Reminder:** \n{reminder['name']} coming up on  <t:{int(datetime.strptime(reminder['next_release_date'], "%Y-%m-%d").timestamp())}:D>",
-                        description=f"**Media Details**",
-                        color=discord.Color.blue(),  # You can choose any color
-                    )
+                    try:
+                        embed = discord.Embed(
+                            title=f"🔔 **Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'], '%Y-%m-%d').timestamp())}:D>",
+                            description="**Media Details**",
+                            color=discord.Color.blue(),
+                        )
 
-                    if reminder.get("status", None):
-                        embed.add_field(
-                            name="⚠️ Status", value=reminder["status"], inline=False
-                        )
-                        embed.add_field(
-                            name="Release_date",
-                            value=f"<t:{int(datetime.strptime({reminder["release_date"]}, "%Y-%m-%d").timestamp())}:D>",
-                            inline=False,
-                        )
-                    else:
-                        embed.add_field(name="⚠️ Status", value="Watching", inline=False)
-                        embed.add_field(
-                            name="Details",
-                            value=f"S{reminder['season']} E{reminder['episode']}",
-                            inline=False,
-                        )
-                    await user.send(embed=embed)
+                        if reminder.get("status"):
+                            embed.add_field(name="⚠️ Status", value=reminder["status"], inline=False)
+                            embed.add_field(
+                                name="Release Date",
+                                value=f"<t:{int(datetime.strptime(reminder['release_date'], '%Y-%m-%d').timestamp())}:D>",
+                                inline=False,
+                            )
+                        else:
+                            season = reminder.get('season', '?')
+                            episode = reminder.get('episode', '?')
+                            embed.add_field(name="⚠️ Status", value="Watching", inline=False)
+                            embed.add_field(
+                                name="Details",
+                                value=f"S{season} E{episode}",
+                                inline=False,
+                            )
+
+                        await user.send(embed=embed)
+
+                    except discord.HTTPException as dm_error:
+                        errorHandler.handle_exception(dm_error)
+
         except Exception as e:
             errorHandler.handle_exception(e)
 

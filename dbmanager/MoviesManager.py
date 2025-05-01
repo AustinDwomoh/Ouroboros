@@ -172,11 +172,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
             media_data = await get_media_details("tv", title)
             first_key = next(iter(media_data), None)
             first_value = media_data.get(first_key, {})
-            next_release_date = (
-                first_value.get("next_episode_date", "N/A")
-                if "next_episode_date" in first_value
-                else None
-            )
+            next_release_date = first_value.get("next_episode_date")
             if existing:
                 # Update existing series
                 await cursor.execute(
@@ -425,11 +421,11 @@ async def get_media_details(media, media_name):
                         "release_date": data["first_air_date"],
                         "last_air_date": data["last_air_date"],
                         "next_episode_date": (
-                            data["next_episode_to_air"]["air_date"]
-                            if data.get("next_episode_to_air")
-                            else "N/A"
-                        ),
-                        "seasons": [
+                                data["next_episode_to_air"]["air_date"]
+                                if data.get("next_episode_to_air")
+                                else None
+                            ),
+                            "seasons": [
                             {
                                 "season_number": season["season_number"],
                                 "episode_count": season["episode_count"],
@@ -540,6 +536,9 @@ async def fetch_reminders(cursor, table_name, columns):
         return []
 
 async def check_upcoming_dates():
+    """
+    This method looks through the tables and checks their dates which are formed when they are added
+    """
     now = datetime.now(timezone.utc)
     today = now.date().isoformat()
     upcoming_date = (now + timedelta(days=7)).date().isoformat()
@@ -552,15 +551,8 @@ async def check_upcoming_dates():
             await create_user_tables()
             await cursor.execute("SELECT DISTINCT user_id FROM user_media")
             user_ids = [row[0] for row in await cursor.fetchall()]
-
             for user_id in user_ids:
-                table_name =  ErrorHandler.sanitize_table_name(user_id, "Series")
-                await cursor.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
-                )
-                if not await cursor.fetchone():
-                    continue  # Skip users with no tracking data
-
+                table_name = f'"{user_id}_Series"'
                 try:
                     await cursor.execute(
                         f"""
@@ -574,6 +566,7 @@ async def check_upcoming_dates():
                     )
 
                     user_reminders = await cursor.fetchall()
+
                     for title, season, episode, next_release_date in user_reminders:
                         reminders.append(
                             {
@@ -584,24 +577,24 @@ async def check_upcoming_dates():
                                 "next_release_date": next_release_date,
                             }
                         )
+                        
+                     # Process movie and series watch lists
+                    for suffix in ["watch_list_Movies", "watch_list_Series"]:
+                        table_name = f'"{user_id}_{suffix}"' 
+                        rows = await fetch_reminders(cursor, table_name, "*")
+                        for item in rows:
+                            reminders.append({
+                                "user_id": user_id,
+                                "name": item[1],
+                                "status": item[3],
+                                "release_date": item[4],
+                                "next_release_date": item[6],
+                            })
 
                 except aiosqlite.OperationalError as e:
                     errorHandler.handle_exception(e)
 
-                # Process movie and series watch lists
-                for suffix in ["watch_list_Movies", "watch_list_Series"]:
-                    table_name = ErrorHandler.sanitize_table_name(user_id, suffix)
-                    rows = await fetch_reminders(cursor, table_name, "*")
-                    for item in rows:
-                        reminders.append({
-                            "user_id": user_id,
-                            "name": item[1],
-                            "status": item[3],
-                            "release_date": item[4],
-                            "next_release_date": item[6],
-                        })
-
     finally:
         await conn.close()
-
+   
     return reminders
