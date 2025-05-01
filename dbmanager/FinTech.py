@@ -6,7 +6,7 @@ def create_connection(db_path="data/finance.db"):
     return sqlite3.connect(db_path)
 
 def create_money_table(user_id=None):
-    table_name = ErrorHandler.sanitize_table_name(user_id) + "_fintech"
+    table_name = f'"{user_id}_fintech"'
     with create_connection() as conn:
         cursor = conn.cursor()
         if user_id:
@@ -64,7 +64,7 @@ def update_user_ids(user_id):
 
 def fintech_list(user_id):
     """Retrieves all series from the user's database."""
-    table_name = ErrorHandler.sanitize_table_name(user_id) +  "_fintech"
+    table_name = f'"{user_id}_fintech"'
     create_money_table(user_id)
     with create_connection() as conn:
         c = conn.cursor()
@@ -72,7 +72,7 @@ def fintech_list(user_id):
         return c.fetchall()
 
 def update_table(user_id, name, category, amount, due_date, status, frequency="One-Time"):
-    table_name = ErrorHandler.sanitize_table_name(user_id) + "_fintech"
+    table_name = f'"{user_id}_fintech"'
     create_money_table(user_id)
     update_user_ids(user_id)
     
@@ -103,7 +103,8 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
                 (category, amount, new_due_date, last_paid_date, status, name),
             )
             conn.commit()
-            return new_due_date,total_paid + amount
+            
+            return new_due_date, (0 if total_paid is None else total_paid) + amount
         else:
             c.execute(
                 f"""
@@ -117,7 +118,7 @@ def update_table(user_id, name, category, amount, due_date, status, frequency="O
         return due_date,amount
 
 def update_payment_status(user_id, payment_name, status):
-    table_name = ErrorHandler.sanitize_table_name(user_id) + "_fintech"
+    table_name = f'"{user_id}_fintech"'
     with create_connection() as conn:
         c = conn.cursor()
         c.execute(
@@ -140,7 +141,7 @@ def check_due_dates():
         c.execute("SELECT DISTINCT user_id FROM user_payments")
         user_ids = [row[0] for row in c.fetchall()]
         for user_id in user_ids:
-            table_name = ErrorHandler.sanitize_table_name(user_id,"fintech")
+            table_name = f'"{user_id}_fintech"'
             try:
                 c.execute(
                     f"""

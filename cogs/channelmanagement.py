@@ -273,72 +273,68 @@ class ChannelManagement(commands.Cog):
     async def help(self, interaction: discord.Interaction):
         """Displays a list of commands categorized by DM and Server usage."""
         # Create the embed
-        embed = discord.Embed(
-            title="Ouroboros Command List",
-            description=(
-                "Here are all the commands you can use with Ouroboros, "
-                "categorized by where they are available (DMs or Server):"
-            ),
-            color=discord.Color.blue(),
+        content = (
+            "OUROBOROS COMMAND LIST\n"
+            "===========================\n"
+            "Here are all the commands you can use with Ouroboros,\n"
+            "categorized by where they are available (DMs or Server).\n\n"
+            "===========================\n"
+            "📩 DM-Only Commands\n"
+            "===========================\n"
+            "- /add-media : Insert or update a movie in your records.\n"
+            "- /all_media : Show all stored media (series or movies).\n"
+            "- /delete_movies : Delete your record completely (irreversible).\n"
+            "- /search_anime : Look up an anime and get links to watch. Refine the search key to avoid unnecessary results.\n"
+            "- /search_movie_or_series : Look up details for a movie or series in depth.\n"
+            "- /search_saved_media : Search for a media you stored.\n"
+            "- /update_watchlist : Store movies to watch later. Includes automatic reminders. Automatically removed when added to your media records.\n"
+            "- /watch_list : View your watchlist.\n\n"
+            "===========================\n"
+            "🏠 Server-Only Commands\n"
+            "===========================\n"
+            "- /activate_tournament : Initiates the daily quick tour program. [*Admin-only*]\n"
+            "- /clear_message : Delete a specified number of messages in a channel. [*Admin-only*]\n"
+            "- /coinflip : A flip game between two users; reacts to the first two clicks.\n"
+            "- /create_embed : Create an embed with a specified title and description. Can also tag members.\n"
+            "- /delete_categories : Delete all categories. [*Admin-only*]\n"
+            "- /delete_channels : Delete all channels. [*Admin-only*]\n"
+            "- /leaderboard : View the games ranking (global or specific game).\n"
+            "- /level_self : View your level in the ranking.\n"
+            "- /level_server : View the leaderboard of actives in the ranking.\n"
+            "- /rank : View your ranking in games.\n"
+            "- /rpvp : Play Rock-Paper-Scissors against another player.\n"
+            "- /setup_youtube_notifications : Automatically send video updates for added YouTube channels.\n"
+            "- /server_stats : Track server data. [*Admin-only*]\n"
+            "- /set_goodbye_channel : Set the goodbye channel. [*Admin-only*]\n"
+            "- /set_welcome_channel : Set the welcome channel. [*Admin-only*]\n\n"
+            "===========================\n"
+            "🌟 Universal Commands\n"
+            "===========================\n"
+            "- /ouroboros : Get quotes.\n"
+            "- /rps : Play Rock-Paper-Scissors (scores aren’t stored in DMs).\n"
+            "- /sporty : Play a Red or Black and Even/Odd game (scores aren’t stored in DMs).\n"
+            "- /help : Displays all commands and what they do.\n"
+            "- /hi : Establish a DM connection with me.\n\n"
+            "===========================\n"
+            "Need Help?\n"
+            "===========================\n"
+            "If an admin cannot use a command or there’s a problem, please reach out to me:\n"
+            "Inphinithy\n"
+            "https://discord.com/users/755872891601551511\n\n"
+            "===========================\n"
+            "Note:\n"
+            "Use commands in the appropriate location (DMs or Server).\n"
+            "Admin-only commands require the appropriate permissions.\n"
         )
-        # DM-Only Commands
-        embed.add_field(
-            name="📩 DM-Only Commands:",
-            value=(
-                "- **/add-media** - Insert or update a movie in your records.\n"
-                "- **/all_media** - Show all stored media (series or movies).\n"
-                "- **/delete_movies** - Delete your record completely (irreversible).\n"
-                "- **/search_anime** - Looks up an anime and provides links to wacth. Refine the search key to avoid unneccesarry results\n"
-                "- **/search_movie_or_series** - Looks up details for a movie or series in depth\n"
-                "- **/search_saved_media** - Search for a media you stored.\n"
-                "- **/update_watchlist** - Store movies to watch later, automatic reminders, gets cleared when added to your media records\n"
-                "- **/watch_list** - Your watchlist\n"
-            ),
-            inline=False,)
-        # Server-Only Commands
-        embed.add_field(
-            name="🏠 Server-Only Commands:",
-            value=(
-                "- **/activate_tournament** - Initiates the daily quick tour program (Admin-only).\n"
-                "- **/clear_message** - Delete a specified number of messages in a channel (Admin-only).\n"
-                "- **/coinflip** - A flip game between two users; reacts to the first two clicks.\n"
-                "- **/delete_categories** - Delete all categories (Admin-only).\n"
-                "- **/delete_channels** - Delete all channels (Admin-only).\n"
-                "- **/leaderboard** - View the games ranking (global or specific game).\n"
-                "- **/level_self** - View your level in the ranking.\n"
-                "- **/level_server** - View the leaderboard of actives in the ranking.\n"
-                "- **/rank** - View your ranking in games.\n"
-                "- **/rpvp** - Play Rock-Paper-Scissors against another player.\n"
-                "- **/setup_youtube_notifications**- It automatically send video updates for added youtube channels\n"
-                "- **/server_stats** - Admin command to track server data.\n"
-                "- **/create_embed** - Create an embed with a specified title and description.Can also tag members\n"
-                "- **/set_goodbye_channel** - Set the goodbye channel (Admin-only).\n"
-                "- **/set_welcome_channel** - Set the welcome channel (Admin-only).\n\n\n"
-            ),
-            inline=False,
+
+        with open("Ouroboros_Help.txt", "w", encoding="utf-8") as file:
+            file.write(content)
+
+        await interaction.response.send_message(
+            content="Here is the full list of commands:",
+            file=discord.File("Ouroboros_Help.txt"),
+            ephemeral=True
         )
-        # Universal Commands
-        embed.add_field(
-            name="\n\n\n🌟 Universal Commands:",
-            value=(
-                "- **/ouroboros** - Get quotes.\n"
-                "- **/rps** - Play Rock-Paper-Scissors (scores aren’t stored in DM's).\n"
-                "- **/sporty** - Play a Red or Black and Even/Odd game (scores aren’t stored in DM's).\n"
-                "- **/help** - Displays all commands and what they do.\n"
-                "- **/hi** - Establish a DM connection with me."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="Contact for Help If an admin cant use a command",
-            value="Please reach out to me:\n**Inphinithy**\n[Send a DM](https://discord.com/users/755872891601551511)",
-            inline=False,
-        )
-        # Footer
-        embed.set_footer(
-            text="Use commands in the appropriate location (DMs or Server). Admin-only commands require permissions."
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 # ============================================================================
