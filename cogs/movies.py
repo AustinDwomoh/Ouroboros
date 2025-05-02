@@ -643,7 +643,7 @@ class Movies(commands.Cog):
     # ============================================================================ #
     #                                   reminder                                   #
     # ============================================================================ #
-    @tasks.loop(hours=24)
+    @tasks.loop(seconds=60)
     async def media_reminder_loop(self):
         try:
             upcoming = await MoviesManager.check_upcoming_dates()
@@ -656,29 +656,24 @@ class Movies(commands.Cog):
                             description="**Media Details**",
                             color=discord.Color.blue(),
                         )
-
-                        if reminder.get("status"):
-                            embed.add_field(name="⚠️ Status", value=reminder["status"], inline=False)
-                            embed.add_field(
-                                name="Release Date",
-                                value=f"<t:{int(datetime.strptime(reminder['release_date'], '%Y-%m-%d').timestamp())}:D>",
-                                inline=False,
-                            )
-                        else:
-                            season = reminder.get('season', '?')
-                            episode = reminder.get('episode', '?')
-                            embed.add_field(name="⚠️ Status", value="Watching", inline=False)
-                            embed.add_field(
-                                name="Details",
-                                value=f"S{season} E{episode}",
-                                inline=False,
-                            )
-
+                        
+                        season = reminder.get('season', '?')
+                        episode = reminder.get('episode', '?')
+                        status = reminder.get("status","No idea")
+                        embed.add_field(name="Status", value=status, inline=False)
+                        embed.add_field(
+                            name="Details",
+                            value=f"S{season} E{episode}",
+                            inline=False,
+                        )
+                        
                         await user.send(embed=embed)
-
                     except discord.HTTPException as dm_error:
                         errorHandler.handle_exception(dm_error)
-
+           
+                
+            await MoviesManager.refresh_tmdb_dates()
+            
         except Exception as e:
             errorHandler.handle_exception(e)
 

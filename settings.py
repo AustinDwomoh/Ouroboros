@@ -152,27 +152,28 @@ class ErrorHandler:
         :param email_address: Sender's email address.
         :param email_password: Sender's email password.
         """
-        log_file_path = self.get_log_file()
-        if not os.path.exists(log_file_path):
-            return
+        if state != "testing":
+            log_file_path = self.get_log_file()
+            if not os.path.exists(log_file_path):
+                return
 
-        msg = EmailMessage()
-        msg["From"] = email_address
-        msg["To"] = email_address  # Send to self or an admin
-        msg["Subject"] = f"Error Log - {datetime.now().strftime('%Y-%m-%d')}"
-        msg.set_content("Please find the attached error log.")
+            msg = EmailMessage()
+            msg["From"] = email_address
+            msg["To"] = email_address  # Send to self or an admin
+            msg["Subject"] = f"Error Log - {datetime.now().strftime('%Y-%m-%d')}"
+            msg.set_content("Please find the attached error log.")
 
-        # Attach the log file
-        try:
-            with open(log_file_path, "rb") as f:
-                msg.add_attachment(f.read(), maintype="application", subtype="log", filename=os.path.basename(log_file_path))
-        except FileNotFoundError:
-            return
+            # Attach the log file
+            try:
+                with open(log_file_path, "rb") as f:
+                    msg.add_attachment(f.read(), maintype="application", subtype="log", filename=os.path.basename(log_file_path))
+            except FileNotFoundError:
+                return
 
-        # Send email
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(email_address, email_password)
-            server.send_message(msg)
+            # Send email
+            with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                server.starttls()
+                server.login(email_address, email_password)
+                server.send_message(msg)
         
 
