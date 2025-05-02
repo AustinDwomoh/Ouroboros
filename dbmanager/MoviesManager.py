@@ -598,3 +598,27 @@ async def check_upcoming_dates():
         await conn.close()
    
     return reminders
+
+async def refresh_tmdb_dates():
+        conn = await create_connection()
+        try:
+            async with conn.cursor() as cursor:
+                await cursor.execute("SELECT DISTINCT user_id FROM user_media")
+                user_ids = [row[0] for row in await cursor.fetchall()]
+                for user_id in user_ids:
+                    for table_name in [f"{user_id}_Series", f"{user_id}_watch_list_Series"]:
+                        await cursor.execute(f"SELECT title FROM {table_name}")
+                        titles = [row[0] for row in await cursor.fetchall()]
+                        for title in titles:
+                            media_data = await get_media_details("tv", title)
+                            first_key = next(iter(media_data), None)
+                            first_value = media_data.get(first_key, {})
+                            next_date = first_value.get("next_episode_date")
+                            if next_date:
+                                await cursor.execute(
+                                    f"UPDATE {table_name} SET next_release_date=? WHERE title=?",
+                                    (next_date, title),
+                                )
+            await conn.commit()
+        finally:
+            await conn.close()

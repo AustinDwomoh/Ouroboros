@@ -141,6 +141,17 @@ class Finance(commands.Cog):
     )
     async def add_payment(self,interaction: discord.Interaction,name: str,amount: int,status: str='active',frequency: str=None,due_date: str=None,category:str=None
     ):
+        """Adds new payment data when all feilds are filled but updates a specific row based on the name when only the required fields are filled
+
+        Args:
+            interaction (discord.Interaction): bot instance
+            name (str): Payment name
+            amount (int): Amount paid
+            status (str, optional): Any extra data. Defaults to 'active'.
+            frequency (str, optional): The number of times its paid in a year. Defaults to None.
+            due_date (str, optional): date due , can be used to override frequency. Defaults to None.
+            category (str, optional):  ["Subscription", "Bill", "Loan", "Salary", "Investment"]. Defaults to None.
+        """
         await interaction.response.defer()
         if not await self.is_dm(interaction):
             await interaction.response.send_message(
