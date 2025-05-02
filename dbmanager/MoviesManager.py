@@ -40,6 +40,7 @@ async def create_user_tables(user_id=None):
                         season INTEGER,
                         episode INTEGER,
                         date TEXT,
+                        status TEXT,
                         next_release_date TEXT
                     )
                 """
@@ -170,9 +171,11 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
             )
             existing = await cursor.fetchone()
             media_data = await get_media_details("tv", title)
+             
             first_key = next(iter(media_data), None)
             first_value = media_data.get(first_key, {})
             next_release_date = first_value.get("next_episode_date")
+            status = first_value.get("status","watching")
             if existing:
                 # Update existing series
                 await cursor.execute(
@@ -181,19 +184,20 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                     SET season = COALESCE(?, season),
                         episode = COALESCE(?, episode),
                         date = COALESCE(?, date),
+                        status = COAlESCE(?, status),
                         next_release_date = COALESCE(?, next_release_date)
                     WHERE title = ?
                 """,
-                    (season, episode, date,next_release_date,title),
+                    (season, episode, date,status,next_release_date,title),
                 )
             else:
                 # Insert new series
                 await cursor.execute(
                     f"""
-                    INSERT INTO {table_name} (title, season, episode, date, next_release_date)
+                    INSERT INTO {table_name} (title, season, episode, date,status,next_release_date)
                     VALUES (?, ?, ?, ?,?)
                 """,
-                    (title, season, episode, date, next_release_date),
+                    (title, season, episode, date,status, next_release_date),
                 )
             await conn.commit()
             return next_release_date
@@ -337,8 +341,8 @@ async def add_or_update_watch_list(user_id, title, date, extra, media_type):
                 media_data = await get_media_details(media_type, title)
                 first_value = next(iter(media_data.values()), {})
 
-                title = first_value.get("title", "Unknown")
-                status = first_value.get("status", "Unknown")
+                title = first_value.get("title", title)
+                status = first_value.get("status", "To be watched")
                 release_date = first_value.get("release_date", "Unknown")
                 next_release_date = first_value.get("next_episode_date", "Unknown")
 
@@ -556,23 +560,25 @@ async def check_upcoming_dates():
                 try:
                     await cursor.execute(
                         f"""
-                        SELECT title, season, episode, next_release_date
+                        SELECT title, season, episode,status, next_release_date
                         FROM {table_name}  
                         WHERE next_release_date IS NOT NULL 
-                        AND next_release_date BETWEEN ? AND ? 
+                            AND status != 'E
+                            nded'
+                            AND next_release_date BETWEEN ? AND ? 
                         ORDER BY next_release_date ASC
                         """,
                         (today, upcoming_date),
                     )
 
                     user_reminders = await cursor.fetchall()
-
-                    for title, season, episode, next_release_date in user_reminders:
+                    for title, season, episode,status, next_release_date in user_reminders:
                         reminders.append(
                             {
                                 "user_id": user_id,
                                 "name": title,
                                 "season": season,
+                                "status":status,
                                 "episode": episode,
                                 "next_release_date": next_release_date,
                             }
@@ -587,7 +593,6 @@ async def check_upcoming_dates():
                                 "user_id": user_id,
                                 "name": item[1],
                                 "status": item[3],
-                                "release_date": item[4],
                                 "next_release_date": item[6],
                             })
 
@@ -596,29 +601,38 @@ async def check_upcoming_dates():
 
     finally:
         await conn.close()
-   
     return reminders
 
 async def refresh_tmdb_dates():
-        conn = await create_connection()
-        try:
-            async with conn.cursor() as cursor:
-                await cursor.execute("SELECT DISTINCT user_id FROM user_media")
-                user_ids = [row[0] for row in await cursor.fetchall()]
-                for user_id in user_ids:
-                    for table_name in [f"{user_id}_Series", f"{user_id}_watch_list_Series"]:
-                        await cursor.execute(f"SELECT title FROM {table_name}")
-                        titles = [row[0] for row in await cursor.fetchall()]
-                        for title in titles:
-                            media_data = await get_media_details("tv", title)
-                            first_key = next(iter(media_data), None)
-                            first_value = media_data.get(first_key, {})
-                            next_date = first_value.get("next_episode_date")
-                            if next_date:
-                                await cursor.execute(
-                                    f"UPDATE {table_name} SET next_release_date=? WHERE title=?",
-                                    (next_date, title),
-                                )
-            await conn.commit()
-        finally:
-            await conn.close()
+    print("check db")
+    conn = await create_connection()
+    errorHandler = ErrorHandler()
+    try:
+        async with conn.cursor() as cursor:
+            await cursor.execute("SELECT DISTINCT user_id FROM user_media")
+            user_ids = [row[0] for row in await cursor.fetchall()]
+            for user_id in user_ids:
+                table_name = f'"{user_id}_Series"'
+                await cursor.execute(f"SELECT title FROM {table_name}")
+                titles = [row[0] for row in await cursor.fetchall()]
+                for title in titles:
+                    media_data = await get_media_details("tv", title)
+                    first_key = next(iter(media_data), None)
+                    first_value = media_data.get(first_key, {})
+                    next_date = first_value.get("next_episode_date")
+                    status = first_value.get("status")
+                    print("first",title ,"status", status)
+                    await cursor.execute(
+                            f"""
+                            UPDATE {table_name}
+                            SET next_release_date = ?, status = ?
+                            WHERE title = ? 
+                            """,
+                            (next_date, status, title),
+                        )
+                    await conn.commit()
+    except Exception as e:
+        errorHandler.handle_exception(e)
+        await conn.commit()
+    finally:
+        await conn.close()
