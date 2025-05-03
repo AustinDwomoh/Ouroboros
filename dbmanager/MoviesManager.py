@@ -195,7 +195,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                 await cursor.execute(
                     f"""
                     INSERT INTO {table_name} (title, season, episode, date,status,next_release_date)
-                    VALUES (?, ?, ?, ?,?)
+                    VALUES (?, ?, ?, ?,?,?)
                 """,
                     (title, season, episode, date,status, next_release_date),
                 )
