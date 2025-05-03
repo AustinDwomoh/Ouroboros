@@ -604,7 +604,6 @@ async def check_upcoming_dates():
     return reminders
 
 async def refresh_tmdb_dates():
-    print("check db")
     conn = await create_connection()
     errorHandler = ErrorHandler()
     try:
@@ -621,7 +620,6 @@ async def refresh_tmdb_dates():
                     first_value = media_data.get(first_key, {})
                     next_date = first_value.get("next_episode_date")
                     status = first_value.get("status")
-                    print("first",title ,"status", status)
                     await cursor.execute(
                             f"""
                             UPDATE {table_name}
