@@ -529,9 +529,8 @@ class Movies(commands.Cog):
                 f"No data found for {media_name}.", ephemeral=True
             )
             return
-        if media_type == "tv":
-            for result in media_data.values():
-                embed = discord.Embed(
+        for result in media_data.values():
+            embed = discord.Embed(
                     title=result["title"],
                     description=(
                         result["overview"][:500] + "..."
@@ -542,21 +541,22 @@ class Movies(commands.Cog):
                     url=result["homepage"] if result.get("homepage") else None,
                 )
 
-                if result.get("poster_url"):
-                    embed.set_thumbnail(url=result["poster_url"])
+            if result.get("poster_url"):
+                embed.set_thumbnail(url=result["poster_url"])
 
-                embed.add_field(
+            embed.add_field(
                     name="Genres",
                     value=", ".join(result["genres"]) if result["genres"] else "N/A",
                     inline=True,
                 )
-                embed.add_field(
+            embed.add_field(
                     name="Release Date",
                     value=(
                         result["release_date"] if result.get("release_date") else "N/A"
                     ),
                     inline=True,
                 )
+            if media_type == "tv":
                 embed.add_field(
                     name="Last Aired",
                     value=(
@@ -593,36 +593,7 @@ class Movies(commands.Cog):
                     text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD"
                 )
 
-                await interaction.followup.send(embed=embed)
-        else:
-            for result in media_data.values():
-
-                embed = discord.Embed(
-                    title=result["title"],
-                    description=(
-                        result["overview"][:500] + "..."
-                        if len(result["overview"]) > 500
-                        else result["overview"]
-                    ),  # Limit description size
-                    color=discord.Color.blue(),
-                    url=result["homepage"] if result.get("homepage") else None,
-                )
-
-                if result.get("poster_url"):
-                    embed.set_thumbnail(url=result["poster_url"])
-
-                embed.add_field(
-                    name="Genres",
-                    value=", ".join(result["genres"]) if result["genres"] else "N/A",
-                    inline=True,
-                )
-                embed.add_field(
-                    name="Release Date",
-                    value=(
-                        result["release_date"] if result.get("release_date") else "N/A"
-                    ),
-                    inline=True,
-                )
+            else:
                 embed.add_field(name="Status", value=result["status"], inline=True)
                 if ( "belongs_to_collection" in result and result["belongs_to_collection"]):
                     collection = result["belongs_to_collection"]
@@ -638,12 +609,12 @@ class Movies(commands.Cog):
                         embed.set_image( url=f"https://image.tmdb.org/t/p/w500{collection_backdrop}")
                 embed.set_footer(text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD")
 
-                await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed)
 
     # ============================================================================ #
     #                                   reminder                                   #
     # ============================================================================ #
-    @tasks.loop(seconds=60)
+    @tasks.loop(hours=24)
     async def media_reminder_loop(self):
         try:
             upcoming = await MoviesManager.check_upcoming_dates()
@@ -670,8 +641,6 @@ class Movies(commands.Cog):
                         await user.send(embed=embed)
                     except discord.HTTPException as dm_error:
                         errorHandler.handle_exception(dm_error)
-           
-                
             await MoviesManager.refresh_tmdb_dates()
             
         except Exception as e:
@@ -688,8 +657,7 @@ class Movies(commands.Cog):
     @search_movie_or_series.autocomplete("media_type")
     @all_media.autocomplete("media_type")  # Correct decorator placement
     async def type_autocomplete(
-        self, interaction: discord.Interaction, current: str
-    ) -> typing.List[app_commands.Choice[str]]:
+        self, interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
         try:
             choices = ["series", "movie"]
             filtered_choices = [
