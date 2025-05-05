@@ -411,10 +411,10 @@ async def get_media_details(media, media_name):
     ids = await search_media_id(media, media_name)
 
     media_data = {}
-    for i in range(len(ids)):
-
-        url = f"{MOVIE_BASE_URL}/{media}/{ids[i]}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
-        async with aiohttp.ClientSession() as session:
+    
+    async with aiohttp.ClientSession() as session:
+        for i in range(len(ids)):
+            url = f"{MOVIE_BASE_URL}/{media}/{ids[i]}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
             async with session.get(url) as response:
                 data = await response.json()
                 if media == "tv":
@@ -429,6 +429,11 @@ async def get_media_details(media, media_name):
                                 if data.get("next_episode_to_air")
                                 else None
                             ),
+                            "next_episode_number": (
+                            data["next_episode_to_air"]["episode_number"]
+                            if data.get("next_episode_to_air")
+                            else None
+                        ),
                             "seasons": [
                             {
                                 "season_number": season["season_number"],
