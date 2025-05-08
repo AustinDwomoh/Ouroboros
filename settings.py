@@ -112,7 +112,7 @@ class ErrorHandler:
     def get_log_file(self):
         """Generates a log file name based on the current date."""
         date_str = datetime.now().strftime("%Y-%m-%d")
-        return os.path.join(self.log_dir, f"{date_str}.log")
+        return os.path.join(self.log_dir, f"{date_str}.txt")
     
 
     def handle_exception(self, exception):
@@ -166,7 +166,7 @@ class ErrorHandler:
             # Attach the log file
             try:
                 with open(log_file_path, "rb") as f:
-                    msg.add_attachment(f.read(), maintype="application", subtype="log", filename=os.path.basename(log_file_path))
+                    msg.add_attachment(f.read(), maintype="application", subtype="txt", filename=os.path.basename(log_file_path))
             except FileNotFoundError:
                 return
 
