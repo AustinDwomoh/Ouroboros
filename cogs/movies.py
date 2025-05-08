@@ -622,7 +622,7 @@ class Movies(commands.Cog):
                 if user:
                     try:
                         embed = discord.Embed(
-                            title=f"🔔 **Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'], '%Y-%m-%d').timestamp())}:D>",
+                            title=f"🔔 **Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'] , '%Y-%m-%d').timestamp())}:D>" if reminder['next_release_date'] else "Soon",
                             description="**Media Details**",
                             color=discord.Color.blue(),
                         )
