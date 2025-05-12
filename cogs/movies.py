@@ -167,7 +167,7 @@ class MediaSearchPaginator(discord.ui.View):
                 else "https://example.com/default-thumbnail.jpg"
             )
             embed.add_field(
-                name=f"🎥 {media['title']}",
+                name=f"ðŸŽ¥ {media['title']}",
                 value=f"[Watch Here]({media['link']}) || " f"[Poster]({thumbnail_url})",
                 inline=False,
             )
@@ -177,7 +177,7 @@ class MediaSearchPaginator(discord.ui.View):
         return embed
 
     @discord.ui.button(
-        label="⬅ Previous", style=discord.ButtonStyle.secondary, disabled=True
+        label="â¬… Previous", style=discord.ButtonStyle.secondary, disabled=True
     )
     async def previous_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
@@ -196,7 +196,7 @@ class MediaSearchPaginator(discord.ui.View):
 
         await interaction.response.edit_message(embed=self.get_embed(), view=self)
 
-    @discord.ui.button(label="Next ➡", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Next âž¡", style=discord.ButtonStyle.primary)
     async def next_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
@@ -320,7 +320,7 @@ class Movies(commands.Cog):
                 )
                 embed = discord.Embed(
                 title="Series Updated",
-                description=f"Your series **{title}** has been added/updated.\n Details: S{season}|| E{episode}\n📅 Watched on: {date_watched}",
+                description=f"Your series **{title}** has been added/updated.\n Details: S{season}|| E{episode}\nðŸ“… Watched on: {date_watched}",
                 color=discord.Color.blue(),
             )
                 if next_release_date:
@@ -341,7 +341,7 @@ class Movies(commands.Cog):
 
                 embed = discord.Embed(
                 title="Movie Updated",
-                description=f"Your movie **{title}** has been added/updated.\n📅 Watched on: {date_watched}",
+                description=f"Your movie **{title}** has been added/updated.\nðŸ“… Watched on: {date_watched}",
                 color=discord.Color.green(),
             )
                 await interaction.followup.send(embed=embed)
@@ -620,26 +620,30 @@ class Movies(commands.Cog):
             for reminder in upcoming:
                 user = self.client.get_user(reminder["user_id"])
                 if user:
-                    try:
+                    if reminder['next_release_date']:
                         embed = discord.Embed(
-                            title=f"🔔 **Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'] , '%Y-%m-%d').timestamp())}:D>" if reminder['next_release_date'] else "Soon",
-                            description="**Media Details**",
-                            color=discord.Color.blue(),
-                        )
-                        
-                        season = reminder.get('season', '?')
-                        episode = reminder.get('episode', '?')
-                        status = reminder.get("status","No idea")
-                        embed.add_field(name="Status", value=status, inline=False)
-                        embed.add_field(
-                            name="Details",
-                            value=f"S{season} E{episode}",
-                            inline=False,
-                        )
-                        
-                        await user.send(embed=embed)
-                    except discord.HTTPException as dm_error:
-                        errorHandler.handle_exception(dm_error)
+                        title=f"**Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'] , '%Y-%m-%d').timestamp())}:D>",
+                        description="**Media Details**",
+                        color=discord.Color.blue(),
+                    )
+                    else:
+                        embed = discord.Embed(
+                        title=f"**Media Reminder:**\n{reminder['name']} coming up on soon",
+                        description="**Media Details**",
+                        color=discord.Color.blue()),
+                    
+                    
+                    season = reminder.get('season', '?')
+                    episode = reminder.get('episode', '?')
+                    status = reminder.get("status","No idea")
+                    embed.add_field(name="Status", value=status, inline=False)
+                    embed.add_field(
+                        name="Details",
+                        value=f"S{season} E{episode}",
+                        inline=False,
+                    )
+                    
+                    await user.send(embed=embed)
             await MoviesManager.refresh_tmdb_dates()
             
         except Exception as e:
