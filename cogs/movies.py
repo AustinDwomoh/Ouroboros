@@ -624,7 +624,7 @@ class Movies(commands.Cog):
                         embed = discord.Embed(
                         title=f"**Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'] , '%Y-%m-%d').timestamp())}:D>",
                         description="**Media Details**",
-                        color=discord.Color.blue(),
+                        color=discord.Color.blue()
                     )
                     else:
                         embed = discord.Embed(
