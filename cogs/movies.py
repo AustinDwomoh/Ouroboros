@@ -630,7 +630,7 @@ class Movies(commands.Cog):
                         embed = discord.Embed(
                         title=f"**Media Reminder:**\n{reminder['name']} coming up on soon",
                         description="**Media Details**",
-                        color=discord.Color.blue()),
+                        color=discord.Color.blue())
                     
                     
                     season = reminder.get('season', '?')
