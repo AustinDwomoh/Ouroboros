@@ -320,7 +320,7 @@ class Movies(commands.Cog):
                 )
                 embed = discord.Embed(
                 title="Series Updated",
-                description=f"Your series **{title}** has been added/updated.\n Details: S{season}|| E{episode}\nðŸ“… Watched on: {date_watched}",
+                description=f"Your series **{title}** has been added/updated.\n Details: S{season}|| E{episode}\n“… Watched on: {date_watched}",
                 color=discord.Color.blue(),
             )
                 if next_release_date:
@@ -341,7 +341,7 @@ class Movies(commands.Cog):
 
                 embed = discord.Embed(
                 title="Movie Updated",
-                description=f"Your movie **{title}** has been added/updated.\nðŸ“… Watched on: {date_watched}",
+                description=f"Your movie **{title}** has been added/updated.\n“… Watched on: {date_watched}",
                 color=discord.Color.green(),
             )
                 await interaction.followup.send(embed=embed)
