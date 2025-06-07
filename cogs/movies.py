@@ -615,47 +615,58 @@ class Movies(commands.Cog):
     # ============================================================================ #
     @tasks.loop(hours=24)
     async def media_reminder_loop(self):
-        try: 
-            print("loop started")
-            upcoming = await MoviesManager.check_upcoming_dates()
-            print(upcoming)
-            for reminder in upcoming:
-                user = self.client.get_user(755872891601551511)
+        print("loop started")
+        upcoming = await MoviesManager.check_upcoming_dates()
+        print(upcoming)
+
+        user = await self.client.fetch_user(755872891601551511)
+
+        for reminder in upcoming:
+            try:
+                media_details = await MoviesManager.get_media_details("tv", reminder["name"])
+                season_data = media_details.get("tv_0", {})
+
                 if reminder['next_release_date']:
-                    embed = discord.Embed(
-                    title=f"**Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'] , '%Y-%m-%d').timestamp())}:D>",
+                    timestamp = int(datetime.strptime(reminder['next_release_date'], '%Y-%m-%d').timestamp())
+                    title_text = f"**Media Reminder:**\n{reminder['name']} coming up on <t:{timestamp}:D>"
+                else:
+                    title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon"
+
+                embed = discord.Embed(
+                    title=title_text,
                     description="**Media Details**",
                     color=discord.Color.blue()
                 )
-                else:
-                    embed = discord.Embed(
-                    title=f"**Media Reminder:**\n{reminder['name']} coming up on soon",
-                    description="**Media Details**",
-                    color=discord.Color.blue())
-                
-                
-                season = reminder.get('season', '?')
-                episode = reminder.get('episode', '?')
-                status = reminder.get("status","No idea")
-                embed.add_field(name="Status", value=status, inline=False)
+
+                poster_url = season_data.get("poster_url")
+                if poster_url:
+                    embed.set_image(url=poster_url)
+
+                # Current media details
+                current_season = reminder.get('season', '?')
+                current_episode = reminder.get('episode', '?')
+                current_status = reminder.get("status", "No idea")
+
+                embed.add_field(name="Status", value=current_status, inline=False)
                 embed.add_field(
                     name="Current Details",
-                    value=f"S{season} E{episode}",
+                    value=f"S{current_season} E{current_episode}",
                     inline=False,
                 )
-                season_data = (await MoviesManager.get_media_details("tv", reminder["name"])).get("tv_0")#should be only series
-                
-                episode = season_data.get('next_episode_number', '?')
+
+                next_episode = season_data.get('next_episode_number', '?')
+                next_season = season_data.get('next_season_number', '?')
                 embed.add_field(
                     name="Expected Details",
-                    value=f"S{season}(might be wrong) E{episode}",
+                    value=f"S{next_season} E{next_episode}",
                     inline=False,
                 )
+
+                print("sending")
                 await user.send(embed=embed)
-            await MoviesManager.refresh_tmdb_dates()
-            
-        except Exception as e:
-            errorHandler.handle_exception(e)
+            except Exception as e:
+                errorHandler.handle_exception(e)
+        await MoviesManager.refresh_tmdb_dates()
 
     # ============================================================================ #
     #                                 AUTOCOMPLETE                                 #

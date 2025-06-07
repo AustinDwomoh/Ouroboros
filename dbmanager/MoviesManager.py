@@ -417,7 +417,8 @@ async def get_media_details(media, media_name):
             url = f"{MOVIE_BASE_URL}/{media}/{ids[i]}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
             async with session.get(url) as response:
                 data = await response.json()
-                print(data)
+                if data.get("status_code") == 34:
+                    continue 
                 if media == "tv":
                     media_data[f"{media}_{i}"] = {
                         "title": data["name"],
@@ -432,6 +433,11 @@ async def get_media_details(media, media_name):
                             ),
                         "next_episode_number": (
                             data["next_episode_to_air"]["episode_number"]
+                            if data.get("next_episode_to_air")
+                            else None
+                        ),
+                        "next_season_number": (
+                            data["next_episode_to_air"]["season_number"]
                             if data.get("next_episode_to_air")
                             else None
                         ),
@@ -554,7 +560,6 @@ async def check_upcoming_dates():
     upcoming_date = (now + timedelta(days=7)).date().isoformat()
     reminders = []
     conn = await create_connection()
-    print("Start check")
     errorHandler = ErrorHandler()  # Moved outside of the loop for efficiency
     try:
         async with conn.cursor() as cursor:
@@ -604,7 +609,6 @@ async def check_upcoming_dates():
 
     finally:
         await conn.close()
-        print("check done")
     return reminders
 
 async def refresh_tmdb_dates():
