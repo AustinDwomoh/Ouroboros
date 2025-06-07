@@ -38,6 +38,10 @@ class Client(commands.Bot):
 
     async def on_ready(self):
         await self.change_presence(activity=discord.Game(name="Eternal loop"))
+        #for guild in self.guilds:
+         #   await guild.leave()
+          #  print(f"Leaving {guild.name} ({guild.id})")
+		
         logger.info("Ouroboros Is Ready")
 
     async def load_commands(self):

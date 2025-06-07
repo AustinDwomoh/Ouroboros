@@ -6,42 +6,42 @@ categorized by where they are available (DMs or Server).
 ===========================
 📩 DM-Only Commands
 ===========================
-- /add-media – Insert or update a movie in your records.
-- /all_media – Show all stored media (series or movies).
-- /delete_movies – Delete your record completely (irreversible).
-- /search_anime – Look up an anime and get links to watch. Refine the search key to avoid unnecessary results.
-- /search_movie_or_series – Look up details for a movie or series in depth.
-- /search_saved_media – Search for a media you stored.
-- /update_watchlist – Store movies to watch later. Includes automatic reminders. Automatically removed when added to your media records.
-- /watch_list – View your watchlist.
+- /add-media : Insert or update a movie in your records.
+- /all_media : Show all stored media (series or movies).
+- /delete_movies : Delete your record completely (irreversible).
+- /search_anime : Look up an anime and get links to watch. Refine the search key to avoid unnecessary results.
+- /search_movie_or_series : Look up details for a movie or series in depth.
+- /search_saved_media : Search for a media you stored.
+- /update_watchlist : Store movies to watch later. Includes automatic reminders. Automatically removed when added to your media records.
+- /watch_list : View your watchlist.
 
 ===========================
 🏠 Server-Only Commands
 ===========================
-- /activate_tournament – Initiates the daily quick tour program. [*Admin-only*]
-- /clear_message – Delete a specified number of messages in a channel. [*Admin-only*]
-- /coinflip – A flip game between two users; reacts to the first two clicks.
-- /create_embed – Create an embed with a specified title and description. Can also tag members.
-- /delete_categories – Delete all categories. [*Admin-only*]
-- /delete_channels – Delete all channels. [*Admin-only*]
-- /leaderboard – View the games ranking (global or specific game).
-- /level_self – View your level in the ranking.
-- /level_server – View the leaderboard of actives in the ranking.
-- /rank – View your ranking in games.
-- /rpvp – Play Rock-Paper-Scissors against another player.
-- /setup_youtube_notifications – Automatically send video updates for added YouTube channels.
-- /server_stats – Track server data. [*Admin-only*]
-- /set_goodbye_channel – Set the goodbye channel. [*Admin-only*]
-- /set_welcome_channel – Set the welcome channel. [*Admin-only*]
+- /activate_tournament : Initiates the daily quick tour program. [*Admin-only*]
+- /clear_message : Delete a specified number of messages in a channel. [*Admin-only*]
+- /coinflip : A flip game between two users; reacts to the first two clicks.
+- /create_embed : Create an embed with a specified title and description. Can also tag members.
+- /delete_categories : Delete all categories. [*Admin-only*]
+- /delete_channels : Delete all channels. [*Admin-only*]
+- /leaderboard : View the games ranking (global or specific game).
+- /level_self : View your level in the ranking.
+- /level_server : View the leaderboard of actives in the ranking.
+- /rank : View your ranking in games.
+- /rpvp : Play Rock-Paper-Scissors against another player.
+- /setup_youtube_notifications : Automatically send video updates for added YouTube channels.
+- /server_stats : Track server data. [*Admin-only*]
+- /set_goodbye_channel : Set the goodbye channel. [*Admin-only*]
+- /set_welcome_channel : Set the welcome channel. [*Admin-only*]
 
 ===========================
 🌟 Universal Commands
 ===========================
-- /ouroboros – Get quotes.
-- /rps – Play Rock-Paper-Scissors (scores aren’t stored in DMs).
-- /sporty – Play a Red or Black and Even/Odd game (scores aren’t stored in DMs).
-- /help – Displays all commands and what they do.
-- /hi – Establish a DM connection with me.
+- /ouroboros : Get quotes.
+- /rps : Play Rock-Paper-Scissors (scores aren’t stored in DMs).
+- /sporty : Play a Red or Black and Even/Odd game (scores aren’t stored in DMs).
+- /help : Displays all commands and what they do.
+- /hi : Establish a DM connection with me.
 
 ===========================
 Need Help?
