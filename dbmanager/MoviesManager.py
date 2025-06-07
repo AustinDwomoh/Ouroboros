@@ -417,6 +417,7 @@ async def get_media_details(media, media_name):
             url = f"{MOVIE_BASE_URL}/{media}/{ids[i]}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
             async with session.get(url) as response:
                 data = await response.json()
+                print(data)
                 if media == "tv":
                     media_data[f"{media}_{i}"] = {
                         "title": data["name"],
@@ -429,12 +430,12 @@ async def get_media_details(media, media_name):
                                 if data.get("next_episode_to_air")
                                 else None
                             ),
-                            "next_episode_number": (
+                        "next_episode_number": (
                             data["next_episode_to_air"]["episode_number"]
                             if data.get("next_episode_to_air")
                             else None
                         ),
-                            "seasons": [
+                        "seasons": [
                             {
                                 "season_number": season["season_number"],
                                 "episode_count": season["episode_count"],
@@ -553,87 +554,84 @@ async def check_upcoming_dates():
     upcoming_date = (now + timedelta(days=7)).date().isoformat()
     reminders = []
     conn = await create_connection()
-    
+    print("Start check")
     errorHandler = ErrorHandler()  # Moved outside of the loop for efficiency
     try:
         async with conn.cursor() as cursor:
-            await create_user_tables()
-            await cursor.execute("SELECT DISTINCT user_id FROM user_media")
-            user_ids = [row[0] for row in await cursor.fetchall()]
-            for user_id in user_ids:
-                table_name = f'"{user_id}_Series"'
-                try:
-                    await cursor.execute(
-                        f"""
-                        SELECT title, season, episode,status, next_release_date
-                        FROM {table_name}  
-                        WHERE next_release_date IS NOT NULL 
-                            AND status != 'E
-                            nded'
-                            AND next_release_date BETWEEN ? AND ? 
-                        ORDER BY next_release_date ASC
-                        """,
-                        (today, upcoming_date),
+            user_id =  755872891601551511
+            table_name = f'"{user_id}_Series"'
+            try:
+                await cursor.execute(
+                    f"""
+                    SELECT title, season, episode,status, next_release_date
+                    FROM {table_name}  
+                    WHERE next_release_date IS NOT NULL 
+                        AND status != 'E
+                        nded'
+                        AND next_release_date BETWEEN ? AND ? 
+                    ORDER BY next_release_date ASC
+                    """,
+                    (today, upcoming_date),
+                )
+
+                user_reminders = await cursor.fetchall()
+                for title, season, episode,status, next_release_date in user_reminders:
+                    reminders.append(
+                        {
+                            #"user_id": user_id,
+                            "name": title,
+                            "season": season,
+                            "status":status,
+                            "episode": episode,
+                            "next_release_date": next_release_date,
+                        }
                     )
+                    
+                    # Process movie and series watch lists
+                for suffix in ["watch_list_Movies", "watch_list_Series"]:
+                    table_name = f'"{user_id}_{suffix}"' 
+                    rows = await fetch_reminders(cursor, table_name, "*")
+                    for item in rows:
+                        reminders.append({
+                            #"user_id": user_id,
+                            "name": item[1],
+                            "status": item[3],
+                            "next_release_date": item[6],
+                        })
 
-                    user_reminders = await cursor.fetchall()
-                    for title, season, episode,status, next_release_date in user_reminders:
-                        reminders.append(
-                            {
-                                "user_id": user_id,
-                                "name": title,
-                                "season": season,
-                                "status":status,
-                                "episode": episode,
-                                "next_release_date": next_release_date,
-                            }
-                        )
-                        
-                     # Process movie and series watch lists
-                    for suffix in ["watch_list_Movies", "watch_list_Series"]:
-                        table_name = f'"{user_id}_{suffix}"' 
-                        rows = await fetch_reminders(cursor, table_name, "*")
-                        for item in rows:
-                            reminders.append({
-                                "user_id": user_id,
-                                "name": item[1],
-                                "status": item[3],
-                                "next_release_date": item[6],
-                            })
-
-                except aiosqlite.OperationalError as e:
-                    errorHandler.handle_exception(e)
+            except aiosqlite.OperationalError as e:
+                errorHandler.handle_exception(e)
 
     finally:
         await conn.close()
+        print("check done")
     return reminders
 
 async def refresh_tmdb_dates():
+    print("checking dates")
     conn = await create_connection()
     errorHandler = ErrorHandler()
     try:
         async with conn.cursor() as cursor:
-            await cursor.execute("SELECT DISTINCT user_id FROM user_media")
-            user_ids = [row[0] for row in await cursor.fetchall()]
-            for user_id in user_ids:
-                table_name = f'"{user_id}_Series"'
-                await cursor.execute(f"SELECT title FROM {table_name}")
-                titles = [row[0] for row in await cursor.fetchall()]
-                for title in titles:
-                    media_data = await get_media_details("tv", title)
-                    first_key = next(iter(media_data), None)
-                    first_value = media_data.get(first_key, {})
-                    next_date = first_value.get("next_episode_date")
-                    status = first_value.get("status")
-                    await cursor.execute(
-                            f"""
-                            UPDATE {table_name}
-                            SET next_release_date = ?, status = ?
-                            WHERE title = ? 
-                            """,
-                            (next_date, status, title),
-                        )
-                    await conn.commit()
+            user_id =  755872891601551511
+            table_name = f'"{user_id}_Series"'
+            await cursor.execute(f"SELECT title FROM {table_name}")
+            titles = [row[0] for row in await cursor.fetchall()]
+            for title in titles:
+                media_data = await get_media_details("tv", title)
+                first_key = next(iter(media_data), None)
+                first_value = media_data.get(first_key, {})
+                next_date = first_value.get("next_episode_date")
+                status = first_value.get("status")
+                await cursor.execute(
+                        f"""
+                        UPDATE {table_name}
+                        SET next_release_date = ?, status = ?
+                        WHERE title = ? 
+                        """,
+                        (next_date, status, title),
+                    )
+                await conn.commit()
     except Exception as e:
         errorHandler.handle_exception(e)
         await conn.commit()

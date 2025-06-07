@@ -615,35 +615,43 @@ class Movies(commands.Cog):
     # ============================================================================ #
     @tasks.loop(hours=24)
     async def media_reminder_loop(self):
-        try:
+        try: 
+            print("loop started")
             upcoming = await MoviesManager.check_upcoming_dates()
+            print(upcoming)
             for reminder in upcoming:
-                user = self.client.get_user(reminder["user_id"])
-                if user:
-                    if reminder['next_release_date']:
-                        embed = discord.Embed(
-                        title=f"**Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'] , '%Y-%m-%d').timestamp())}:D>",
-                        description="**Media Details**",
-                        color=discord.Color.blue()
-                    )
-                    else:
-                        embed = discord.Embed(
-                        title=f"**Media Reminder:**\n{reminder['name']} coming up on soon",
-                        description="**Media Details**",
-                        color=discord.Color.blue())
-                    
-                    
-                    season = reminder.get('season', '?')
-                    episode = reminder.get('episode', '?')
-                    status = reminder.get("status","No idea")
-                    embed.add_field(name="Status", value=status, inline=False)
-                    embed.add_field(
-                        name="Details",
-                        value=f"S{season} E{episode}",
-                        inline=False,
-                    )
-                    
-                    await user.send(embed=embed)
+                user = self.client.get_user(755872891601551511)
+                if reminder['next_release_date']:
+                    embed = discord.Embed(
+                    title=f"**Media Reminder:**\n{reminder['name']} coming up on <t:{int(datetime.strptime(reminder['next_release_date'] , '%Y-%m-%d').timestamp())}:D>",
+                    description="**Media Details**",
+                    color=discord.Color.blue()
+                )
+                else:
+                    embed = discord.Embed(
+                    title=f"**Media Reminder:**\n{reminder['name']} coming up on soon",
+                    description="**Media Details**",
+                    color=discord.Color.blue())
+                
+                
+                season = reminder.get('season', '?')
+                episode = reminder.get('episode', '?')
+                status = reminder.get("status","No idea")
+                embed.add_field(name="Status", value=status, inline=False)
+                embed.add_field(
+                    name="Current Details",
+                    value=f"S{season} E{episode}",
+                    inline=False,
+                )
+                season_data = (await MoviesManager.get_media_details("tv", reminder["name"])).get("tv_0")#should be only series
+                
+                episode = season_data.get('next_episode_number', '?')
+                embed.add_field(
+                    name="Expected Details",
+                    value=f"S{season}(might be wrong) E{episode}",
+                    inline=False,
+                )
+                await user.send(embed=embed)
             await MoviesManager.refresh_tmdb_dates()
             
         except Exception as e:
