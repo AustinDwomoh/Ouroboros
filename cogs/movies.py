@@ -626,9 +626,13 @@ class Movies(commands.Cog):
                 media_details = await MoviesManager.get_media_details("tv", reminder["name"])
                 season_data = media_details.get("tv_0", {})
 
-                if reminder['next_release_date']:
-                    timestamp = int(datetime.strptime(reminder['next_release_date'], '%Y-%m-%d').timestamp())
-                    title_text = f"**Media Reminder:**\n{reminder['name']} coming up on <t:{timestamp}:D>"
+                next_release_date = reminder.get('next_release_date')
+                if next_release_date and next_release_date != "N/A":
+                    try:
+                        timestamp = int(datetime.strptime(next_release_date, '%Y-%m-%d').timestamp())
+                        title_text = f"**Media Reminder:**\n{reminder['name']} coming up on <t:{timestamp}:D>"
+                    except ValueError:
+                        title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon (invalid date)"
                 else:
                     title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon"
 
