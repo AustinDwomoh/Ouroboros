@@ -122,7 +122,7 @@ class ErrorHandler:
         """
         error_message = f"Exception occurred on {datetime.now()}:\n{exception}\n{traceback.format_exc()}"
         log_file_path = self.get_log_file()
-
+       
         # Write to file
         with open(log_file_path, "a") as log_file:
             log_file.write(error_message + "\n")

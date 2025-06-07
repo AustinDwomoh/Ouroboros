@@ -119,17 +119,25 @@ class Finance(commands.Cog):
         Args:
             interaction (discord.Interaction)
         """
-        await interaction.response.defer()
-        if not await self.is_dm(interaction):
-            await interaction.response.send_message("This command can only be used in DMs!", ephemeral=True)
-            return
-        findata = FinTech.fintech_list(interaction.user.id)
-        finPaginationView = FinTechListPaginationView(findata)
-        await interaction.followup.send(
-            embed=finPaginationView.create_embed(finPaginationView.get_current_page_data(),finPaginationView.get_total_pages(),),view=finPaginationView,
-        )
-        # Fetch the message object after it is sent
-        finPaginationView.message = await interaction.original_response()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await self.is_dm(interaction):
+                await interaction.response.send_message("This command can only be used in DMs!", ephemeral=True)
+                return
+            findata = FinTech.fintech_list(interaction.user.id)
+            finPaginationView = FinTechListPaginationView(findata)
+            await interaction.followup.send(
+                embed=finPaginationView.create_embed(finPaginationView.get_current_page_data(),finPaginationView.get_total_pages(),),view=finPaginationView,
+            )
+            # Fetch the message object after it is sent
+            finPaginationView.message = await interaction.original_response()
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e)
+                
+        
 
     @app_commands.command( name="add_payment", description="For a new record fill everthing to avoid unexpected errors")
     @app_commands.describe(
@@ -152,35 +160,41 @@ class Finance(commands.Cog):
             due_date (str, optional): date due , can be used to override frequency. Defaults to None.
             category (str, optional):  ["Subscription", "Bill", "Loan", "Salary", "Investment"]. Defaults to None.
         """
-        await interaction.response.defer()
-        if not await self.is_dm(interaction):
-            await interaction.response.send_message(
-                "This command can only be used in DMs!", ephemeral=True
-            )
-            return
-        choices = []
-        titles = FinTech.fintech_list(interaction.user.id)
-        for item in titles:
-            choices.append(item[1])
-        if name not in choices and (category is None or due_date is None or frequency is None):
-            await interaction.response.send_message(
-                "New records require category, due_date, frequency", ephemeral=True
-            )
-            return
-        next_due_date,total_paid = FinTech.update_table(interaction.user.id, name=name, category=category, amount=amount, due_date=due_date, status=status, frequency=frequency)
-
-        embed = discord.Embed(
-                title="Series Updated",
-                description=f"Your payment **{name}** has been added/updated.\n📅 Next due on: {next_due_date}",
-                color=discord.Color.blue(),
-            )
-        if total_paid != amount:
-                    embed.add_field(
-                    name="Total Paid",
-                    value=f"{total_paid}",
-                    inline=False,
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await self.is_dm(interaction):
+                await interaction.response.send_message(
+                    "This command can only be used in DMs!", ephemeral=True
                 )
-        await interaction.followup.send(embed = embed)
+                return
+            choices = []
+            titles = FinTech.fintech_list(interaction.user.id)
+            for item in titles:
+                choices.append(item[1])
+            if name not in choices and (category is None or due_date is None or frequency is None):
+                await interaction.response.send_message(
+                    "New records require category, due_date, frequency", ephemeral=True
+                )
+                return
+            next_due_date,total_paid = FinTech.update_table(interaction.user.id, name=name, category=category, amount=amount, due_date=due_date, status=status, frequency=frequency)
+
+            embed = discord.Embed(
+                    title="Series Updated",
+                    description=f"Your payment **{name}** has been added/updated.\n📅 Next due on: {next_due_date}",
+                    color=discord.Color.blue(),
+                )
+            if total_paid != amount:
+                        embed.add_field(
+                        name="Total Paid",
+                        value=f"{total_paid}",
+                        inline=False,
+                    )
+            await interaction.followup.send(embed = embed)
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e)
 
     # ============================================================================ #
     #                                   AUtocomp                                   #
@@ -277,6 +291,8 @@ class Finance(commands.Cog):
                    
                     await user.send(embed=embed)
 
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
         except Exception as e:
             errorHandler.handle_exception(e)
 

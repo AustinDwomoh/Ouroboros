@@ -244,7 +244,8 @@ class Movies(commands.Cog):
         """Command for movie recording state management, only usable in DMs."""
         # Check if the command is invoked in a DM
         try:
-            await interaction.response.defer()
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
             if not await self.is_dm(interaction):
                 await interaction.response.send_message(
                     "This command can only be used in DMs!", ephemeral=True
@@ -265,10 +266,10 @@ class Movies(commands.Cog):
                     )
                 else:
                     await interaction.followup.send("No records found to delete")
-        except Exception as e:
-            embed = errorHandler.help_embed()
+        except discord.DiscordException as e:
             errorHandler.handle_exception(e)
-            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            errorHandler.handle_exception(e)
             
 
     # ============================================================================ #
@@ -292,7 +293,8 @@ class Movies(commands.Cog):
         episode: str,
     ):
         try:
-            await interaction.response.defer()
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
             if not await self.is_dm(interaction):
                 await interaction.response.send_message(
                     "This command can only be used in DMs!", ephemeral=True
@@ -345,10 +347,10 @@ class Movies(commands.Cog):
                 color=discord.Color.green(),
             )
                 await interaction.followup.send(embed=embed)
-        except Exception as e:
-            embed = errorHandler.help_embed()
+        except discord.DiscordException as e:
             errorHandler.handle_exception(e)
-            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            errorHandler.handle_exception(e)
     # ============================================================================ #
     #                               LOOK UP MEDIA CMD                              #
     # ============================================================================ #
@@ -361,7 +363,8 @@ class Movies(commands.Cog):
     ):
         """Search for movies or series based on a partial title match."""
         try:
-            await interaction.response.defer()
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
             if not await self.is_dm(interaction):
                 await interaction.followup.send(
                     "This command can only be used in DMs!", ephemeral=True
@@ -386,33 +389,39 @@ class Movies(commands.Cog):
             pagination_view.message = await interaction.followup.send(
                 embed=embed, view=pagination_view
             )
-        except Exception as e:
-            embed = errorHandler.help_embed()
+        except discord.DiscordException as e:
             errorHandler.handle_exception(e)
-            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            errorHandler.handle_exception(e)
 
             
     @app_commands.command(name="all_media", description="List Of all movies or series")
     @app_commands.describe(media_type="movie or series")
     async def all_media(self, interaction: discord.Interaction, media_type: str):
         """All movies and series"""
-        if not await self.is_dm(interaction):
-            await interaction.response.send_message(
-                "This command can only be used in DMs!", ephemeral=True
+        try:
+            if not await self.is_dm(interaction):
+                await interaction.response.send_message(
+                    "This command can only be used in DMs!", ephemeral=True
+                )
+                return
+            if not interaction.response.is_done():
+                    await interaction.response.defer(thinking=True, ephemeral=True)
+            data = await MoviesManager.view_media(interaction.user.id, media_type)
+            pagination_view = MediaListPaginationView(data, media_type=media_type)
+            await interaction.followup.send(
+                embed=pagination_view.create_embed(
+                    pagination_view.get_current_page_data(),
+                    pagination_view.get_total_pages(),
+                ),
+                view=pagination_view,
             )
-            return
-        await interaction.response.defer()
-        data = await MoviesManager.view_media(interaction.user.id, media_type)
-        pagination_view = MediaListPaginationView(data, media_type=media_type)
-        await interaction.followup.send(
-            embed=pagination_view.create_embed(
-                pagination_view.get_current_page_data(),
-                pagination_view.get_total_pages(),
-            ),
-            view=pagination_view,
-        )
-        # Fetch the message object after it is sent
-        pagination_view.message = await interaction.original_response()
+            # Fetch the message object after it is sent
+            pagination_view.message = await interaction.original_response()
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e)
 
     # ============================================================================ #
     #                                WACTH_LIST CMDS                               #
@@ -423,25 +432,31 @@ class Movies(commands.Cog):
     @app_commands.describe(media_type="movie or series")
     async def watch_list(self, interaction: discord.Interaction, media_type: str):
         """This function shows the uers wacthlist based on movie typ"""
-        await interaction.response.defer()
-        if not await self.is_dm(interaction):
-            await interaction.followup.send(
-                "This command can only be used in DMs!", ephemeral=True
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await self.is_dm(interaction):
+                await interaction.followup.send(
+                    "This command can only be used in DMs!", ephemeral=True
+                )
+                return
+            data = await MoviesManager.view_watch_list(interaction.user.id, media_type)
+            pagination_view = MediaListPaginationView(
+                data, media_type=media_type, watchlist=True
             )
-            return
-        data = await MoviesManager.view_watch_list(interaction.user.id, media_type)
-        pagination_view = MediaListPaginationView(
-            data, media_type=media_type, watchlist=True
-        )
-        await interaction.followup.send(
-            embed=pagination_view.create_embed(
-                pagination_view.get_current_page_data(),
-                pagination_view.get_total_pages(),
-            ),
-            view=pagination_view,
-        )
-        # Fetch the message object after it is sent
-        pagination_view.message = await interaction.original_response()
+            await interaction.followup.send(
+                embed=pagination_view.create_embed(
+                    pagination_view.get_current_page_data(),
+                    pagination_view.get_total_pages(),
+                ),
+                view=pagination_view,
+            )
+            # Fetch the message object after it is sent
+            pagination_view.message = await interaction.original_response()
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e)
 
     @app_commands.command(
         name="update_watchlist", description="Add or update the watchlist"
@@ -456,38 +471,37 @@ class Movies(commands.Cog):
         media_type: str,
         extra: str = None,):
         """Command to add or update a movie/series in the user's watchlist"""
-
-        await interaction.response.defer(
-            thinking=True
-        )  # Ensure proper response handling
-        if not await self.is_dm(interaction):
-            await interaction.followup.send(
-                "This command can only be used in DMs!", ephemeral=True
-            )
-            return
-        if media_type == "series":
-            media_type = "tv"
         try:
-            date_added = date.today()
-            title = title.lower()  # Standardize title formatting
-            # Ensure MoviesManager has the method defined properly
-            if not hasattr(MoviesManager, "add_or_update_watch_list"):
-                raise AttributeError(
-                    "MoviesManager is missing method 'add_or_update_watch_list'"
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await self.is_dm(interaction):
+                await interaction.followup.send(
+                    "This command can only be used in DMs!", ephemeral=True
                 )
+                return
+            if media_type == "series":
+                media_type = "tv"
+                date_added = date.today()
+                title = title.lower()  # Standardize title formatting
+                # Ensure MoviesManager has the method defined properly
+                if not hasattr(MoviesManager, "add_or_update_watch_list"):
+                    raise AttributeError(
+                        "MoviesManager is missing method 'add_or_update_watch_list'"
+                    )
 
-            await MoviesManager.add_or_update_watch_list(
-                interaction.user.id,
-                title=title,
-                date=date_added,
-                extra=extra,
-                media_type=media_type,
-            )
-            await interaction.followup.send(
-                f"Your {media_type} '{title}' has been added/updated."
-            )
+                await MoviesManager.add_or_update_watch_list(
+                    interaction.user.id,
+                    title=title,
+                    date=date_added,
+                    extra=extra,
+                    media_type=media_type,
+                )
+                await interaction.followup.send(
+                    f"Your {media_type} '{title}' has been added/updated."
+                ) 
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
         except Exception as e:
-            await interaction.followup.send(f"Error updating watchlist: {e}")
             errorHandler.handle_exception(e)
 
 
@@ -500,115 +514,127 @@ class Movies(commands.Cog):
     )
     @app_commands.describe(media_name="name of the anime you are looking for")
     async def search_anime(self, interaction: discord.Interaction, media_name: str):
-        await interaction.response.defer(thinking=True)
-        if not await self.is_dm(interaction):
-            await interaction.followup.send("This command can only be used in DMs!",ephemeral=True)
-            return
-        tv_data = await MoviesManager.search_hianime(media_name)
-        if not tv_data:
-            await interaction.followup.send("No anime found for that name.", ephemeral=True)
-            return
-        view = MediaSearchPaginator(tv_data, interaction.user)
-        await interaction.followup.send(embed=view.get_embed(), view=view)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await self.is_dm(interaction):
+                await interaction.followup.send("This command can only be used in DMs!",ephemeral=True)
+                return
+            tv_data = await MoviesManager.search_hianime(media_name)
+            if not tv_data:
+                await interaction.followup.send("No anime found for that name.", ephemeral=True)
+                return
+            view = MediaSearchPaginator(tv_data, interaction.user)
+            await interaction.followup.send(embed=view.get_embed(), view=view)
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e)
 
     @app_commands.command(name="search_movie_or_series",description="The more refined the name is the more refined the search will be",)
     @app_commands.describe(media_name="what you are looking for")
     async def search_movie_or_series(self, interaction: discord.Interaction, media_name: str, media_type: str):
         if media_type == "series":
             media_type = "tv"
-        await interaction.response.defer(thinking=True)
-        if not await self.is_dm(interaction):
-            await interaction.followup.send(
-                "This command can only be used in DMs!", ephemeral=True
-            )
-            return
-        media_data = await MoviesManager.get_media_details(media_type, media_name)
-        if not media_data:
-            await interaction.followup.send(
-                f"No data found for {media_name}.", ephemeral=True
-            )
-            return
-        for result in media_data.values():
-            embed = discord.Embed(
-                    title=result["title"],
-                    description=(
-                        result["overview"][:500] + "..."
-                        if len(result["overview"]) > 500
-                        else result["overview"]
-                    ),  # Limit description size
-                    color=discord.Color.blue(),
-                    url=result["homepage"] if result.get("homepage") else None,
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await self.is_dm(interaction):
+                await interaction.followup.send(
+                    "This command can only be used in DMs!", ephemeral=True
                 )
+                return
+            media_data = await MoviesManager.get_media_details(media_type, media_name)
+            if not media_data:
+                await interaction.followup.send(
+                    f"No data found for {media_name}.", ephemeral=True
+                )
+                return
+            for result in media_data.values():
+                embed = discord.Embed(
+                        title=result["title"],
+                        description=(
+                            result["overview"][:500] + "..."
+                            if len(result["overview"]) > 500
+                            else result["overview"]
+                        ),  # Limit description size
+                        color=discord.Color.blue(),
+                        url=result["homepage"] if result.get("homepage") else None,
+                    )
 
-            if result.get("poster_url"):
-                embed.set_thumbnail(url=result["poster_url"])
+                if result.get("poster_url"):
+                    embed.set_thumbnail(url=result["poster_url"])
 
-            embed.add_field(
-                    name="Genres",
-                    value=", ".join(result["genres"]) if result["genres"] else "N/A",
-                    inline=True,
-                )
-            embed.add_field(
-                    name="Release Date",
-                    value=(
-                        result["release_date"] if result.get("release_date") else "N/A"
-                    ),
-                    inline=True,
-                )
-            if media_type == "tv":
                 embed.add_field(
-                    name="Last Aired",
-                    value=(
-                        result["last_air_date"]
-                        if result.get("last_air_date")
-                        else "N/A"
-                    ),
-                    inline=True,
-                )
+                        name="Genres",
+                        value=", ".join(result["genres"]) if result["genres"] else "N/A",
+                        inline=True,
+                    )
                 embed.add_field(
-                    name="Next Episode", value=result["next_episode_date"], inline=True
-                )
-                embed.add_field(name="Status", value=result["status"], inline=True)
-                embed.add_field(
-                    name="Networks",
-                    value=(
-                        ", ".join(result["networks"]) if result["networks"] else "N/A"
-                    ),
-                    inline=False,
-                )
+                        name="Release Date",
+                        value=(
+                            result["release_date"] if result.get("release_date") else "N/A"
+                        ),
+                        inline=True,
+                    )
+                if media_type == "tv":
+                    embed.add_field(
+                        name="Last Aired",
+                        value=(
+                            result["last_air_date"]
+                            if result.get("last_air_date")
+                            else "N/A"
+                        ),
+                        inline=True,
+                    )
+                    embed.add_field(
+                        name="Next Episode", value=result["next_episode_date"], inline=True
+                    )
+                    embed.add_field(name="Status", value=result["status"], inline=True)
+                    embed.add_field(
+                        name="Networks",
+                        value=(
+                            ", ".join(result["networks"]) if result["networks"] else "N/A"
+                        ),
+                        inline=False,
+                    )
 
-                seasons_info = "\n".join(
-                    [
-                        f"Season {s['season_number']}: {s['episode_count']} episodes"
-                        for s in result["seasons"]
-                    ]
-                )
-                embed.add_field(
-                    name="Seasons",
-                    value=seasons_info if seasons_info else "N/A",
-                    inline=False,
-                )
-                embed.set_footer(
-                    text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD"
-                )
+                    seasons_info = "\n".join(
+                        [
+                            f"Season {s['season_number']}: {s['episode_count']} episodes"
+                            for s in result["seasons"]
+                        ]
+                    )
+                    embed.add_field(
+                        name="Seasons",
+                        value=seasons_info if seasons_info else "N/A",
+                        inline=False,
+                    )
+                    embed.set_footer(
+                        text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD"
+                    )
 
-            else:
-                embed.add_field(name="Status", value=result["status"], inline=True)
-                if ( "belongs_to_collection" in result and result["belongs_to_collection"]):
-                    collection = result["belongs_to_collection"]
-                    collection_name = collection.get("name", "Unknown Collection")
-                    collection_poster = collection.get("poster_path")
-                    collection_backdrop = collection.get("backdrop_path")
+                else:
+                    embed.add_field(name="Status", value=result["status"], inline=True)
+                    if ( "belongs_to_collection" in result and result["belongs_to_collection"]):
+                        collection = result["belongs_to_collection"]
+                        collection_name = collection.get("name", "Unknown Collection")
+                        collection_poster = collection.get("poster_path")
+                        collection_backdrop = collection.get("backdrop_path")
 
-                    embed.add_field(name="Collection", value=collection_name, inline=False)
+                        embed.add_field(name="Collection", value=collection_name, inline=False)
 
-                    if collection_poster:
-                        embed.set_image(url=f"https://image.tmdb.org/t/p/w500{collection_poster}")
-                    elif collection_backdrop:
-                        embed.set_image( url=f"https://image.tmdb.org/t/p/w500{collection_backdrop}")
-                embed.set_footer(text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD")
+                        if collection_poster:
+                            embed.set_image(url=f"https://image.tmdb.org/t/p/w500{collection_poster}")
+                        elif collection_backdrop:
+                            embed.set_image( url=f"https://image.tmdb.org/t/p/w500{collection_backdrop}")
+                    embed.set_footer(text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD")
 
-            await interaction.followup.send(embed=embed)
+                await interaction.followup.send(embed=embed)
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e) 
 
     # ============================================================================ #
     #                                   reminder                                   #
@@ -666,8 +692,10 @@ class Movies(commands.Cog):
                     inline=False,
                 )
 
-                print("sending")
+               
                 await user.send(embed=embed)
+            except discord.DiscordException as e:
+                errorHandler.handle_exception(e)
             except Exception as e:
                 errorHandler.handle_exception(e)
         await MoviesManager.refresh_tmdb_dates()
