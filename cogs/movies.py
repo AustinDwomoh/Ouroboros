@@ -639,12 +639,9 @@ class Movies(commands.Cog):
     # ============================================================================ #
     #                                   reminder                                   #
     # ============================================================================ #
-    @tasks.loop(hours=24)
+    @tasks.loop(hours=168)
     async def media_reminder_loop(self):
-        print("loop started")
         upcoming = await MoviesManager.check_upcoming_dates()
-        print(upcoming)
-
         for reminder in upcoming:
             user = self.client.get_user(reminder["user_id"])
             if user:
@@ -700,6 +697,60 @@ class Movies(commands.Cog):
                     errorHandler.handle_exception(e)
         await MoviesManager.refresh_tmdb_dates()
 
+    @tasks.loop(hours=760)
+    async def check_completion_loop(self):
+        uncompleted = await MoviesManager.check_completion()
+        for reminder in uncompleted:
+            user = self.client.get_user(reminder["user_id"])
+            if user:
+                try:
+            
+                    embed = discord.Embed(
+                        title=reminder["name"],
+                        description="**Media Details**",
+                        color=discord.Color.blue()
+                    )
+
+                    poster_url = reminder.get("poster_url")
+                    if poster_url:
+                        embed.set_image(url=poster_url)
+
+                    # Current media details
+                    watched_value = reminder.get("watched")
+
+                    if watched_value is not None:
+                        current_season, current_episode = watched_value
+                    else:
+                        current_season, current_episode = None, None
+                    
+                    unwatched_value = reminder.get("unwatched")
+
+                    if unwatched_value is not None:
+                        last_season, last_episode = unwatched_value
+                    else:
+                        last_season, last_episode = None, None
+                    
+                    
+                    embed.add_field(
+                        name="Current Details",
+                        value=f"S{current_season} E{current_episode}",
+                        inline=False,
+                    )
+
+                    
+                    embed.add_field(
+                        name="Last realesed Details",
+                        value=f"S{last_season} E{last_episode}",
+                        inline=False,
+                    )
+
+                
+                    await user.send(embed=embed)
+                except discord.DiscordException as e:
+                    errorHandler.handle_exception(e)
+                except Exception as e:
+                    errorHandler.handle_exception(e)
+        await MoviesManager.refresh_tmdb_dates()
     # ============================================================================ #
     #                                 AUTOCOMPLETE                                 #
     # ============================================================================ #

@@ -615,6 +615,47 @@ async def check_upcoming_dates():
         await conn.close()
     return reminders
 
+async def check_completion():
+    """Checks whether a series has been completed once its in the db
+    """
+    reminders = []
+    conn = await create_connection()
+    errorHandler = ErrorHandler()  
+    try:
+        async with conn.cursor() as cursor:
+            await create_user_tables()
+            await cursor.execute("SELECT DISTINCT user_id FROM user_media")
+            user_ids = [row[0] for row in await cursor.fetchall()]
+            for user_id in user_ids:
+                table_name = f'"{user_id}_Series"'
+                
+                await cursor.execute(
+                    f"SELECT title, season, episode FROM {table_name}"
+                )
+                shows = await cursor.fetchall()
+                
+                for title, last_season, last_episode in shows:
+                   
+                    show_data = await get_media_details('tv',title)
+                    last_realeased =show_data['seasons'][-1]
+                    season = last_realeased['season_number']
+                    episode = last_realeased['episode_count']
+                    
+                    if ((season> last_season) or(season == last_season and episode > last_episode)):
+                        reminders.append({
+                            "user_id": user_id,
+                            "name": title,
+                            "unwatched": (season,episode),
+                            "watched": (last_season,last_episode),
+                            "poster_url":show_data["poster_url"]
+                        })
+
+    finally:
+        await conn.close()
+    return reminders
+
+
+
 async def refresh_tmdb_dates():
     print("checking dates")
     conn = await create_connection()
