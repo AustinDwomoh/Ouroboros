@@ -563,49 +563,53 @@ async def check_upcoming_dates():
     errorHandler = ErrorHandler()  # Moved outside of the loop for efficiency
     try:
         async with conn.cursor() as cursor:
-            user_id =  755872891601551511
-            table_name = f'"{user_id}_Series"'
-            try:
-                await cursor.execute(
-                    f"""
-                    SELECT title, season, episode,status, next_release_date
-                    FROM {table_name}  
-                    WHERE next_release_date IS NOT NULL 
-                        AND status != 'E
-                        nded'
-                        AND next_release_date BETWEEN ? AND ? 
-                    ORDER BY next_release_date ASC
-                    """,
-                    (today, upcoming_date),
-                )
-
-                user_reminders = await cursor.fetchall()
-                for title, season, episode,status, next_release_date in user_reminders:
-                    reminders.append(
-                        {
-                            #"user_id": user_id,
-                            "name": title,
-                            "season": season,
-                            "status":status,
-                            "episode": episode,
-                            "next_release_date": next_release_date,
-                        }
+            await create_user_tables()
+            await cursor.execute("SELECT DISTINCT user_id FROM user_media")
+            user_ids = [row[0] for row in await cursor.fetchall()]
+            for user_id in user_ids:
+                table_name = f'"{user_id}_Series"'
+                try:
+                    await cursor.execute(
+                        f"""
+                        SELECT title, season, episode,status, next_release_date
+                        FROM {table_name}  
+                        WHERE next_release_date IS NOT NULL 
+                            AND status != 'E
+                            nded'
+                            AND next_release_date BETWEEN ? AND ? 
+                        ORDER BY next_release_date ASC
+                        """,
+                        (today, upcoming_date),
                     )
-                    
-                    # Process movie and series watch lists
-                for suffix in ["watch_list_Movies", "watch_list_Series"]:
-                    table_name = f'"{user_id}_{suffix}"' 
-                    rows = await fetch_reminders(cursor, table_name, "*")
-                    for item in rows:
-                        reminders.append({
-                            #"user_id": user_id,
-                            "name": item[1],
-                            "status": item[3],
-                            "next_release_date": item[6],
-                        })
 
-            except aiosqlite.OperationalError as e:
-                errorHandler.handle_exception(e)
+
+                    user_reminders = await cursor.fetchall()
+                    for title, season, episode,status, next_release_date in user_reminders:
+                        reminders.append(
+                            {
+                                #"user_id": user_id,
+                                "name": title,
+                                "season": season,
+                                "status":status,
+                                "episode": episode,
+                                "next_release_date": next_release_date,
+                            }
+                        )
+                        
+                        # Process movie and series watch lists
+                    for suffix in ["watch_list_Movies", "watch_list_Series"]:
+                        table_name = f'"{user_id}_{suffix}"' 
+                        rows = await fetch_reminders(cursor, table_name, "*")
+                        for item in rows:
+                            reminders.append({
+                                "user_id": user_id,
+                                "name": item[1],
+                                "status": item[3],
+                                "next_release_date": item[6],
+                            })
+
+                except aiosqlite.OperationalError as e:
+                    errorHandler.handle_exception(e)
 
     finally:
         await conn.close()

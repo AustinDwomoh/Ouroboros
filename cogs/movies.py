@@ -645,59 +645,59 @@ class Movies(commands.Cog):
         upcoming = await MoviesManager.check_upcoming_dates()
         print(upcoming)
 
-        user = await self.client.fetch_user(755872891601551511)
-
         for reminder in upcoming:
-            try:
-                media_details = await MoviesManager.get_media_details("tv", reminder["name"])
-                season_data = media_details.get("tv_0", {})
+            user = self.client.get_user(reminder["user_id"])
+            if user:
+                try:
+                    media_details = await MoviesManager.get_media_details("tv", reminder["name"])
+                    season_data = media_details.get("tv_0", {})
 
-                next_release_date = reminder.get('next_release_date')
-                if next_release_date and next_release_date != "N/A":
-                    try:
-                        timestamp = int(datetime.strptime(next_release_date, '%Y-%m-%d').timestamp())
-                        title_text = f"**Media Reminder:**\n{reminder['name']} coming up on <t:{timestamp}:D>"
-                    except ValueError:
-                        title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon (invalid date)"
-                else:
-                    title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon"
+                    next_release_date = reminder.get('next_release_date')
+                    if next_release_date and next_release_date != "N/A":
+                        try:
+                            timestamp = int(datetime.strptime(next_release_date, '%Y-%m-%d').timestamp())
+                            title_text = f"**Media Reminder:**\n{reminder['name']} coming up on <t:{timestamp}:D>"
+                        except ValueError:
+                            title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon (invalid date)"
+                    else:
+                        title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon"
 
-                embed = discord.Embed(
-                    title=title_text,
-                    description="**Media Details**",
-                    color=discord.Color.blue()
-                )
+                    embed = discord.Embed(
+                        title=title_text,
+                        description="**Media Details**",
+                        color=discord.Color.blue()
+                    )
 
-                poster_url = season_data.get("poster_url")
-                if poster_url:
-                    embed.set_image(url=poster_url)
+                    poster_url = season_data.get("poster_url")
+                    if poster_url:
+                        embed.set_image(url=poster_url)
 
-                # Current media details
-                current_season = reminder.get('season', '?')
-                current_episode = reminder.get('episode', '?')
-                current_status = reminder.get("status", "No idea")
+                    # Current media details
+                    current_season = reminder.get('season', '?')
+                    current_episode = reminder.get('episode', '?')
+                    current_status = reminder.get("status", "No idea")
 
-                embed.add_field(name="Status", value=current_status, inline=False)
-                embed.add_field(
-                    name="Current Details",
-                    value=f"S{current_season} E{current_episode}",
-                    inline=False,
-                )
+                    embed.add_field(name="Status", value=current_status, inline=False)
+                    embed.add_field(
+                        name="Current Details",
+                        value=f"S{current_season} E{current_episode}",
+                        inline=False,
+                    )
 
-                next_episode = season_data.get('next_episode_number', '?')
-                next_season = season_data.get('next_season_number', '?')
-                embed.add_field(
-                    name="Expected Details",
-                    value=f"S{next_season} E{next_episode}",
-                    inline=False,
-                )
+                    next_episode = season_data.get('next_episode_number', '?')
+                    next_season = season_data.get('next_season_number', '?')
+                    embed.add_field(
+                        name="Expected Details",
+                        value=f"S{next_season} E{next_episode}",
+                        inline=False,
+                    )
 
-               
-                await user.send(embed=embed)
-            except discord.DiscordException as e:
-                errorHandler.handle_exception(e)
-            except Exception as e:
-                errorHandler.handle_exception(e)
+                
+                    await user.send(embed=embed)
+                except discord.DiscordException as e:
+                    errorHandler.handle_exception(e)
+                except Exception as e:
+                    errorHandler.handle_exception(e)
         await MoviesManager.refresh_tmdb_dates()
 
     # ============================================================================ #
