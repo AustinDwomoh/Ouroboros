@@ -221,7 +221,7 @@ class Movies(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.media_reminder_loop.start()
-        self.check_completion_loop.start(wait=True)
+        self.check_completion_loop.start()
 
     # ================================= DM CHECK ================================= #
 
