@@ -587,7 +587,7 @@ async def check_upcoming_dates():
                     for title, season, episode,status, next_release_date in user_reminders:
                         reminders.append(
                             {
-                                #"user_id": user_id,
+                                "user_id": user_id,
                                 "name": title,
                                 "season": season,
                                 "status":status,
