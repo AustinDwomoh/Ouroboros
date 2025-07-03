@@ -1,10 +1,12 @@
 from settings import ErrorHandler  # for Dir
-import discord, typing
+import discord, typing,asyncio
 from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import MoviesManager
 from tabulate import tabulate
 from datetime import date,datetime
+
+
 
 
 errorHandler = ErrorHandler()
@@ -218,8 +220,11 @@ class MediaSearchPaginator(discord.ui.View):
 class Movies(commands.Cog):
     def __init__(self, client):
         self.client = client
-        self.media_reminder_loop.start()
-        self.check_completion_loop.start()
+        if not self.media_reminder_loop.is_running():
+            self.media_reminder_loop.start(wait=True)
+
+        if not self.check_completion_loop.is_running():
+            self.check_completion_loop.start(wait=True)
 
     # ================================= DM CHECK ================================= #
 
