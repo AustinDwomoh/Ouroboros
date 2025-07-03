@@ -642,7 +642,7 @@ async def check_completion():
               
                 show = []
                 for title, last_season, last_episode in shows:
-                    print(f"for {title}")
+                    
                     show_data = await get_media_details('tv', title)
                     show.append(show_data)
                     first_value = show_data.get("tv_0")#eork around for picking first value it macthes
@@ -686,25 +686,20 @@ async def refresh_tmdb_dates():
                 titles = [row[0] for row in await cursor.fetchall()]
                 for title in titles:
                     media_data = await get_media_details("tv", title)
-                    first_value = media_data.get('tv_0')
-                    api_title = first_value.get("title") or ""
-                    original_api_title = first_value.get("original_title") or ""
-
-                    if is_similar(api_title, title) or is_similar(original_api_title, title):
-                        new_title = first_value.get("title") or title
-                    else:
-                        new_title = title
+                    first_key = next(iter(media_data), None)
+                    first_value = media_data.get(first_key, {})
                     next_date = first_value.get("next_episode_date")
                     status = first_value.get("status")
                     await cursor.execute(
                             f"""
-                                UPDATE {table_name}
-                                SET title = ?, next_release_date = ?, status = ?
-                                WHERE title = ?
-                                """,
-                                (new_title, next_date, status, title),
+                            UPDATE {table_name}
+                            SET next_release_date = ?, status = ?
+                            WHERE title = ? 
+                            """,
+                            (next_date, status, title),
                         )
                     await conn.commit()
+
     except Exception as e:
         errorHandler.handle_exception(e)
         await conn.commit()
