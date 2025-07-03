@@ -219,6 +219,7 @@ class Movies(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.media_reminder_loop.start()
+        #self.check_completion_loop.start()
 
     # ================================= DM CHECK ================================= #
 
@@ -641,115 +642,109 @@ class Movies(commands.Cog):
     # ============================================================================ #
     @tasks.loop(hours=168)
     async def media_reminder_loop(self):
-        upcoming = await MoviesManager.check_upcoming_dates()
-        for reminder in upcoming:
-            user = self.client.get_user(reminder["user_id"])
-            if user:
-                try:
-                    media_details = await MoviesManager.get_media_details("tv", reminder["name"])
-                    season_data = media_details.get("tv_0", {})
+        try:
+            upcoming = await MoviesManager.check_upcoming_dates()
+            for reminder in upcoming:
+                user = await self.client.fetch_user(reminder["user_id"]) 
+                if user:
+                    
+                        media_details = await MoviesManager.get_media_details("tv", reminder["name"])
+                        season_data = media_details.get("tv_0", {})
 
-                    next_release_date = reminder.get('next_release_date')
-                    if next_release_date and next_release_date != "N/A":
-                        try:
-                            timestamp = int(datetime.strptime(next_release_date, '%Y-%m-%d').timestamp())
-                            title_text = f"**Media Reminder:**\n{reminder['name']} coming up on <t:{timestamp}:D>"
-                        except ValueError:
-                            title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon (invalid date)"
-                    else:
-                        title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon"
+                        next_release_date = reminder.get('next_release_date')
+                        if next_release_date and next_release_date != "N/A":
+                            try:
+                                timestamp = int(datetime.strptime(next_release_date, '%Y-%m-%d').timestamp())
+                                title_text = f"**Media Reminder:**\n{reminder['name']} coming up on <t:{timestamp}:D>"
+                            except ValueError:
+                                title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon (invalid date)"
+                        else:
+                            title_text = f"**Media Reminder:**\n{reminder['name']} coming up soon"
 
-                    embed = discord.Embed(
-                        title=title_text,
-                        description="**Media Details**",
-                        color=discord.Color.blue()
-                    )
+                        embed = discord.Embed(
+                            title=title_text,
+                            description="**Media Details**",
+                            color=discord.Color.blue()
+                        )
 
-                    poster_url = season_data.get("poster_url")
-                    if poster_url:
-                        embed.set_image(url=poster_url)
+                        poster_url = season_data.get("poster_url")
+                        if poster_url:
+                            embed.set_image(url=poster_url)
 
-                    # Current media details
-                    current_season = reminder.get('season', '?')
-                    current_episode = reminder.get('episode', '?')
-                    current_status = reminder.get("status", "No idea")
+                        # Current media details
+                        current_season = reminder.get('season', '?')
+                        current_episode = reminder.get('episode', '?')
+                        current_status = reminder.get("status", "No idea")
 
-                    embed.add_field(name="Status", value=current_status, inline=False)
-                    embed.add_field(
-                        name="Current Details",
-                        value=f"S{current_season} E{current_episode}",
-                        inline=False,
-                    )
+                        embed.add_field(name="Status", value=current_status, inline=False)
+                        embed.add_field(
+                            name="Current Details",
+                            value=f"S{current_season} E{current_episode}",
+                            inline=False,
+                        )
 
-                    next_episode = season_data.get('next_episode_number', '?')
-                    next_season = season_data.get('next_season_number', '?')
-                    embed.add_field(
-                        name="Expected Details",
-                        value=f"S{next_season} E{next_episode}",
-                        inline=False,
-                    )
+                        next_episode = season_data.get('next_episode_number', '?')
+                        next_season = season_data.get('next_season_number', '?')
+                        embed.add_field(
+                            name="Expected Details",
+                            value=f"S{next_season} E{next_episode}",
+                            inline=False,
+                        )
 
-                
-                    await user.send(embed=embed)
-                except discord.DiscordException as e:
-                    errorHandler.handle_exception(e)
-                except Exception as e:
-                    errorHandler.handle_exception(e)
+                    
+                        await user.send(embed=embed)
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e)
         await MoviesManager.refresh_tmdb_dates()
 
     @tasks.loop(hours=760)
     async def check_completion_loop(self):
-        uncompleted = await MoviesManager.check_completion()
-        for reminder in uncompleted:
-            user = self.client.get_user(reminder["user_id"])
-            if user:
-                try:
-            
-                    embed = discord.Embed(
-                        title=reminder["name"],
-                        description="**Media Details**",
-                        color=discord.Color.blue()
-                    )
-
-                    poster_url = reminder.get("poster_url")
-                    if poster_url:
-                        embed.set_image(url=poster_url)
-
-                    # Current media details
-                    watched_value = reminder.get("watched")
-
-                    if watched_value is not None:
-                        current_season, current_episode = watched_value
-                    else:
-                        current_season, current_episode = None, None
-                    
-                    unwatched_value = reminder.get("unwatched")
-
-                    if unwatched_value is not None:
-                        last_season, last_episode = unwatched_value
-                    else:
-                        last_season, last_episode = None, None
-                    
-                    
-                    embed.add_field(
-                        name="Current Details",
-                        value=f"S{current_season} E{current_episode}",
-                        inline=False,
-                    )
-
-                    
-                    embed.add_field(
-                        name="Last realesed Details",
-                        value=f"S{last_season} E{last_episode}",
-                        inline=False,
-                    )
-
+        try:
+            uncompleted = await MoviesManager.check_completion()
+            for reminder in uncompleted:
+                user = await self.client.fetch_user(reminder.get("user_id"))
                 
-                    await user.send(embed=embed)
-                except discord.DiscordException as e:
-                    errorHandler.handle_exception(e)
-                except Exception as e:
-                    errorHandler.handle_exception(e)
+                if user:               
+                        embed = discord.Embed(
+                            title=reminder["name"],
+                            description="**Media Details**",
+                            color=discord.Color.blue()
+                        )
+                        poster_url = reminder.get("poster_url")
+                        if poster_url:
+                            embed.set_image(url=poster_url)
+
+                        # Current media details
+                        watched_value = reminder.get("watched")
+                        if watched_value is not None:
+                            current_season, current_episode = watched_value
+                        else:
+                            current_season, current_episode = None, None
+                        unwatched_value = reminder.get("unwatched")
+                        if unwatched_value is not None:
+                            last_season, last_episode = unwatched_value
+                        else:
+                            last_season, last_episode = None, None
+                        
+                        embed.add_field(
+                            name="Current Details",
+                            value=f"S{current_season} E{current_episode}",
+                            inline=False,
+                        )
+
+                        embed.add_field(
+                            name="Last realesed Details",
+                            value=f"S{last_season} E{last_episode}",
+                            inline=False,
+                        )
+
+                        await user.send(embed=embed)
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e)
         await MoviesManager.refresh_tmdb_dates()
     # ============================================================================ #
     #                                 AUTOCOMPLETE                                 #

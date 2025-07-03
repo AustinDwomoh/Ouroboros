@@ -2,6 +2,10 @@ from settings import *
 import aiohttp, aiosqlite
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta,timezone
+from difflib import SequenceMatcher
+import json
+def is_similar(a, b, threshold=0.7):
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio() >= threshold
 
 
 async def create_connection(db_path="data/mediarecords.db"):
@@ -172,9 +176,9 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
             existing = await cursor.fetchone()
             media_data = await get_media_details("tv", title)
              
-            first_key = next(iter(media_data), None)
-            first_value = media_data.get(first_key, {})
+            first_value = media_data.get('tv_0') #work around
             next_release_date = first_value.get("next_episode_date")
+            title = first_value.get('title') or title
             status = first_value.get("status","watching")
             if existing:
                 # Update existing series
@@ -201,7 +205,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                 )
             await conn.commit()
             return next_release_date
-    finally:
+    finally: 
         await conn.close()
 
 
@@ -339,8 +343,7 @@ async def add_or_update_watch_list(user_id, title, date, extra, media_type):
                 )
             else:
                 media_data = await get_media_details(media_type, title)
-                first_value = next(iter(media_data.values()), {})
-
+                first_value = media_data.get('tv_0')
                 title = first_value.get("title", title)
                 status = first_value.get("status", "To be watched")
                 release_date = first_value.get("release_date", "Unknown")
@@ -422,6 +425,7 @@ async def get_media_details(media, media_name):
                 if media == "tv":
                     media_data[f"{media}_{i}"] = {
                         "title": data["name"],
+                        "original_title":data['original_name'],
                         "overview": data["overview"],
                         "genres": [genre["name"] for genre in data["genres"]],
                         "release_date": data["first_air_date"],
@@ -507,8 +511,10 @@ async def search_media_id(media, media_name):
 
     results = data.get("results", [])
     ids = []
-    for data in results:
-        ids.append(data["id"])
+    for result in results:
+        title = result.get("name") or result.get("title")
+        if title and is_similar(title, media_name):
+            ids.append(result["id"])
     return ids
 
 async def search_hianime(keyword):
@@ -568,6 +574,7 @@ async def check_upcoming_dates():
             user_ids = [row[0] for row in await cursor.fetchall()]
             for user_id in user_ids:
                 table_name = f'"{user_id}_Series"'
+
                 try:
                     await cursor.execute(
                         f"""
@@ -596,7 +603,7 @@ async def check_upcoming_dates():
                             }
                         )
                         
-                        # Process movie and series watch lists
+                
                     for suffix in ["watch_list_Movies", "watch_list_Series"]:
                         table_name = f'"{user_id}_{suffix}"' 
                         rows = await fetch_reminders(cursor, table_name, "*")
@@ -610,7 +617,6 @@ async def check_upcoming_dates():
 
                 except aiosqlite.OperationalError as e:
                     errorHandler.handle_exception(e)
-
     finally:
         await conn.close()
     return reminders
@@ -633,23 +639,34 @@ async def check_completion():
                     f"SELECT title, season, episode FROM {table_name}"
                 )
                 shows = await cursor.fetchall()
-                
+              
+                show = []
                 for title, last_season, last_episode in shows:
-                   
-                    show_data = await get_media_details('tv',title)
-                    last_realeased =show_data['seasons'][-1]
-                    season = last_realeased['season_number']
-                    episode = last_realeased['episode_count']
-                    
-                    if ((season> last_season) or(season == last_season and episode > last_episode)):
-                        reminders.append({
-                            "user_id": user_id,
-                            "name": title,
-                            "unwatched": (season,episode),
-                            "watched": (last_season,last_episode),
-                            "poster_url":show_data["poster_url"]
-                        })
+                    print(f"for {title}")
+                    show_data = await get_media_details('tv', title)
+                    show.append(show_data)
+                    first_value = show_data.get("tv_0")#eork around for picking first value it macthes
 
+                    # Safeguard: Make sure 'seasons' exists and is a list
+                    if first_value  and "seasons" in first_value and isinstance(first_value["seasons"], list) and first_value["seasons"]:
+                        last_released = first_value["seasons"][-1]
+                        season = last_released.get("season_number", 0)
+                        episode = last_released.get("episode_count", 0)
+
+                        if (season > last_season and episode !=0) or (season == last_season and episode > last_episode):
+                            reminders.append({
+                                "user_id": user_id,
+                                "name": title,
+                                "unwatched": (season, episode),
+                                "watched": (last_season, last_episode),
+                                "poster_url": first_value.get("poster_url")
+                            })
+                   
+
+               
+    except Exception as e:
+        errorHandler.handle_exception(e)
+        await conn.commit()
     finally:
         await conn.close()
     return reminders
@@ -657,30 +674,37 @@ async def check_completion():
 
 
 async def refresh_tmdb_dates():
-    print("checking dates")
     conn = await create_connection()
     errorHandler = ErrorHandler()
     try:
         async with conn.cursor() as cursor:
-            user_id =  755872891601551511
-            table_name = f'"{user_id}_Series"'
-            await cursor.execute(f"SELECT title FROM {table_name}")
-            titles = [row[0] for row in await cursor.fetchall()]
-            for title in titles:
-                media_data = await get_media_details("tv", title)
-                first_key = next(iter(media_data), None)
-                first_value = media_data.get(first_key, {})
-                next_date = first_value.get("next_episode_date")
-                status = first_value.get("status")
-                await cursor.execute(
-                        f"""
-                        UPDATE {table_name}
-                        SET next_release_date = ?, status = ?
-                        WHERE title = ? 
-                        """,
-                        (next_date, status, title),
-                    )
-                await conn.commit()
+            await cursor.execute("SELECT DISTINCT user_id FROM user_media")
+            user_ids = [row[0] for row in await cursor.fetchall()]
+            for user_id in user_ids:
+                table_name = f'"{user_id}_Series"'
+                await cursor.execute(f"SELECT title FROM {table_name}")
+                titles = [row[0] for row in await cursor.fetchall()]
+                for title in titles:
+                    media_data = await get_media_details("tv", title)
+                    first_value = media_data.get('tv_0')
+                    api_title = first_value.get("title") or ""
+                    original_api_title = first_value.get("original_title") or ""
+
+                    if is_similar(api_title, title) or is_similar(original_api_title, title):
+                        new_title = first_value.get("title") or title
+                    else:
+                        new_title = title
+                    next_date = first_value.get("next_episode_date")
+                    status = first_value.get("status")
+                    await cursor.execute(
+                            f"""
+                                UPDATE {table_name}
+                                SET title = ?, next_release_date = ?, status = ?
+                                WHERE title = ?
+                                """,
+                                (new_title, next_date, status, title),
+                        )
+                    await conn.commit()
     except Exception as e:
         errorHandler.handle_exception(e)
         await conn.commit()
