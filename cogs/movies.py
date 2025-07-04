@@ -594,13 +594,7 @@ class Movies(commands.Cog):
                         name="Next Episode", value=result["next_episode_date"], inline=True
                     )
                     embed.add_field(name="Status", value=result["status"], inline=True)
-                    embed.add_field(
-                        name="Networks",
-                        value=(
-                            ", ".join(result["networks"]) if result["networks"] else "N/A"
-                        ),
-                        inline=False,
-                    )
+                    
 
                     seasons_info = "\n".join(
                         [

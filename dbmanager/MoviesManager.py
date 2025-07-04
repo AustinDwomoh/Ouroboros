@@ -1,7 +1,7 @@
 from settings import *
 import aiohttp, aiosqlite
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta,timezone
+from datetime import datetime, timedelta,timezone,date
 from difflib import SequenceMatcher
 import json
 def is_similar(a, b, threshold=0.7):
@@ -178,7 +178,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
              
             first_value = media_data.get('tv_0') #work around
             next_release_date = first_value.get("next_episode_date")
-            title = first_value.get('title') or title
+            
             status = first_value.get("status","watching")
             if existing:
                 # Update existing series
@@ -194,6 +194,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                 """,
                     (season, episode, date,status,next_release_date,title),
                 )
+                
             else:
                 # Insert new series
                 await cursor.execute(
@@ -410,6 +411,9 @@ async def view_watch_list(user_id, media_type):
 # ============================================================================ #
 #                         MOVIE AND SERIES API SERVICES                        #
 # ============================================================================ #
+
+    
+
 async def get_media_details(media, media_name):
     ids = await search_media_id(media, media_name)
 
@@ -445,13 +449,14 @@ async def get_media_details(media, media_name):
                             if data.get("next_episode_to_air")
                             else None
                         ),
-                        "seasons": [
+                        "last_episode": (
                             {
-                                "season_number": season["season_number"],
-                                "episode_count": season["episode_count"],
+                                "episode": data["last_episode_to_air"].get("episode_number"),
+                                "season": data["last_episode_to_air"].get("season_number"),
+                                "air_date": data["last_episode_to_air"].get("air_date"),
                             }
-                            for season in data["seasons"]
-                        ],
+                            if data.get("last_episode_to_air") else None
+                        ),
                         "poster_url": (
                             f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
                             if data.get("poster_path")
@@ -459,7 +464,7 @@ async def get_media_details(media, media_name):
                         ),
                         "homepage": data["homepage"],
                         "status": data["status"],
-                        "networks": [network["name"] for network in data["networks"]],
+                       
                     }
                 else:
                     media_data[f"{media}_{i}"] = {
@@ -645,13 +650,11 @@ async def check_completion():
                     
                     show_data = await get_media_details('tv', title)
                     show.append(show_data)
-                    first_value = show_data.get("tv_0")#eork around for picking first value it macthes
-
-                    # Safeguard: Make sure 'seasons' exists and is a list
-                    if first_value  and "seasons" in first_value and isinstance(first_value["seasons"], list) and first_value["seasons"]:
-                        last_released = first_value["seasons"][-1]
-                        season = last_released.get("season_number", 0)
-                        episode = last_released.get("episode_count", 0)
+                    first_value = show_data.get("tv_0")
+                    if first_value  and first_value["last_episode"] :
+                        last_released = first_value['last_episode']
+                        season = last_released.get("season", 0)
+                        episode = last_released.get("episode", 0)
 
                         if (season > last_season and episode !=0) or (season == last_season and episode > last_episode):
                             reminders.append({
@@ -662,7 +665,8 @@ async def check_completion():
                                 "poster_url": first_value.get("poster_url")
                             })
                    
-
+        with open("reminders.json", "w", encoding="utf-8") as f:
+            json.dump(show, f, indent=4)
                
     except Exception as e:
         errorHandler.handle_exception(e)
