@@ -1,0 +1,282 @@
+2025-07-03 20:39:44,037 - INFO - Loaded command: coinflip.py
+2025-07-03 20:39:44,039 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:39:44,054 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:39:44,057 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:39:44,061 - INFO - Loaded command: sporty.py
+2025-07-03 20:39:44,065 - INFO - Loaded command: update.py
+2025-07-03 20:39:44,072 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:39:44,077 - INFO - Loaded cog: embed.py
+2025-07-03 20:39:44,100 - INFO - Loaded cog: finance.py
+2025-07-03 20:39:44,155 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:39:45,294 - INFO - Loaded cog: leveling.py
+2025-07-03 20:39:45,530 - INFO - Loaded cog: movies.py
+2025-07-03 20:39:45,619 - INFO - Loaded cog: notification.py
+2025-07-03 20:39:45,624 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:39:45,628 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:39:45,631 - INFO - Loaded cog: welcome.py
+2025-07-03 20:39:45,631 - INFO - Loaded commands and cogs
+2025-07-03 20:39:45,969 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 20:39:48,229 - INFO - Ouroboros Is Ready
+2025-07-03 20:42:43,324 - INFO - Loaded command: coinflip.py
+2025-07-03 20:42:43,326 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:42:43,340 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:42:43,344 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:42:43,348 - INFO - Loaded command: sporty.py
+2025-07-03 20:42:43,351 - INFO - Loaded command: update.py
+2025-07-03 20:42:43,357 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:42:43,361 - INFO - Loaded cog: embed.py
+2025-07-03 20:42:43,388 - INFO - Loaded cog: finance.py
+2025-07-03 20:42:43,448 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:42:44,614 - INFO - Loaded cog: leveling.py
+2025-07-03 20:42:44,873 - INFO - Loaded cog: movies.py
+2025-07-03 20:42:44,957 - INFO - Loaded cog: notification.py
+2025-07-03 20:42:44,962 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:42:44,966 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:42:44,969 - INFO - Loaded cog: welcome.py
+2025-07-03 20:42:44,969 - INFO - Loaded commands and cogs
+2025-07-03 20:42:45,340 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 20:42:47,560 - INFO - Ouroboros Is Ready
+2025-07-03 20:43:31,186 - INFO - Loaded command: coinflip.py
+2025-07-03 20:43:31,189 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:43:31,201 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:43:31,205 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:43:31,208 - INFO - Loaded command: sporty.py
+2025-07-03 20:43:31,212 - INFO - Loaded command: update.py
+2025-07-03 20:43:31,220 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:43:31,223 - INFO - Loaded cog: embed.py
+2025-07-03 20:43:31,248 - INFO - Loaded cog: finance.py
+2025-07-03 20:43:31,303 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:43:32,473 - INFO - Loaded cog: leveling.py
+2025-07-03 20:43:32,661 - INFO - Loaded cog: movies.py
+2025-07-03 20:43:32,746 - INFO - Loaded cog: notification.py
+2025-07-03 20:43:32,751 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:43:32,755 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:43:32,758 - INFO - Loaded cog: welcome.py
+2025-07-03 20:43:32,758 - INFO - Loaded commands and cogs
+2025-07-03 20:43:33,033 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 20:43:35,289 - INFO - Ouroboros Is Ready
+2025-07-03 20:47:07,693 - INFO - Loaded command: coinflip.py
+2025-07-03 20:47:07,696 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:47:07,709 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:47:07,712 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:47:07,715 - INFO - Loaded command: sporty.py
+2025-07-03 20:47:07,719 - INFO - Loaded command: update.py
+2025-07-03 20:47:07,725 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:47:07,729 - INFO - Loaded cog: embed.py
+2025-07-03 20:47:07,752 - INFO - Loaded cog: finance.py
+2025-07-03 20:47:07,803 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:47:08,998 - INFO - Loaded cog: leveling.py
+2025-07-03 20:47:09,210 - INFO - Loaded cog: movies.py
+2025-07-03 20:47:09,297 - INFO - Loaded cog: notification.py
+2025-07-03 20:47:09,302 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:47:09,305 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:47:09,308 - INFO - Loaded cog: welcome.py
+2025-07-03 20:47:09,308 - INFO - Loaded commands and cogs
+2025-07-03 20:47:10,715 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 20:47:12,957 - INFO - Ouroboros Is Ready
+2025-07-03 20:51:23,047 - INFO - Loaded command: coinflip.py
+2025-07-03 20:51:23,050 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:51:23,063 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:51:23,067 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:51:23,069 - INFO - Loaded command: sporty.py
+2025-07-03 20:51:23,073 - INFO - Loaded command: update.py
+2025-07-03 20:51:23,079 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:51:23,082 - INFO - Loaded cog: embed.py
+2025-07-03 20:51:23,104 - INFO - Loaded cog: finance.py
+2025-07-03 20:51:23,153 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:51:24,341 - INFO - Loaded cog: leveling.py
+2025-07-03 20:51:24,631 - INFO - Loaded cog: movies.py
+2025-07-03 20:51:24,725 - INFO - Loaded cog: notification.py
+2025-07-03 20:51:24,730 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:51:24,734 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:51:24,775 - INFO - Loaded cog: welcome.py
+2025-07-03 20:51:24,783 - INFO - Loaded commands and cogs
+2025-07-03 20:51:25,128 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 20:51:27,460 - INFO - Ouroboros Is Ready
+Exception occurred on 2025-07-03 20:51:45.067785:
+'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\cogs\movies.py", line 492, in update_watchlist
+    await MoviesManager.add_or_update_watch_list(
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\dbmanager\MoviesManager.py", line 334, in add_or_update_watch_list
+    title = first_value.get("title", title)
+            ^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+
+2025-07-03 20:51:45,070 - ERROR - Exception occurred on 2025-07-03 20:51:45.067785:
+'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\cogs\movies.py", line 492, in update_watchlist
+    await MoviesManager.add_or_update_watch_list(
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\dbmanager\MoviesManager.py", line 334, in add_or_update_watch_list
+    title = first_value.get("title", title)
+            ^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+
+2025-07-03 20:54:07,784 - INFO - Loaded command: coinflip.py
+2025-07-03 20:54:07,787 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:54:07,802 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:54:07,805 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:54:07,808 - INFO - Loaded command: sporty.py
+2025-07-03 20:54:07,811 - INFO - Loaded command: update.py
+2025-07-03 20:54:07,819 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:54:07,823 - INFO - Loaded cog: embed.py
+2025-07-03 20:54:07,847 - INFO - Loaded cog: finance.py
+2025-07-03 20:54:07,906 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:54:09,092 - INFO - Loaded cog: leveling.py
+2025-07-03 20:54:09,323 - INFO - Loaded cog: movies.py
+2025-07-03 20:54:09,432 - INFO - Loaded cog: notification.py
+2025-07-03 20:54:09,442 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:54:09,449 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:54:09,461 - INFO - Loaded cog: welcome.py
+2025-07-03 20:54:09,463 - INFO - Loaded commands and cogs
+2025-07-03 20:54:09,888 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 20:54:12,120 - INFO - Ouroboros Is Ready
+Exception occurred on 2025-07-03 20:54:30.354557:
+'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\cogs\movies.py", line 492, in update_watchlist
+    await MoviesManager.add_or_update_watch_list(
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\dbmanager\MoviesManager.py", line 338, in add_or_update_watch_list
+    title = first_value.get("title", title)
+            ^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+
+2025-07-03 20:54:30,359 - ERROR - Exception occurred on 2025-07-03 20:54:30.354557:
+'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\cogs\movies.py", line 492, in update_watchlist
+    await MoviesManager.add_or_update_watch_list(
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\dbmanager\MoviesManager.py", line 338, in add_or_update_watch_list
+    title = first_value.get("title", title)
+            ^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+
+2025-07-03 20:56:24,227 - INFO - Loaded command: coinflip.py
+2025-07-03 20:56:24,230 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:56:24,245 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:56:24,248 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:56:24,251 - INFO - Loaded command: sporty.py
+2025-07-03 20:56:24,255 - INFO - Loaded command: update.py
+2025-07-03 20:56:24,261 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:56:24,264 - INFO - Loaded cog: embed.py
+2025-07-03 20:56:24,289 - INFO - Loaded cog: finance.py
+2025-07-03 20:56:24,346 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:56:25,860 - INFO - Loaded cog: leveling.py
+2025-07-03 20:56:26,094 - INFO - Loaded cog: movies.py
+2025-07-03 20:56:26,189 - INFO - Loaded cog: notification.py
+2025-07-03 20:56:26,195 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:56:26,198 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:56:26,202 - INFO - Loaded cog: welcome.py
+2025-07-03 20:56:26,203 - INFO - Loaded commands and cogs
+2025-07-03 20:56:26,478 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 20:56:28,745 - INFO - Ouroboros Is Ready
+2025-07-03 20:57:12,428 - INFO - Loaded command: coinflip.py
+2025-07-03 20:57:12,431 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:57:12,444 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:57:12,446 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:57:12,450 - INFO - Loaded command: sporty.py
+2025-07-03 20:57:12,454 - INFO - Loaded command: update.py
+2025-07-03 20:57:12,460 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:57:12,463 - INFO - Loaded cog: embed.py
+2025-07-03 20:57:12,486 - INFO - Loaded cog: finance.py
+2025-07-03 20:57:12,536 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:57:13,623 - INFO - Loaded cog: leveling.py
+2025-07-03 20:57:13,823 - INFO - Loaded cog: movies.py
+2025-07-03 20:57:13,912 - INFO - Loaded cog: notification.py
+2025-07-03 20:57:13,917 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:57:13,925 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:57:13,934 - INFO - Loaded cog: welcome.py
+2025-07-03 20:57:13,942 - INFO - Loaded commands and cogs
+2025-07-03 20:57:31,680 - INFO - Loaded command: coinflip.py
+2025-07-03 20:57:31,683 - INFO - Loaded command: ouroboros.py
+2025-07-03 20:57:31,696 - INFO - Loaded command: rpsgame.py
+2025-07-03 20:57:31,699 - INFO - Loaded command: rpsvs.py
+2025-07-03 20:57:31,702 - INFO - Loaded command: sporty.py
+2025-07-03 20:57:31,706 - INFO - Loaded command: update.py
+2025-07-03 20:57:31,715 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 20:57:31,717 - INFO - Loaded cog: embed.py
+2025-07-03 20:57:31,740 - INFO - Loaded cog: finance.py
+2025-07-03 20:57:31,788 - INFO - Loaded cog: leaderboard.py
+2025-07-03 20:57:32,848 - INFO - Loaded cog: leveling.py
+2025-07-03 20:57:33,057 - INFO - Loaded cog: movies.py
+2025-07-03 20:57:33,140 - INFO - Loaded cog: notification.py
+2025-07-03 20:57:33,145 - INFO - Loaded cog: serverstat.py
+2025-07-03 20:57:33,150 - INFO - Loaded cog: tournaments.py
+2025-07-03 20:57:33,152 - INFO - Loaded cog: welcome.py
+2025-07-03 20:57:33,153 - INFO - Loaded commands and cogs
+2025-07-03 20:58:14,245 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 20:58:16,457 - INFO - Ouroboros Is Ready
+Exception occurred on 2025-07-03 21:14:49.968193:
+'seasons'
+Traceback (most recent call last):
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\cogs\movies.py", line 599, in search_movie_or_series
+    for s in result["seasons"]
+             ~~~~~~^^^^^^^^^^^
+KeyError: 'seasons'
+
+2025-07-03 21:14:49,988 - ERROR - Exception occurred on 2025-07-03 21:14:49.968193:
+'seasons'
+Traceback (most recent call last):
+  File "C:\Users\Inphinithy\Documents\projects\Ourobors-fixed\cogs\movies.py", line 599, in search_movie_or_series
+    for s in result["seasons"]
+             ~~~~~~^^^^^^^^^^^
+KeyError: 'seasons'
+
+2025-07-03 21:37:15,898 - INFO - Loaded command: coinflip.py
+2025-07-03 21:37:15,902 - INFO - Loaded command: ouroboros.py
+2025-07-03 21:37:15,916 - INFO - Loaded command: rpsgame.py
+2025-07-03 21:37:15,920 - INFO - Loaded command: rpsvs.py
+2025-07-03 21:37:15,923 - INFO - Loaded command: sporty.py
+2025-07-03 21:37:15,927 - INFO - Loaded command: update.py
+2025-07-03 21:37:15,934 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 21:37:15,937 - INFO - Loaded cog: embed.py
+2025-07-03 21:37:15,961 - INFO - Loaded cog: finance.py
+2025-07-03 21:37:16,019 - INFO - Loaded cog: leaderboard.py
+2025-07-03 21:37:17,164 - INFO - Loaded cog: leveling.py
+2025-07-03 21:37:17,421 - INFO - Loaded cog: movies.py
+2025-07-03 21:37:17,509 - INFO - Loaded cog: notification.py
+2025-07-03 21:37:17,514 - INFO - Loaded cog: serverstat.py
+2025-07-03 21:37:17,519 - INFO - Loaded cog: tournaments.py
+2025-07-03 21:37:17,522 - INFO - Loaded cog: welcome.py
+2025-07-03 21:37:17,523 - INFO - Loaded commands and cogs
+2025-07-03 21:37:17,731 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 21:37:19,977 - INFO - Ouroboros Is Ready
+2025-07-03 21:39:00,583 - INFO - Loaded command: coinflip.py
+2025-07-03 21:39:00,586 - INFO - Loaded command: ouroboros.py
+2025-07-03 21:39:00,598 - INFO - Loaded command: rpsgame.py
+2025-07-03 21:39:00,602 - INFO - Loaded command: rpsvs.py
+2025-07-03 21:39:00,604 - INFO - Loaded command: sporty.py
+2025-07-03 21:39:00,608 - INFO - Loaded command: update.py
+2025-07-03 21:39:00,615 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 21:39:00,618 - INFO - Loaded cog: embed.py
+2025-07-03 21:39:00,640 - INFO - Loaded cog: finance.py
+2025-07-03 21:39:00,688 - INFO - Loaded cog: leaderboard.py
+2025-07-03 21:39:01,935 - INFO - Loaded cog: leveling.py
+2025-07-03 21:39:02,122 - INFO - Loaded cog: movies.py
+2025-07-03 21:39:02,206 - INFO - Loaded cog: notification.py
+2025-07-03 21:39:02,211 - INFO - Loaded cog: serverstat.py
+2025-07-03 21:39:02,215 - INFO - Loaded cog: tournaments.py
+2025-07-03 21:39:02,219 - INFO - Loaded cog: welcome.py
+2025-07-03 21:39:02,219 - INFO - Loaded commands and cogs
+2025-07-03 21:39:02,501 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 21:39:04,765 - INFO - Ouroboros Is Ready
+2025-07-03 21:39:43,385 - INFO - Loaded command: coinflip.py
+2025-07-03 21:39:43,388 - INFO - Loaded command: ouroboros.py
+2025-07-03 21:39:43,400 - INFO - Loaded command: rpsgame.py
+2025-07-03 21:39:43,404 - INFO - Loaded command: rpsvs.py
+2025-07-03 21:39:43,407 - INFO - Loaded command: sporty.py
+2025-07-03 21:39:43,411 - INFO - Loaded command: update.py
+2025-07-03 21:39:43,417 - INFO - Loaded cog: channelmanagement.py
+2025-07-03 21:39:43,420 - INFO - Loaded cog: embed.py
+2025-07-03 21:39:43,443 - INFO - Loaded cog: finance.py
+2025-07-03 21:39:43,495 - INFO - Loaded cog: leaderboard.py
+2025-07-03 21:39:44,563 - INFO - Loaded cog: leveling.py
+2025-07-03 21:39:44,768 - INFO - Loaded cog: movies.py
+2025-07-03 21:39:44,849 - INFO - Loaded cog: notification.py
+2025-07-03 21:39:44,854 - INFO - Loaded cog: serverstat.py
+2025-07-03 21:39:44,858 - INFO - Loaded cog: tournaments.py
+2025-07-03 21:39:44,861 - INFO - Loaded cog: welcome.py
+2025-07-03 21:39:44,862 - INFO - Loaded commands and cogs
+2025-07-03 21:39:45,231 - INFO - Slash commands synced successfully: 32 commands
+2025-07-03 21:39:47,422 - INFO - Ouroboros Is Ready

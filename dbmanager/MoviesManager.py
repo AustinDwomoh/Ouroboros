@@ -328,37 +328,24 @@ async def add_or_update_watch_list(user_id, title, date, extra, media_type):
     conn = await create_connection()
     try:
         async with conn.cursor() as cursor:
+            media_data = await get_media_details(media_type, title)
+            first_key = next(iter(media_data), None)
+            first_value = media_data.get(first_key)
+            title = first_value.get("title", title)
+            status = first_value.get("status", "To be watched")
+            release_date = first_value.get("release_date", "Unknown")
+            next_release_date = first_value.get("next_episode_date", "Unknown")
+            
+                       
+
             await cursor.execute(
-                f"SELECT * FROM {table_name} WHERE title LIKE ?", ("%" + title + "%",)
-            )
-            existing = await cursor.fetchone()
-            if existing:
-                await cursor.execute(
-                    f"""
-                    UPDATE {table_name}
-                    SET date = COALESCE(?, date),
-                        extra = COALESCE(?, extra)
-                    WHERE title = ?
+                f"""
+                    INSERT INTO {table_name} (title, extra, status, release_date, added_date, next_release_date)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                    (date, extra, title),
-                )
-            else:
-                media_data = await get_media_details(media_type, title)
-                first_value = media_data.get('tv_0')
-                title = first_value.get("title", title)
-                status = first_value.get("status", "To be watched")
-                release_date = first_value.get("release_date", "Unknown")
-                next_release_date = first_value.get("next_episode_date", "Unknown")
-
-                                
-
-                await cursor.execute(
-                    f"""
-                        INSERT INTO {table_name} (title, extra, status, release_date, added_date, next_release_date)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (title, extra, status, release_date, date, next_release_date),
-                )
+                (title, extra, status, release_date, date, next_release_date),
+            )
+           
 
         await conn.commit()
     finally:
@@ -448,7 +435,13 @@ async def get_media_details(media, media_name):
                             data["next_episode_to_air"]["season_number"]
                             if data.get("next_episode_to_air")
                             else None
-                        ),
+                        ), 
+                        "seasons": [
+                            {
+                                "season_number": season["season_number"],
+                                "episode_count": season["episode_count"]
+                            }
+                            for season in data["seasons"]],
                         "last_episode": (
                             {
                                 "episode": data["last_episode_to_air"].get("episode_number"),
@@ -609,16 +602,25 @@ async def check_upcoming_dates():
                         )
                         
                 
-                    for suffix in ["watch_list_Movies", "watch_list_Series"]:
-                        table_name = f'"{user_id}_{suffix}"' 
-                        rows = await fetch_reminders(cursor, table_name, "*")
-                        for item in rows:
-                            reminders.append({
-                                "user_id": user_id,
-                                "name": item[1],
-                                "status": item[3],
-                                "next_release_date": item[6],
-                            })
+                   
+                    table_name = f'"{user_id}_watch_list_Series"' 
+                    rows = await fetch_reminders(cursor, table_name, "*")
+                    for item in rows:
+                        reminders.append({
+                            "user_id": user_id,
+                            "name": item[1],
+                            "next_release_date": item[6],
+                        })
+                    
+                    table_name = f'"{user_id}_watch_list_Movies"' 
+                    rows = await fetch_reminders(cursor, table_name, "*")
+                    for item in rows:
+                        reminders.append({
+                            "user_id": user_id,
+                            "name": item[1],
+                            "release_date":item[4],
+                            "movie":True,
+                        })
 
                 except aiosqlite.OperationalError as e:
                     errorHandler.handle_exception(e)
@@ -665,8 +667,8 @@ async def check_completion():
                                 "poster_url": first_value.get("poster_url")
                             })
                    
-        with open("reminders.json", "w", encoding="utf-8") as f:
-            json.dump(show, f, indent=4)
+        """ with open("reminders.json", "w", encoding="utf-8") as f:
+            json.dump(show, f, indent=4) """
                
     except Exception as e:
         errorHandler.handle_exception(e)
