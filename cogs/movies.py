@@ -792,7 +792,7 @@ class Movies(commands.Cog):
     @add_media.autocomplete("title")
     @update_watchlist.autocomplete("title")
     @search_saved_media.autocomplete("title")
-    @search_movie_or_series.autocomplete("title")
+    @search_movie_or_series.autocomplete("media_name")
     async def list_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> typing.List[app_commands.Choice[str]]:

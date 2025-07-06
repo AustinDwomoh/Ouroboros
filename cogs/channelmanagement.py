@@ -269,6 +269,17 @@ class ChannelManagement(commands.Cog):
             errorHandler.handle_exception(e)
             await interaction.response.send_message(embed=embed)
    
+    @app_commands.command(name="cleandms", description="Clean the bot dms")
+    async def cleandms(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        if isinstance(interaction.channel, discord.DMChannel):
+            async for msg in interaction.channel.history():
+                if msg.author.id == self.client.user.id:
+                    try:
+                        await msg.delete()
+                    except discord.NotFound:
+                        pass
+                    await asyncio.sleep(2)
     @app_commands.command( name="help", description="Displays a list of commands and their descriptions")
     async def help(self, interaction: discord.Interaction):
         """Displays a list of commands categorized by DM and Server usage."""
