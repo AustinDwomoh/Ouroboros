@@ -708,8 +708,7 @@ class Movies(commands.Cog):
         await MoviesManager.refresh_tmdb_dates()
 
     @tasks.loop(hours=760)
-    async def check_completion_loop(self):
-        
+    async def check_completion_loop(self):  
         uncompleted = await MoviesManager.check_completion()
         for reminder in uncompleted:
             user_id = reminder.get("user_id")
@@ -793,6 +792,7 @@ class Movies(commands.Cog):
     @add_media.autocomplete("title")
     @update_watchlist.autocomplete("title")
     @search_saved_media.autocomplete("title")
+    @search_movie_or_series.autocomplete("title")
     async def list_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> typing.List[app_commands.Choice[str]]:
