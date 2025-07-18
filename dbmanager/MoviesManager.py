@@ -1,9 +1,9 @@
 from settings import *
 import aiohttp, aiosqlite
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta,timezone,date
+from datetime import datetime, timedelta,timezone
 from difflib import SequenceMatcher
-import json
+
 def is_similar(a, b, threshold=0.7):
     return SequenceMatcher(None, a.lower(), b.lower()).ratio() >= threshold
 
@@ -174,9 +174,7 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
                 f"SELECT * FROM {table_name} WHERE title LIKE ?", ("%" + title + "%",)
             )
             existing = await cursor.fetchone()
-            media_data = await get_media_details("tv", title)
-             
-            first_value = media_data.get('tv_0') #work around
+            first_value = await get_media_details("tv", title)
             next_release_date = first_value.get("next_episode_date")
             
             status = first_value.get("status","watching")
@@ -250,6 +248,7 @@ async def search_media(user_id, title, media_type):
         table_name = f'"{user_id}_Movies"'
     elif media_type == "series":
         table_name = f'"{user_id}_Series"'
+        media_type = 'tv'
 
     # Construct the query to fetch all columns
     query = f"SELECT * FROM {table_name} WHERE title LIKE ?"
@@ -260,9 +259,16 @@ async def search_media(user_id, title, media_type):
         async with conn.cursor() as cursor:
             await cursor.execute(query, (f"%{title}%",))
             column_names = [description[0] for description in cursor.description]
-            rows = await cursor.fetchall()
-            results = [dict(zip(column_names, row)) for row in rows]
-        return results
+            row = await cursor.fetchone()
+            if row is None:
+                return None
+            results = dict(zip(column_names, row))
+            data = await get_media_details(media_type,title)
+            combined = {
+                "db_data": results,
+                "api_data": data
+            }                
+        return combined
     except aiosqlite.OperationalError as e:
         if "no such table" in str(e):
             # Handle missing table error
@@ -284,12 +290,37 @@ async def view_media(user_id, media_type):
         table_name = f'"{user_id}_Movies"'
     elif media_type.lower() == "series":
         table_name = f'"{user_id}_Series"'
+        media_type = 'tv'
     await create_user_tables(user_id)
     conn = await create_connection()
     try:
         async with conn.cursor() as cursor:
             await cursor.execute(f"SELECT * FROM {table_name}")
-            return await cursor.fetchall()
+            rows = await cursor.fetchall()
+
+            # Get column names dynamically
+            column_names = [column[0] for column in cursor.description]
+
+            results = []
+            for row in rows:
+                db_data = dict(zip(column_names, row))
+                title = db_data.get("title")
+                if not title:
+                    continue 
+                try:
+                    api_data = await get_media_details(media_type, title)
+                except Exception as e:
+                    print(f"[WARN] Failed to fetch API for '{title}': {e}")
+                    api_data = None
+
+                # Combine DB + API data
+                combined = {
+                    "db_data": db_data,
+                    "api_data": api_data
+                }
+                results.append(combined)
+
+            return results
     finally:
         await conn.close()
 
@@ -328,9 +359,7 @@ async def add_or_update_watch_list(user_id, title, date, extra, media_type):
     conn = await create_connection()
     try:
         async with conn.cursor() as cursor:
-            media_data = await get_media_details(media_type, title)
-            first_key = next(iter(media_data), None)
-            first_value = media_data.get(first_key)
+            first_value = await get_media_details(media_type, title)
             title = first_value.get("title", title)
             status = first_value.get("status", "To be watched")
             release_date = first_value.get("release_date", "Unknown")
@@ -378,6 +407,43 @@ async def delete_from_watchlist(user_id, title, media_type):
     finally:
         await conn.close()
 
+async def fetch_titles(user_id):
+    movie_table = f'"{user_id}_Movies"'
+    series_table = f'"{user_id}_Series"'
+    watch_list_s_table_name = f'"{user_id}_watch_list_Series"'
+    watch_list_m_table_name = f'"{user_id}_watch_list_Movies"'
+    await create_user_tables(user_id)
+    conn = await create_connection()
+    
+    titles = set()
+
+    try:
+        async with conn.cursor() as cursor:
+            # Fetch movie titles
+            await cursor.execute(f"SELECT title FROM {movie_table}")
+            movie_rows = await cursor.fetchall()
+            titles.update(title[0] for title in movie_rows if title[0])
+
+            # Fetch series titles
+            await cursor.execute(f"SELECT title FROM {series_table}")
+            series_rows = await cursor.fetchall()
+            titles.update(title[0] for title in series_rows if title[0])
+            
+            #fecth watch_list_series titles
+            await cursor.execute(f"SELECT title FROM{watch_list_s_table_name}") 
+            watch_list_series_rows = await cursor.fetchall()
+            titles.update(title[0] for title in watch_list_series_rows if title[0])
+                            
+            #fecth watch_list_movie titles
+            await cursor.execute(f"SELECT title FROM{watch_list_m_table_name}")
+            watch_list_movies_rows = await cursor.fetchall()
+            titles.update(title[0] for title in watch_list_movies_rows if title[0])
+    finally:
+        await conn.close()
+
+    return list(titles)
+
+           
 
 async def view_watch_list(user_id, media_type):
     """Retrieves all movies from the user's database."""
@@ -385,12 +451,35 @@ async def view_watch_list(user_id, media_type):
         table_name = f'"{user_id}_watch_list_Movies"'
     elif media_type.lower() == "series":
         table_name = f'"{user_id}_watch_list_Series"'
+        media_type = "tv"
     await create_user_tables(user_id)
     conn = await create_connection()
     try:
         async with conn.cursor() as cursor:
             await cursor.execute(f"SELECT * FROM {table_name}")
-            return await cursor.fetchall()
+            rows = await cursor.fetchall()
+            column_names = [column[0] for column in cursor.description]
+
+            results = []
+            for row in rows:
+                db_data = dict(zip(column_names, row))
+                title = db_data.get("title")
+                if not title:
+                    continue 
+                try:
+                    api_data = await get_media_details(media_type, title)
+                except Exception as e:
+                    print(f"[WARN] Failed to fetch API for '{title}': {e}")
+                    api_data = None
+
+                # Combine DB + API data
+                combined = {
+                    "db_data": db_data,
+                    "api_data": api_data
+                }
+                results.append(combined)
+
+            return results
     finally:
         await conn.close()
 
@@ -402,101 +491,100 @@ async def view_watch_list(user_id, media_type):
     
 
 async def get_media_details(media, media_name):
-    ids = await search_media_id(media, media_name)
+    id = await search_media_id(media, media_name)
 
     media_data = {}
-    
-    async with aiohttp.ClientSession() as session:
-        for i in range(len(ids)):
-            url = f"{MOVIE_BASE_URL}/{media}/{ids[i]}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
+    if id:
+        async with aiohttp.ClientSession() as session:
+            url = f"{MOVIE_BASE_URL}/{media}/{id}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
             async with session.get(url) as response:
                 data = await response.json()
-                if data.get("status_code") == 34:
-                    continue 
-                if media == "tv":
-                    media_data[f"{media}_{i}"] = {
-                        "title": data["name"],
-                        "original_title":data['original_name'],
-                        "overview": data["overview"],
-                        "genres": [genre["name"] for genre in data["genres"]],
-                        "release_date": data["first_air_date"],
-                        "last_air_date": data["last_air_date"],
-                        "next_episode_date": (
-                                data["next_episode_to_air"]["air_date"]
+                if data.get("status_code") != 34:
+                    if media == "tv":
+                        media_data= {
+                            "title": data["name"],
+                            "original_title":data['original_name'],
+                            "overview": data["overview"],
+                            "genres": [genre["name"] for genre in data["genres"]],
+                            "release_date": data["first_air_date"],
+                            "last_air_date": data["last_air_date"],
+                            "next_episode_date": (
+                                    data["next_episode_to_air"]["air_date"]
+                                    if data.get("next_episode_to_air")
+                                    else None
+                                ),
+                            "next_episode_number": (
+                                data["next_episode_to_air"]["episode_number"]
                                 if data.get("next_episode_to_air")
                                 else None
                             ),
-                        "next_episode_number": (
-                            data["next_episode_to_air"]["episode_number"]
-                            if data.get("next_episode_to_air")
-                            else None
-                        ),
-                        "next_season_number": (
-                            data["next_episode_to_air"]["season_number"]
-                            if data.get("next_episode_to_air")
-                            else None
-                        ), 
-                        "seasons": [
-                            {
-                                "season_number": season["season_number"],
-                                "episode_count": season["episode_count"]
-                            }
-                            for season in data["seasons"]],
-                        "last_episode": (
-                            {
-                                "episode": data["last_episode_to_air"].get("episode_number"),
-                                "season": data["last_episode_to_air"].get("season_number"),
-                                "air_date": data["last_episode_to_air"].get("air_date"),
-                            }
-                            if data.get("last_episode_to_air") else None
-                        ),
-                        "poster_url": (
-                            f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
-                            if data.get("poster_path")
-                            else None
-                        ),
-                        "homepage": data["homepage"],
-                        "status": data["status"],
-                       
-                    }
-                else:
-                    media_data[f"{media}_{i}"] = {
-                        "title": data["title"],
-                        "overview": data["overview"],
-                        "genres": [genre["name"] for genre in data["genres"]],
-                        "release_date": data["release_date"],
-                        "poster_url": (
-                            f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
-                            if data.get("poster_path")
-                            else None
-                        ),
-                        "homepage": data["homepage"],
-                        "status": data["status"],
-                        "in_collection": (
-                            [
+                            "next_season_number": (
+                                data["next_episode_to_air"]["season_number"]
+                                if data.get("next_episode_to_air")
+                                else None
+                            ), 
+                            "seasons": [
                                 {
-                                    "id": data["belongs_to_collection"]["id"],
-                                    "name": data["belongs_to_collection"]["name"],
-                                    "poster_path": (
-                                        f"https://image.tmdb.org/t/p/w500{data["belongs_to_collection"]['poster_path']}"
-                                        if data["belongs_to_collection"].get(
-                                            "poster_path"
-                                        )
-                                        else None
-                                    ),
-                                    "backdrop_path": (
-                                        f"https://image.tmdb.org/t/p/w500{data["belongs_to_collection"]['backdrop_path']}"
-                                        if data["belongs_to_collection"].get(
-                                            "backdrop_path"
-                                        )
-                                        else None
-                                    ),
+                                    "season_number": season["season_number"],
+                                    "episode_count": season["episode_count"]
                                 }
-                            ]
-                            if data.get("belongs_to_collection")
-                            else []
-                        ),
-                    }
+                                for season in data["seasons"]],
+                            "last_episode": (
+                                {
+                                    "episode": data["last_episode_to_air"].get("episode_number"),
+                                    "season": data["last_episode_to_air"].get("season_number"),
+                                    "air_date": data["last_episode_to_air"].get("air_date"),
+                                }
+                                if data.get("last_episode_to_air") else None
+                            ),
+                            "poster_url": (
+                                f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
+                                if data.get("poster_path")
+                                else None
+                            ),
+                            "homepage": data["homepage"],
+                            "status": data["status"],
+                            
+                        }
+                        
+                    else:
+                        media_data = {
+                            "title": data["title"],
+                            "overview": data["overview"],
+                            "genres": [genre["name"] for genre in data["genres"]],
+                            "release_date": data["release_date"],
+                            "poster_url": (
+                                f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
+                                if data.get("poster_path")
+                                else None
+                            ),
+                            "homepage": data["homepage"],
+                            "status": data["status"],
+                            "in_collection": (
+                                [
+                                    {
+                                        "id": data["belongs_to_collection"]["id"],
+                                        "name": data["belongs_to_collection"]["name"],
+                                        "poster_path": (
+                                            f"https://image.tmdb.org/t/p/w500{data["belongs_to_collection"]['poster_path']}"
+                                            if data["belongs_to_collection"].get(
+                                                "poster_path"
+                                            )
+                                            else None
+                                        ),
+                                        "backdrop_path": (
+                                            f"https://image.tmdb.org/t/p/w500{data["belongs_to_collection"]['backdrop_path']}"
+                                            if data["belongs_to_collection"].get(
+                                                "backdrop_path"
+                                            )
+                                            else None
+                                        ),
+                                    }
+                                ]
+                                if data.get("belongs_to_collection")
+                                else []
+                            ),
+                        }
     return media_data
 
 async def search_media_id(media, media_name):
@@ -508,12 +596,13 @@ async def search_media_id(media, media_name):
             data = await response.json()
 
     results = data.get("results", [])
-    ids = []
+    id = None 
     for result in results:
         title = result.get("name") or result.get("title")
         if title and is_similar(title, media_name):
-            ids.append(result["id"])
-    return ids
+            id = result.get('id')
+            break
+    return id
 
 async def search_hianime(keyword):
     """Scrape Hianime search results for a given keyword."""
@@ -647,12 +736,9 @@ async def check_completion():
                 )
                 shows = await cursor.fetchall()
               
-                show = []
+
                 for title, last_season, last_episode in shows:
-                    
-                    show_data = await get_media_details('tv', title)
-                    show.append(show_data)
-                    first_value = show_data.get("tv_0")
+                    first_value = await get_media_details('tv', title)
                     if first_value  and first_value["last_episode"] :
                         last_released = first_value['last_episode']
                         season = last_released.get("season", 0)
@@ -677,8 +763,6 @@ async def check_completion():
         await conn.close()
     return reminders
 
-
-
 async def refresh_tmdb_dates():
     conn = await create_connection()
     errorHandler = ErrorHandler()
@@ -691,9 +775,7 @@ async def refresh_tmdb_dates():
                 await cursor.execute(f"SELECT title FROM {table_name}")
                 titles = [row[0] for row in await cursor.fetchall()]
                 for title in titles:
-                    media_data = await get_media_details("tv", title)
-                    first_key = next(iter(media_data), None)
-                    first_value = media_data.get(first_key, {})
+                    first_value = await get_media_details("tv", title)
                     next_date = first_value.get("next_episode_date")
                     status = first_value.get("status")
                     await cursor.execute(

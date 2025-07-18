@@ -1,87 +1,19 @@
 # ============================================================================ #
 #                                    IMPORT                                    #
 # ============================================================================ #
-import discord, os
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from discord import File, app_commands
+import discord,sqlite3
+from discord import  app_commands
 from discord.ext import commands
 from dbmanager import Games
-from tabulate import tabulate
+from cogs.leveling import LeaderboardPaginationView  
 from discord.ext import commands
-from settings import ErrorHandler,IMGS_DIR
-
+from settings import ErrorHandler
+from io import BytesIO
 
 
 # ============================================================================ #
 #                                LEADERBOARD UI                                #
 # ============================================================================ #
-class LeaderboardPaginationView(discord.ui.View):
-    def __init__(self, data, sep=10, timeout=None):
-        super().__init__(timeout=timeout)
-        self.data = data
-        self.sep = sep
-        self.current_page = 1
-
-    def create_embed(self, data, total_pages):
-        embed = discord.Embed(
-            title=f"Leaderboard Page {self.current_page} / {total_pages}"
-        )
-        table_data = [
-            [idx, player_name, score]
-            for idx, (player_name, score) in enumerate(
-                data, start=(self.current_page - 1) * self.sep + 1
-            )
-        ]
-        headers = ["Rank", "Player Name", "Pts"]
-        table_output = tabulate(table_data, headers=headers, tablefmt="grid")
-        embed.description = f"```\n{table_output}\n```"
-        return embed
-
-    def get_current_page_data(self):
-        from_item = (self.current_page - 1) * self.sep
-        until_item = from_item + self.sep
-        return self.data[from_item:until_item]
-
-    def get_total_pages(self):
-        return (len(self.data) - 1) // self.sep + 1
-
-    async def update_message(self, interaction):
-        total_pages = self.get_total_pages()
-        page_data = self.get_current_page_data()
-        embed = self.create_embed(page_data, total_pages)
-        if self.message:
-            await self.message.edit(embed=embed, view=self)
-
-    # ================================== BUTTONS ================================= #
-    @discord.ui.button(label="|<", style=discord.ButtonStyle.green)
-    async def first_page_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        self.current_page = 1
-        await self.update_message(interaction)
-
-    @discord.ui.button(label="<", style=discord.ButtonStyle.primary)
-    async def prev_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        if self.current_page > 1:
-            self.current_page -= 1
-        await self.update_message(interaction)
-
-    @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
-    async def next_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        if self.current_page < self.get_total_pages():
-            self.current_page += 1
-        await self.update_message(interaction)
-
-    @discord.ui.button(label=">|", style=discord.ButtonStyle.green)
-    async def last_page_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        self.current_page = self.get_total_pages()
-        await self.update_message(interaction)
 
 errorHandler =ErrorHandler()
 # ============================================================================ #
@@ -98,8 +30,7 @@ class Leaderboard(commands.Cog):
     )
     @app_commands.guild_only()
     async def leaderboard(
-        self, interaction: discord.Interaction, game_type: str = None
-    ):
+        self, interaction: discord.Interaction, game_type: str = None):
         """Show the leaderboard for the current guild with pagination or a specific game type."""
         await interaction.response.defer()
         with Games.create_connection() as conn:
@@ -116,7 +47,7 @@ class Leaderboard(commands.Cog):
                         f"SELECT player_id, total_score FROM {table_name} ORDER BY total_score DESC"
                     )
                 rows = c.fetchall()
-            except Exception as e:
+            except sqlite3.OperationalError as e:
                 await interaction.followup.send("No Leaderboard available.")
                 errorHandler.handle_exception(e)
                 return
@@ -124,22 +55,39 @@ class Leaderboard(commands.Cog):
         for idx, (player_id, score) in enumerate(rows, start=1):
             member = interaction.guild.get_member(player_id)
             if member:
-                leaderboard_data.append((member.display_name, score))
+                avatar_url = member.display_avatar.url
+                leaderboard_data.append((idx,member.display_name, score, 0,avatar_url))
+
         pagination_view = LeaderboardPaginationView(
             data=leaderboard_data, sep=5, timeout=None
         )
+        # Generate the first page's image
+        page_data = pagination_view.get_current_page_data()
+        img = pagination_view.generate_leaderboard_image(page_data)
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        # Prepare discord file
+        discord_file = discord.File(buffer, filename="leaderboard.png")
+
+        # Create embed
+        embed = discord.Embed(
+            title=f"🏆 Leaderboard Page {pagination_view.current_page}/{pagination_view.get_total_pages()}",
+            color=discord.Color.gold()
+        )
+        embed.set_image(url="attachment://leaderboard.png")
+        embed.set_footer(text="Use the buttons below to navigate pages.")
+
+        # Send initial message and store it
         pagination_view.message = await interaction.followup.send(
-            embed=pagination_view.create_embed(
-                pagination_view.get_current_page_data(),
-                pagination_view.get_total_pages(),
-            ),
-            view=pagination_view,
+            embed=embed,
+            file=discord_file,
+            view=pagination_view
         )
 
     @leaderboard.autocomplete("game_type")
-    async def game_type_autocomplete(
-        self, interaction: discord.Interaction, current: str
-    ):
+    async def game_type_autocomplete(self, interaction: discord.Interaction, current: str):
         # List of possible game types/
         try:
             current = current.strip() if current else ""
@@ -177,8 +125,7 @@ class Leaderboard(commands.Cog):
     @app_commands.guild_only()
     @app_commands.command(name="rank", description="Rank with score in mini games")
     async def rank(
-        self, interaction: discord.Interaction, member: discord.Member = None
-    ):
+        self, interaction: discord.Interaction, member: discord.Member = None):
         """Show the rank of a member in the current guild."""
 
         await interaction.response.defer()
@@ -216,42 +163,21 @@ class Leaderboard(commands.Cog):
                 errorHandler.handle_exception(e)
                 rank = 0
             # banner making code
-            banner_path = IMGS_DIR / "default.png"
-            banner = Image.open(banner_path).convert("RGBA")
-            blurred_banner = banner.filter(ImageFilter.GaussianBlur(10))
-            overlay = Image.new("RGBA", blurred_banner.size, (0, 0, 0, 0))
-            combined_image = Image.alpha_composite(blurred_banner, overlay)
-            draw = ImageDraw.Draw(combined_image)
-            try:
-                font = ImageFont.truetype("arial.ttf", 40)
-                bold_font = ImageFont.truetype("arialbd.ttf", 60)
-            except IOError as e:
-                errorHandler.handle_exception(e)
-                return
-            player_name = member.display_name
             pvp_text = f"PvP: {pvp_score}pts"
             pvb_text = f"PvB: {pvb_score}pts"
             sporty_text = f"Sporty: {sporty_score}pts"
             efootball_text = f"Efootball: {efootball_score}pts"
-            rank_text = f"Rank: #{rank}"
-            name_position = (200, 30)
-            pvp_score_position = (50, 100)
-            pvb_score_position = (50, 150)
-            sporty_score_position = (50, 200)
-            efootball_score_position = (300, 100)
-            image_width, image_height = combined_image.size
-            rank_position = (image_width - 350, image_height - 70)
-            draw.text(name_position, player_name, font=bold_font, fill=(255, 255, 255, 255))
-            draw.text(pvp_score_position, pvp_text, font=font, fill=(255, 255, 255, 255))
-            draw.text(pvb_score_position, pvb_text, font=font, fill=(255, 255, 255, 255))
-            draw.text(sporty_score_position, sporty_text, font=font, fill=(255, 255, 255, 255))
-            draw.text(efootball_score_position,efootball_text,font=font,fill=(255, 255, 255, 255),)
-            draw.text(rank_position, rank_text, font=bold_font, fill=(255, 255, 255, 255))
-            image_path = f"{member.display_name}_rank.png"
-            combined_image.save(image_path, format="PNG", quality=100)
-            await interaction.followup.send(file=File(image_path))
-            os.remove(image_path)
-
+        
+            embed = discord.Embed(
+                title=f"🏆Rank #{rank} ",
+                description=(
+                    f"Congratulations **{interaction.user.name}**!\n You are **Rank #{rank}**.\n\n With \n {pvp_text}  \n {pvb_text} \n {sporty_text} \n {efootball_text}"
+                ),
+                color=discord.Color.purple()  # pick your color
+                )
+            embed.set_thumbnail(url=str(interaction.user.display_avatar.url))
+            await interaction.followup.send(embed=embed)
+            
 
 # ============================================================================ #
 #                                     SETUP                                    #

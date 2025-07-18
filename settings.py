@@ -39,7 +39,7 @@ BASE_DIR = pathlib.Path(__file__).parent
 CMDS_DIR = BASE_DIR / "cmds"
 COGS_DIR = BASE_DIR / "cogs"
 IMGS_DIR = BASE_DIR / "imgs"
-
+FONT_DIR = BASE_DIR / "fonts"
 # Load logging configuration from file
 LOGGING_CONFIG = {
     "version": 1,

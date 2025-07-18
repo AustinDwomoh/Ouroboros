@@ -1,145 +1,13 @@
-from settings import ErrorHandler  # for Dir
-import discord, typing,asyncio
+import aiohttp
+from settings import ErrorHandler,FONT_DIR  # for Dir
+import discord, typing,asyncio,requests
 from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import MoviesManager
-from tabulate import tabulate
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 from datetime import date,datetime, timezone
-
-
-
-
 errorHandler = ErrorHandler()
-
-class MediaListPaginationView(discord.ui.View):
-    def __init__(self, data, media_type, sep=10, timeout=60, watchlist=False):
-        super().__init__(timeout=timeout)
-        self.data = data
-        self.sep = sep
-        self.media_type = media_type  # "movie" or "series"
-        self.current_page = 1
-        self.watch_list = watchlist
-
-    def create_embed(self, data, total_pages):
-        embed = discord.Embed(
-            title=f"{self.media_type.capitalize()} Page {self.current_page} / {total_pages}"
-        )
-        table_data = []  # List to hold table rows
-        headers = []  # Headers for the table
-
-        # Define headers based on media type
-        if self.watch_list:
-            headers = ["No.", "Title", "Details", "Date"]
-            for idx, item in enumerate(
-                data, start=(self.current_page - 1) * self.sep + 1
-            ):
-                try:
-                    if isinstance(item, dict):
-                        table_data.append(
-                            [str(idx), item["title"], item["extra"], item["date"]]
-                        )
-                    elif isinstance(item, tuple):
-                        table_data.append([str(idx), item[1], item[2], item[3]])
-                except IndexError as e:
-                    continue
-
-            # Generate the table with Tabulate
-            rendered_table = tabulate(table_data, headers=headers, tablefmt="grid")
-
-            # Handle empty data
-            if not data:
-                embed.description = "No results available for this page."
-            else:
-                embed.description = f"```\n{rendered_table}\n```"  # Use triple backticks to display the table in code block format
-
-        else:
-            if self.media_type == "movie":
-                headers = ["No.", "Title", "Date"]
-            elif self.media_type == "series":
-                headers = ["No.", "Title", "Details", "Date"]
-            for idx, item in enumerate(
-                data, start=(self.current_page - 1) * self.sep + 1
-            ):
-                try:
-                    if self.media_type == "movie":
-                        if isinstance(item, dict):
-                            table_data.append([str(idx), item["title"], item["date"]])
-                        elif isinstance(item, tuple):
-                            table_data.append([str(idx), item[1], item[2]])
-                    elif self.media_type == "series":
-                        if isinstance(item, dict):
-                            table_data.append(
-                                [
-                                    str(idx),
-                                    item["title"],
-                                    f"S{item['season']} E{item['episode']}",
-                                    item["date"],
-                                ]
-                            )
-                        elif isinstance(item, tuple):
-                            table_data.append(
-                                [str(idx), item[1], f"S{item[2]} E{item[3]}", item[4]]
-                            )
-                except IndexError as e:
-                    continue
-
-            # Generate the table with Tabulate
-            rendered_table = tabulate(table_data, headers=headers, tablefmt="grid")
-
-            # Handle empty data
-            if not data:
-                embed.description = "No results available for this page."
-            else:
-                embed.description = f"```\n{rendered_table}\n```"  # Use triple backticks to display the table in code block format
-
-        return embed
-
-    def get_current_page_data(self):
-        from_item = (self.current_page - 1) * self.sep
-        until_item = from_item + self.sep
-        return self.data[from_item:until_item]
-
-    def get_total_pages(self):
-        return (len(self.data) - 1) // self.sep + 1
-
-    async def update_message(self, interaction: discord.Interaction):
-        total_pages = self.get_total_pages()
-        page_data = self.get_current_page_data()
-        embed = self.create_embed(page_data, total_pages)
-
-        await interaction.response.edit_message(embed=embed, view=self)
-
-    # ================================== BUTTONS ================================= #
-    @discord.ui.button(label="|<", style=discord.ButtonStyle.green)
-    async def first_page_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        self.current_page = 1
-        await self.update_message(interaction)
-
-    @discord.ui.button(label="<", style=discord.ButtonStyle.primary)
-    async def prev_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        if self.current_page > 1:
-            self.current_page -= 1
-        await self.update_message(interaction)
-
-    @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
-    async def next_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        if self.current_page < self.get_total_pages():
-            self.current_page += 1
-        await self.update_message(interaction)
-
-    @discord.ui.button(label=">|", style=discord.ButtonStyle.green)
-    async def last_page_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        self.current_page = self.get_total_pages()
-        await self.update_message(interaction)
-
 
 class MediaSearchPaginator(discord.ui.View):
     """A Discord UI view with buttons for pagination."""
@@ -169,7 +37,7 @@ class MediaSearchPaginator(discord.ui.View):
                 else "https://example.com/default-thumbnail.jpg"
             )
             embed.add_field(
-                name=f"ðŸŽ¥ {media['title']}",
+                name=f"{media['title']}",
                 value=f"[Watch Here]({media['link']}) || " f"[Poster]({thumbnail_url})",
                 inline=False,
             )
@@ -179,7 +47,7 @@ class MediaSearchPaginator(discord.ui.View):
         return embed
 
     @discord.ui.button(
-        label="â¬… Previous", style=discord.ButtonStyle.secondary, disabled=True
+        label="Previous", style=discord.ButtonStyle.secondary, disabled=True
     )
     async def previous_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
@@ -198,7 +66,7 @@ class MediaSearchPaginator(discord.ui.View):
 
         await interaction.response.edit_message(embed=self.get_embed(), view=self)
 
-    @discord.ui.button(label="Next âž¡", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.primary)
     async def next_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
@@ -216,12 +84,186 @@ class MediaSearchPaginator(discord.ui.View):
 
         await interaction.response.edit_message(embed=self.get_embed(), view=self)
 
+class MediaListPaginationView(discord.ui.View):
+    def __init__(self, data, media_type, sep=10, timeout=60, watchlist=False):
+        super().__init__(timeout=timeout)
+        self.data = data
+        self.sep = sep
+        self.media_type = media_type
+        self.current_page = 1
+        self.watch_list = watchlist
+        self.message = None
+
+    def wrap_text(self,text, font, max_width):
+        words = text.split()
+        line = ""
+        lines = []
+        for word in words:
+            test_line = f"{line} {word}".strip()
+            if font.getlength(test_line) <= max_width:
+                line = test_line
+            else:
+                lines.append(line)
+                line = word
+        if line:
+            lines.append(line)
+        return lines[:2]  # Max 2 lines
+
+    async def generate_media_image(self, page_data):
+        row_height = 80
+        image_width = 900
+        margin = 10
+        avatar_size = 50
+        font_size = 24
+        background_color = (44, 47, 51, 255)
+        text_color = (255, 255, 255)
+        max_title_width = image_width - (margin * 2 + avatar_size + 100)
+
+        image_height = len(page_data) * (row_height + margin) + margin
+        base_img = Image.new("RGBA", (image_width, image_height), color=background_color)
+        draw = ImageDraw.Draw(base_img)
+        overlay = Image.new("RGBA", base_img.size, (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
+
+        try:
+            font = ImageFont.truetype(str(FONT_DIR / "OpenSans-Bold.ttf"), font_size)
+        except Exception:
+            font = ImageFont.load_default()
+
+        urls = [item.get("api_data", {}).get("poster_url") for item in page_data]
+        avatars = await self.download_all_avatars(urls, avatar_size)
+        for i, item in enumerate(page_data):
+            y = margin + i * (row_height + margin)
+            x = margin
+            db_data = item.get("db_data", {})
+            index = (self.current_page - 1) * self.sep + i + 1
+            title = db_data.get("title", "Unknown Title")
+            air_date = str(db_data.get("date") or "")
+            season = db_data.get("season")
+            episode = db_data.get("episode")
+            avatar = avatars[i]
+            # === Draw Avatar === #
+            if avatar:
+                avatar = self.circular_crop(avatar)
+                base_img.paste(avatar, (x, y), avatar)
+
+            # === Left: Rank + Title === #
+            rank_text = f"#{index}"
+            rank_x = x + avatar_size + margin
+            draw.text((rank_x, y), rank_text, font=font, fill=text_color)
+
+            rank_text_width = draw.textlength(rank_text, font=font)
+            title_x = rank_x + rank_text_width + 8
+            title_lines = self.wrap_text(title, font, max_title_width)
+            truncated_title = " ".join(title_lines)
+            draw.text((title_x, y), f"• {truncated_title}", font=font, fill=text_color)
+
+            # === Center: Season/Episode === #
+            if season  or episode:
+                season_text = f"S{season} E{episode}"
+                season_x = title_x + draw.textlength(f"• {truncated_title}", font=font) + 10
+                draw.text((season_x, y), season_text, font=font, fill=text_color)
+           
+
+            # === Right: Air Date === #
+            if air_date:
+                date_width = draw.textlength(air_date, font=font)
+                date_x = image_width - margin - date_width
+                date_y = y + (row_height - font_size) // 2
+                draw.text((date_x, date_y), air_date, font=font, fill=text_color)
+
+            # === Separator Line === #
+            line_y = y + row_height + 2
+            overlay_draw.line([(margin, line_y), (image_width - margin, line_y)], fill=(255, 255, 255, 80), width=1)
+
+        return Image.alpha_composite(base_img, overlay)
+
+    async def download_all_avatars(self,urls, avatar_size):
+        async with aiohttp.ClientSession() as session:
+            tasks = [self.download_avatar(session, url, avatar_size) for url in urls]
+            return await asyncio.gather(*tasks)
+        
+    async def download_avatar(self, session, url, avatar_size):
+        if not url or not isinstance(url, str):
+            return None
+        try:
+            async with session.get(url, timeout=5) as resp:
+                if resp.status == 200:
+                    data = await resp.read()
+                    avatar = Image.open(BytesIO(data)).convert("RGBA")
+                    return avatar.resize((avatar_size, avatar_size))
+        except Exception as e:
+            print(f"[WARN] Avatar failed: {e}")
+        return None
+    
+    def circular_crop(self, im):
+        size = im.size
+        mask = Image.new('L', size, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0) + size, fill=255)
+        output = Image.new("RGBA", size, (0, 0, 0, 0))
+        output.paste(im, (0, 0), mask)
+        return output
+
+    def get_current_page_data(self):
+        from_item = (self.current_page - 1) * self.sep
+        until_item = from_item + self.sep
+        return self.data[from_item:until_item]
+
+    def get_total_pages(self):
+        return (len(self.data) - 1) // self.sep + 1
+
+    async def get_embed_and_file(self):
+        page_data = self.get_current_page_data()
+        total_pages = max(1, self.get_total_pages())
+
+        img = await self.generate_media_image(page_data)
+        from io import BytesIO
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        discord_file = discord.File(buffer, filename="medialist.png")
+
+        embed = discord.Embed(
+            title=f"{self.media_type.capitalize()} Page {self.current_page}/{total_pages}",
+            color=discord.Color.blurple()
+        )
+        embed.set_image(url="attachment://medialist.png")
+        embed.set_footer(text="Use the buttons below to navigate pages.")
+        return embed, discord_file
+
+    async def update_message(self, interaction: discord.Interaction):
+        embed, discord_file = await self.get_embed_and_file()
+        await interaction.response.edit_message(embed=embed, view=self, attachments=[discord_file])
+
+    # ============================= BUTTONS ============================= #
+    @discord.ui.button(label="|<", style=discord.ButtonStyle.green)
+    async def first_page_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_page = 1
+        await self.update_message(interaction)
+
+    @discord.ui.button(label="<", style=discord.ButtonStyle.primary)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page > 1:
+            self.current_page -= 1
+        await self.update_message(interaction)
+
+    @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page < self.get_total_pages():
+            self.current_page += 1
+        await self.update_message(interaction)
+
+    @discord.ui.button(label=">|", style=discord.ButtonStyle.green)
+    async def last_page_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_page = self.get_total_pages()
+        await self.update_message(interaction)
 
 class Movies(commands.Cog):
     def __init__(self, client):
         self.client = client
-        self.media_reminder_loop.start()
-        self.check_completion_loop.start()
+        #self.media_reminder_loop.start()
+        #self.check_completion_loop.start()
 
     # ================================= DM CHECK ================================= #
 
@@ -232,12 +274,8 @@ class Movies(commands.Cog):
     # ============================================================================ #
     #                           DATABSE UPDATE COMMAND                             #
     # ============================================================================ #
-    @app_commands.command(
-        name="delete_media", description="Must be invoked delete a record"
-    )
-    @app_commands.describe(
-        title="If you just need to delete your record leave empty or specify title"
-    )
+    @app_commands.command(name="delete_media", description="Must be invoked delete a record")
+    @app_commands.describe(title="If you just need to delete your record leave empty or specify title")
     @app_commands.describe(media_type="Movie or series")
     async def delete_media(
         self,
@@ -278,13 +316,8 @@ class Movies(commands.Cog):
     # ============================================================================ #
     #                               INSERT MEDIA  CMD                              #
     # ============================================================================ #
-    @app_commands.command(
-        name="add_media",
-        description="Add or update movies.All data entered must match the initial inputs especially titles ",
-    )
-    @app_commands.describe(
-        title="If movie add the descritption if a part or a version of the moive"
-    )
+    @app_commands.command(name="add_media",description="Add or update movies.All data entered must match the initial inputs especially titles ",)
+    @app_commands.describe(title="If movie add the descritption if a part or a version of the moive")
     @app_commands.describe(season="If not in seasons 0")
     @app_commands.describe(episode="If not in episodes 0")
     async def add_media(
@@ -293,8 +326,7 @@ class Movies(commands.Cog):
         title: str,
         media_type: str,
         season: str,
-        episode: str,
-    ):
+        episode: str,):
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer(thinking=True, ephemeral=True)
@@ -357,13 +389,10 @@ class Movies(commands.Cog):
     # ============================================================================ #
     #                               LOOK UP MEDIA CMD                              #
     # ============================================================================ #
-    @app_commands.command(
-        name="search_saved_media", description="Search for a movie or series by title"
-    )
+    @app_commands.command(name="search_saved_media", description="Search for a movie or series by title")
     @app_commands.describe(title="Title of the movie or series to search")
     async def search_saved_media(
-        self, interaction: discord.Interaction, title: str, media_type: str
-    ):
+        self, interaction: discord.Interaction, title: str, media_type: str):
         """Search for movies or series based on a partial title match."""
         try:
             if not interaction.response.is_done():
@@ -373,31 +402,111 @@ class Movies(commands.Cog):
                     "This command can only be used in DMs!", ephemeral=True
                 )
                 return
-            matching_records = await MoviesManager.search_media(
+            
+            data = await MoviesManager.search_media(
                 interaction.user.id, title.lower(), media_type
             )
+            result = data.get('api_data')
+            db_data = data.get('db_data')
+            name,last_watched, current_season, current_episode = (
+                db_data.get('title'),
+                db_data.get('date', "Unknown date"),
+                db_data.get('season', 1),
+                db_data.get('episode', 1)
+            )
+            embed = discord.Embed(
+                    title=name,
+                    description=(
+                        result.get("overview")[:500] + "..."
+                        if len( result.get("overview")) > 500
+                        else  result.get("overview")
+                    ),  # Limit description size
+                    color=discord.Color.blue(),
+                    url=result["homepage"] if result.get("homepage") else None,
+                )
 
-            if not matching_records:  # No results found
-                await interaction.followup.send("No matching movies or series found.")
-                return
+            if result.get("poster_url"):
+                embed.set_thumbnail(url=result["poster_url"])
 
-            # If records are found, proceed to create pagination
-            pagination_view = MediaListPaginationView(
-                matching_records, media_type=media_type
-            )
-            embed = pagination_view.create_embed(
-                pagination_view.get_current_page_data(), pagination_view.get_total_pages()
-            )
-            # Send the embed with pagination view
-            pagination_view.message = await interaction.followup.send(
-                embed=embed, view=pagination_view
-            )
+            embed.add_field(
+                    name="Genres",
+                    value=", ".join(result["genres"]) if result["genres"] else "N/A",
+                    inline=True,
+                )
+            embed.add_field(
+                    name="Release Date",
+                    value=(
+                        result["release_date"] if result.get("release_date") else "N/A"
+                    ),
+                    inline=True,
+                )
+            if media_type == "series":
+                embed.add_field(
+                    name="Last Aired",
+                    value=(
+                        result["last_air_date"]
+                        if result.get("last_air_date")
+                        else "N/A"
+                    ),
+                    inline=True,
+                )
+                embed.add_field(
+                            name="Current Details",
+                            value=f"S{current_season} E{current_episode} \n Last Watched {last_watched}",
+                            inline=True,
+                        )
+
+                
+                embed.add_field(
+                    name="Next Episode", value=result["next_episode_date"], inline=True
+                )
+                last_released = result['last_episode']
+                last_season = last_released.get("season", 0)
+                last_episode = last_released.get("episode", 0)
+                embed.add_field(
+                name="Last realesed Details",
+                value=f"S{last_season} E{last_episode}",
+                inline=True,
+                        )
+                embed.add_field(name="Status", value=result["status"], inline=True)
+                
+            else:
+                embed.add_field(name="Status", value=result["status"], inline=True)
+                if ( "belongs_to_collection" in result and result["belongs_to_collection"]):
+                    collection = result["belongs_to_collection"]
+                    collection_name = collection.get("name", "Unknown Collection")
+                    embed.add_field(name="Collection", value=collection_name, inline=False)
+                embed.add_field(name="Wacthed On",value=f"{last_watched}",inline =True)
+            await interaction.followup.send(embed=embed)
         except discord.DiscordException as e:
             errorHandler.handle_exception(e)
         except Exception as e:
             errorHandler.handle_exception(e)
 
-            
+    @app_commands.command(
+        name="search_anime",
+        description="This command only looks the anime up on hanime only",)
+    @app_commands.describe(media_name="name of the anime you are looking for")
+    async def search_anime(self, interaction: discord.Interaction, media_name: str):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await self.is_dm(interaction):
+                await interaction.followup.send("This command can only be used in DMs!",ephemeral=True)
+                return
+            tv_data = await MoviesManager.search_hianime(media_name)
+            if not tv_data:
+                await interaction.followup.send("No anime found for that name.", ephemeral=True)
+                return
+            view = MediaSearchPaginator(tv_data, interaction.user)
+            await interaction.followup.send(embed=view.get_embed(), view=view)
+        except discord.DiscordException as e:
+            errorHandler.handle_exception(e)
+        except Exception as e:
+            errorHandler.handle_exception(e)
+
+    
+        
     @app_commands.command(name="all_media", description="List Of all movies or series")
     @app_commands.describe(media_type="movie or series")
     async def all_media(self, interaction: discord.Interaction, media_type: str):
@@ -409,18 +518,16 @@ class Movies(commands.Cog):
                 )
                 return
             if not interaction.response.is_done():
-                    await interaction.response.defer(thinking=True, ephemeral=True)
+                await interaction.response.defer(thinking=True, ephemeral=True)
             data = await MoviesManager.view_media(interaction.user.id, media_type)
+
             pagination_view = MediaListPaginationView(data, media_type=media_type)
-            await interaction.followup.send(
-                embed=pagination_view.create_embed(
-                    pagination_view.get_current_page_data(),
-                    pagination_view.get_total_pages(),
-                ),
-                view=pagination_view,
-            )
-            # Fetch the message object after it is sent
+            embed, file = await pagination_view.get_embed_and_file()
+            await interaction.followup.send(embed=embed, files=[file], view=pagination_view)
+
+            # Then fetch the sent message object if you want to store it for later editing:
             pagination_view.message = await interaction.original_response()
+
         except discord.DiscordException as e:
             errorHandler.handle_exception(e)
         except Exception as e:
@@ -429,9 +536,7 @@ class Movies(commands.Cog):
     # ============================================================================ #
     #                                WACTH_LIST CMDS                               #
     # ============================================================================ #
-    @app_commands.command(
-        name="watch_list", description="List Of all watchlist movies or series"
-    )
+    @app_commands.command(name="watch_list", description="List Of all watchlist movies or series")
     @app_commands.describe(media_type="movie or series")
     async def watch_list(self, interaction: discord.Interaction, media_type: str):
         """This function shows the uers wacthlist based on movie typ"""
@@ -444,26 +549,19 @@ class Movies(commands.Cog):
                 )
                 return
             data = await MoviesManager.view_watch_list(interaction.user.id, media_type)
-            pagination_view = MediaListPaginationView(
-                data, media_type=media_type, watchlist=True
-            )
-            await interaction.followup.send(
-                embed=pagination_view.create_embed(
-                    pagination_view.get_current_page_data(),
-                    pagination_view.get_total_pages(),
-                ),
-                view=pagination_view,
-            )
-            # Fetch the message object after it is sent
+    
+            pagination_view = MediaListPaginationView(data, media_type=media_type)
+            embed, file = await pagination_view.get_embed_and_file()
+            await interaction.followup.send(embed=embed, files=[file], view=pagination_view)
+
+            # Then fetch the sent message object if you want to store it for later editing:
             pagination_view.message = await interaction.original_response()
         except discord.DiscordException as e:
             errorHandler.handle_exception(e)
         except Exception as e:
             errorHandler.handle_exception(e)
 
-    @app_commands.command(
-        name="update_watchlist", description="Add or update the watchlist"
-    )
+    @app_commands.command(name="update_watchlist", description="Add or update the watchlist")
     @app_commands.describe(media_type="movie or series")
     @app_commands.describe(title="Media title")
     @app_commands.describe(extra="Any additional details (optional)")
@@ -505,32 +603,6 @@ class Movies(commands.Cog):
             errorHandler.handle_exception(e)
 
 
-    # ============================================================================ #
-    #                                   API CALLS                                  #
-    # ============================================================================ #
-    @app_commands.command(
-        name="search_anime",
-        description="This command only looks the anime up on hanime only",
-    )
-    @app_commands.describe(media_name="name of the anime you are looking for")
-    async def search_anime(self, interaction: discord.Interaction, media_name: str):
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(thinking=True, ephemeral=True)
-            if not await self.is_dm(interaction):
-                await interaction.followup.send("This command can only be used in DMs!",ephemeral=True)
-                return
-            tv_data = await MoviesManager.search_hianime(media_name)
-            if not tv_data:
-                await interaction.followup.send("No anime found for that name.", ephemeral=True)
-                return
-            view = MediaSearchPaginator(tv_data, interaction.user)
-            await interaction.followup.send(embed=view.get_embed(), view=view)
-        except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
-        except Exception as e:
-            errorHandler.handle_exception(e)
-
     @app_commands.command(name="search_movie_or_series",description="The more refined the name is the more refined the search will be",)
     @app_commands.describe(media_name="what you are looking for")
     async def search_movie_or_series(self, interaction: discord.Interaction, media_name: str, media_type: str):
@@ -544,87 +616,82 @@ class Movies(commands.Cog):
                     "This command can only be used in DMs!", ephemeral=True
                 )
                 return
-            media_data = await MoviesManager.get_media_details(media_type, media_name)
-            if not media_data:
+            result = await MoviesManager.get_media_details(media_type, media_name)
+            if not result:
                 await interaction.followup.send(
                     f"No data found for {media_name}.", ephemeral=True
                 )
                 return
-            for result in media_data.values():
-                embed = discord.Embed(
-                        title=result["title"],
-                        description=(
-                            result["overview"][:500] + "..."
-                            if len(result["overview"]) > 500
-                            else result["overview"]
-                        ),  # Limit description size
-                        color=discord.Color.blue(),
-                        url=result["homepage"] if result.get("homepage") else None,
-                    )
+           
+            embed = discord.Embed(
+                    title=result["title"],
+                    description=(
+                        result["overview"][:500] + "..."
+                        if len(result["overview"]) > 500
+                        else result["overview"]
+                    ),  # Limit description size
+                    color=discord.Color.blue(),
+                    url=result["homepage"] if result.get("homepage") else None,
+                )
 
-                if result.get("poster_url"):
-                    embed.set_thumbnail(url=result["poster_url"])
+            if result.get("poster_url"):
+                embed.set_thumbnail(url=result["poster_url"])
 
+            embed.add_field(
+                    name="Genres",
+                    value=", ".join(result["genres"]) if result["genres"] else "N/A",
+                    inline=True,
+                )
+            embed.add_field(
+                    name="Release Date",
+                    value=(
+                        result["release_date"] if result.get("release_date") else "N/A"
+                    ),
+                    inline=True,
+                )
+            if media_type == "tv":
                 embed.add_field(
-                        name="Genres",
-                        value=", ".join(result["genres"]) if result["genres"] else "N/A",
-                        inline=True,
-                    )
+                    name="Last Aired",
+                    value=(
+                        result["last_air_date"]
+                        if result.get("last_air_date")
+                        else "N/A"
+                    ),
+                    inline=True,
+                )
                 embed.add_field(
-                        name="Release Date",
-                        value=(
-                            result["release_date"] if result.get("release_date") else "N/A"
-                        ),
-                        inline=True,
-                    )
-                if media_type == "tv":
-                    embed.add_field(
-                        name="Last Aired",
-                        value=(
-                            result["last_air_date"]
-                            if result.get("last_air_date")
-                            else "N/A"
-                        ),
-                        inline=True,
-                    )
-                    embed.add_field(
-                        name="Next Episode", value=result["next_episode_date"], inline=True
-                    )
-                    embed.add_field(name="Status", value=result["status"], inline=True)
+                    name="Next Episode", value=result["next_episode_date"], inline=True
+                )
+                embed.add_field(name="Status", value=result["status"], inline=True)
+                
+
+                seasons_info = "\n".join(
+                    [
+                        f"Season {s['season_number']}: {s['episode_count']} episodes"
+                        for s in result["seasons"]
+                    ]
+                )
+                embed.add_field(
+                    name="Seasons",
+                    value=seasons_info if seasons_info else "N/A",
+                    inline=False,
+                )
+                embed.set_footer(
+                    text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD"
+                )
+
+            else:
+                embed.add_field(name="Status", value=result["status"], inline=True)
+                if ( "belongs_to_collection" in result and result["belongs_to_collection"]):
+                    collection = result["belongs_to_collection"]
+                    collection_name = collection.get("name", "Unknown Collection")
                     
 
-                    seasons_info = "\n".join(
-                        [
-                            f"Season {s['season_number']}: {s['episode_count']} episodes"
-                            for s in result["seasons"]
-                        ]
-                    )
-                    embed.add_field(
-                        name="Seasons",
-                        value=seasons_info if seasons_info else "N/A",
-                        inline=False,
-                    )
-                    embed.set_footer(
-                        text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD"
-                    )
+                    embed.add_field(name="Collection", value=collection_name, inline=False)
 
-                else:
-                    embed.add_field(name="Status", value=result["status"], inline=True)
-                    if ( "belongs_to_collection" in result and result["belongs_to_collection"]):
-                        collection = result["belongs_to_collection"]
-                        collection_name = collection.get("name", "Unknown Collection")
-                        collection_poster = collection.get("poster_path")
-                        collection_backdrop = collection.get("backdrop_path")
+                embed.set_footer(text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD")
 
-                        embed.add_field(name="Collection", value=collection_name, inline=False)
-
-                        if collection_poster:
-                            embed.set_image(url=f"https://image.tmdb.org/t/p/w500{collection_poster}")
-                        elif collection_backdrop:
-                            embed.set_image( url=f"https://image.tmdb.org/t/p/w500{collection_backdrop}")
-                    embed.set_footer(text="If its an anime you can use the search anime command to find it on hianime\n Data from TMBD")
-
-                await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed)
         except discord.DiscordException as e:
             errorHandler.handle_exception(e)
         except Exception as e:
@@ -643,24 +710,23 @@ class Movies(commands.Cog):
     @tasks.loop(hours=168)
     async def media_reminder_loop(self):
         upcoming = await MoviesManager.check_upcoming_dates()
+        id_list = set()
         for reminder in upcoming:
             user_id = reminder.get("user_id")
+            id_list.add(user_id)
             if user_id is None:
                 continue
 
             user = await self.client.fetch_user(user_id) 
             if user:
                 try:
-                    
                     title = reminder.get("name", "Unknown Title")
                     if reminder.get('movie'):
                         date_str = reminder.get('release_date')
-                        media_details = await MoviesManager.get_media_details("movie", reminder["name"])
-                        media_data = media_details.get("movie_0", {})
+                        media_data = await MoviesManager.get_media_details("movie", reminder["name"])
                     else:
                         date_str = reminder.get('next_release_date')
-                        media_details = await MoviesManager.get_media_details("tv", reminder["name"])
-                        media_data = media_details.get("tv_0", {})
+                        media_data = await MoviesManager.get_media_details("tv", reminder["name"])
                     timestamp = await self.parse_date_to_timestamp(date_str)
 
                     if timestamp:
@@ -676,7 +742,7 @@ class Movies(commands.Cog):
 
                     poster_url = media_data.get("poster_url")
                     if poster_url:
-                        embed.set_image(url=poster_url)
+                        embed.set_thumbnail(url=poster_url)
 
                     # Current media details
                     current_season = reminder.get('season', '?')
@@ -705,13 +771,26 @@ class Movies(commands.Cog):
                     errorHandler.handle_exception(e)
                 except Exception as e:
                     errorHandler.handle_exception(e)
+        for id in id_list:
+            user = await self.client.fetch_user(id) 
+            if user:
+                embed = discord.Embed(
+                    title=f"Upcoming Updates complete",
+                    description=f"New Reminders received on <t:{int(datetime.now().timestamp())}:R>",
+                    color=discord.Color.blue(),
+                
+                )
+
+                await user.send(embed=embed)
         await MoviesManager.refresh_tmdb_dates()
 
     @tasks.loop(hours=760)
     async def check_completion_loop(self):  
         uncompleted = await MoviesManager.check_completion()
+        id_list = set()
         for reminder in uncompleted:
             user_id = reminder.get("user_id")
+            id_list.add(user_id)
             if user_id is None:
                 continue
 
@@ -725,7 +804,7 @@ class Movies(commands.Cog):
                         )
                         poster_url = reminder.get("poster_url")
                         if poster_url:
-                            embed.set_image(url=poster_url)
+                            embed.set_thumbnail(url=poster_url)
 
                         # Current media details
                         watched_value = reminder.get("watched")
@@ -756,6 +835,17 @@ class Movies(commands.Cog):
                 errorHandler.handle_exception(e)
             except Exception as e:
                 errorHandler.handle_exception(e)
+        
+        for id in id_list:
+            user = await self.client.fetch_user(id) 
+            if user:
+                embed = discord.Embed(
+                    title=f"Unfinished Series and Watch list",
+                    description=f"New Reminders recieved <t:{int(datetime.now().timestamp())}:R>",
+                    color=discord.Color.green(),
+                    
+                )
+                await user.send(embed=embed)
         await MoviesManager.refresh_tmdb_dates()
     # ============================================================================ #
     #                                 AUTOCOMPLETE                                 #
@@ -793,33 +883,23 @@ class Movies(commands.Cog):
     @update_watchlist.autocomplete("title")
     @search_saved_media.autocomplete("title")
     @search_movie_or_series.autocomplete("media_name")
+    @search_anime.autocomplete("media_name")
     async def list_autocomplete(
-        self, interaction: discord.Interaction, current: str
-    ) -> typing.List[app_commands.Choice[str]]:
+        self, interaction: discord.Interaction, current: str) -> typing.List[app_commands.Choice[str]]:
         try:
+
+            title_list = await MoviesManager.fetch_titles(interaction.user.id)
             choices = []
-            data_movie = await MoviesManager.view_media(interaction.user.id, "movie")
-            data_series = await MoviesManager.view_media(interaction.user.id, "series")
-            data_watchlis_series = await MoviesManager.view_watch_list(
-                interaction.user.id, "series"
-            )
-            data_watchlis_movie = await MoviesManager.view_watch_list(
-                interaction.user.id, "movie"
-            )
-            # Combine movies and series titles
-            for item in (
-                data_movie + data_series + data_watchlis_movie + data_watchlis_series
-            ):
-                choices.append(item[1])
+            for item in title_list:
+                print(item)
+                choices.append(item)
 
             # Filter based on user input and limit to 25 results
             filtered_choices = [
-                app_commands.Choice(name=choice, value=choice)
+                 app_commands.Choice(name=choice, value=choice)
                 for choice in choices
                 if current.lower() in choice.lower()
-            ][
-                :25
-            ]  # Limit to 25 choices
+            ][:25]   # Limit to 25 choices
 
             return filtered_choices
         except discord.errors.NotFound:
