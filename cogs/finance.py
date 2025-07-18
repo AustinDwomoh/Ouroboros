@@ -269,7 +269,6 @@ class Finance(commands.Cog):
                 if user:
                     if reminder["status"] == "reminded":
                         reminder["status"] = "overdue"
-                        #set status to reminder and changes when the user calls add_payment to show payments been made
                         FinTech.update_payment_status(reminder["user_id"], reminder["name"], "overdue"
                         )
                     else:
@@ -278,7 +277,7 @@ class Finance(commands.Cog):
                     embed = discord.Embed(
                         title=f"🔔 **Reminder:** {reminder['name']} Due on <t:{unix_timestamp}:D>",
                         description=f"**Payment Details**",
-                        color=discord.Color.blue(),  # You can choose any color
+                        color=discord.Color.blue(),
                     )
                     # Add fields to the embed
                     embed.add_field(name="⚠️ Status", value=reminder["status"], inline=False)

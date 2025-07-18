@@ -366,3 +366,22 @@ KeyError: 1
 2025-07-17 21:55:53,261 - INFO - Loaded commands and cogs
 2025-07-17 21:55:53,524 - INFO - Slash commands synced successfully: 33 commands
 2025-07-17 21:55:55,839 - INFO - Ouroboros Is Ready
+2025-07-17 22:02:52,548 - INFO - Loaded command: coinflip.py
+2025-07-17 22:02:52,551 - INFO - Loaded command: ouroboros.py
+2025-07-17 22:02:52,565 - INFO - Loaded command: rpsgame.py
+2025-07-17 22:02:52,567 - INFO - Loaded command: rpsvs.py
+2025-07-17 22:02:52,573 - INFO - Loaded command: sporty.py
+2025-07-17 22:02:52,576 - INFO - Loaded command: update.py
+2025-07-17 22:02:52,581 - INFO - Loaded cog: channelmanagement.py
+2025-07-17 22:02:52,584 - INFO - Loaded cog: embed.py
+2025-07-17 22:02:52,615 - INFO - Loaded cog: finance.py
+2025-07-17 22:02:54,159 - INFO - Loaded cog: leaderboard.py
+2025-07-17 22:02:54,162 - INFO - Loaded cog: leveling.py
+2025-07-17 22:02:54,400 - INFO - Loaded cog: movies.py
+2025-07-17 22:02:54,491 - INFO - Loaded cog: notification.py
+2025-07-17 22:02:54,496 - INFO - Loaded cog: serverstat.py
+2025-07-17 22:02:54,500 - INFO - Loaded cog: tournaments.py
+2025-07-17 22:02:54,504 - INFO - Loaded cog: welcome.py
+2025-07-17 22:02:54,505 - INFO - Loaded commands and cogs
+2025-07-17 22:02:54,830 - INFO - Slash commands synced successfully: 33 commands
+2025-07-17 22:02:57,153 - INFO - Ouroboros Is Ready
