@@ -891,7 +891,7 @@ class Movies(commands.Cog):
             title_list = await MoviesManager.fetch_titles(interaction.user.id)
             choices = []
             for item in title_list:
-                print(item)
+                
                 choices.append(item)
 
             # Filter based on user input and limit to 25 results

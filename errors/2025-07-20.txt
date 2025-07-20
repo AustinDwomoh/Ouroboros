@@ -1,0 +1,19 @@
+2025-07-20 17:42:12,493 - INFO - Loaded command: coinflip.py
+2025-07-20 17:42:12,498 - INFO - Loaded command: ouroboros.py
+2025-07-20 17:42:12,549 - INFO - Loaded command: rpsgame.py
+2025-07-20 17:42:12,554 - INFO - Loaded command: rpsvs.py
+2025-07-20 17:42:12,559 - INFO - Loaded command: sporty.py
+2025-07-20 17:42:12,564 - INFO - Loaded command: update.py
+2025-07-20 17:42:12,575 - INFO - Loaded cog: channelmanagement.py
+2025-07-20 17:42:12,585 - INFO - Loaded cog: embed.py
+2025-07-20 17:42:12,650 - INFO - Loaded cog: finance.py
+2025-07-20 17:42:15,075 - INFO - Loaded cog: leaderboard.py
+2025-07-20 17:42:15,078 - INFO - Loaded cog: leveling.py
+2025-07-20 17:42:15,480 - INFO - Loaded cog: movies.py
+2025-07-20 17:42:15,647 - INFO - Loaded cog: notification.py
+2025-07-20 17:42:15,654 - INFO - Loaded cog: serverstat.py
+2025-07-20 17:42:15,659 - INFO - Loaded cog: tournaments.py
+2025-07-20 17:42:15,663 - INFO - Loaded cog: welcome.py
+2025-07-20 17:42:15,664 - INFO - Loaded commands and cogs
+2025-07-20 17:42:15,871 - INFO - Slash commands synced successfully: 33 commands
+2025-07-20 17:42:18,404 - INFO - Ouroboros Is Ready
