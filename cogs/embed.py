@@ -31,7 +31,7 @@ class EmbedCog(commands.Cog):
     )
     @app_commands.dm_only()
     async def trigger(self, interaction: discord.Interaction):
-        if interaction.user.id != ALLOWED_ID:
+        if interaction.user.id not in ALLOWED_ID:
             await interaction.response.send_message("Not for you!", ephemeral=True)
             return
         try:
