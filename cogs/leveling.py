@@ -229,7 +229,7 @@ class Levelling(commands.Cog):
                 await message.channel.send(embed=embed)
             LevelinManager.insert_or_update_user(guild_id, user_id, xp, level)
         except Exception as e:
-            await ErrorHandler.handle(e, context="Levelling Cog on_message")
+            await ErrorHandler().handle(e, context="Levelling Cog on_message")
 
     @app_commands.command(name="level_self", description="Check your level")
     @app_commands.guild_only()
@@ -257,7 +257,7 @@ class Levelling(commands.Cog):
             embed.set_thumbnail(url=str(interaction.user.display_avatar.url))
             await interaction.followup.send(embed=embed)
         except Exception as e:
-            await ErrorHandler.handle(e, context="Levelling Cog level_self command")
+            await ErrorHandler().handle(e, context="Levelling Cog level_self command")
         
 
     @app_commands.command(name="level_server", description="Check the server leaderboard.")
@@ -310,7 +310,7 @@ class Levelling(commands.Cog):
                 view=pagination_view
             )
         except Exception as e:
-            await ErrorHandler.handle(e, context="Levelling Cog level_server command")
+            await ErrorHandler().handle(e, context="Levelling Cog level_server command")
 
 
 async def setup(client):

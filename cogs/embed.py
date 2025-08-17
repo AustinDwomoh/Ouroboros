@@ -37,7 +37,7 @@ class EmbedCog(commands.Cog):
         try:
             1 / 0
         except Exception as e:
-            ErrorHandler.handle(e, context="Embed Trigger Error")
+            ErrorHandler().handle(e, context="Embed Trigger Error")
             await interaction.response.send_message("Triggered error for testing.", ephemeral=True)
 
 

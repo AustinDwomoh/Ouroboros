@@ -15,7 +15,7 @@ from io import BytesIO
 #                                LEADERBOARD UI                                #
 # ============================================================================ #
 
-errorHandler =ErrorHandler()
+
 # ============================================================================ #
 #                              LEADERBOARD COG                                 #
 # ============================================================================ #
@@ -105,7 +105,7 @@ class Leaderboard(commands.Cog):
         except discord.errors.NotFound as e:
            pass
         except Exception as e:
-            errorHandler.handle(e,context="leaderboard_autocomplete")
+            ErrorHandler().handle(e,context="leaderboard_autocomplete")
 
     # ================================ RANK SCRIPT =============================== #
     async def fetch_player_score(self, cursor, table_name, player_id):
