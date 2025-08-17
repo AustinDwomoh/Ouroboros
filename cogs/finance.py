@@ -37,7 +37,7 @@ class FinTechListPaginationView(discord.ui.View):
                 table_data_1.append([str(idx), item[1][:10], item[2][:10], item[5]])
                 table_data_2.append([str(item[3]),"-".join(str(item[7]).split("-")[1:]), "-".join(str(item[8]).split("-")[1:])])#from YYYY-MM-DD to MM-DD
             except IndexError as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e,context= f"Error processing item {item} at index {idx}.")
                 continue
 
         table_1 = tabulate(table_data_1, headers=headers_1, tablefmt="grid")
@@ -113,6 +113,7 @@ class Finance(commands.Cog):
         return isinstance(interaction.channel, discord.DMChannel)
 
     @app_commands.command(name="fin_list", description="list of finance tracking")
+    @app_commands.dm_only()
     async def fin_list(self, interaction: discord.Interaction):
         """Lists all finance tracking records for the user in a paginated view.
 
@@ -133,9 +134,9 @@ class Finance(commands.Cog):
             # Fetch the message object after it is sent
             finPaginationView.message = await interaction.original_response()
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in fin_list command.")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="Unexpected error in fin_list command.")
                 
         
 
@@ -147,8 +148,8 @@ class Finance(commands.Cog):
         frequency="Set payment frequency",
         due_date="Select due date format YYYY-MM-DD",
     )
-    async def add_payment(self,interaction: discord.Interaction,name: str,amount: int,status: str='active',frequency: str=None,due_date: str=None,category:str=None
-    ):
+    @app_commands.dm_only()
+    async def add_payment(self,interaction: discord.Interaction,name: str,amount: int,status: str='active',frequency: str=None,due_date: str=None,category:str=None):
         """Adds new payment data when all feilds are filled but updates a specific row based on the name when only the required fields are filled
 
         Args:
@@ -192,9 +193,9 @@ class Finance(commands.Cog):
                     )
             await interaction.followup.send(embed = embed)
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in add_payment command.")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="Unexpected error in add_payment command.")
 
     # ============================================================================ #
     #                                   AUtocomp                                   #
@@ -215,13 +216,10 @@ class Finance(commands.Cog):
             ][:25]
             return filtered_choices
         except discord.errors.NotFound as e:
-            errorHandler.handle_exception(e)
             return []
         except Exception as e:
-            errorHandler.handle_exception(e)
             return []
         except discord.errors.HTTPException as e:
-            errorHandler.handle_exception(e)
             if "Interaction has already been acknowledged" in str(e):
                 pass
 
@@ -285,16 +283,12 @@ class Finance(commands.Cog):
                     embed.add_field(name="💰 Amount Due",value=f"${reminder['amount']:.2f}",inline=True,)
 
                     embed.add_field(name="📍 Category", value=reminder["category"], inline=True)
-                    
-                    
-                   
                     await user.send(embed=embed)
 
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in payment reminder loop.")
         except Exception as e:
-            errorHandler.handle_exception(e)
-
+            errorHandler.handle(e,context="Unexpected error in payment reminder loop.")
 
 async def setup(client):
     await client.add_cog(Finance(client))

@@ -11,7 +11,6 @@ from dbmanager import ServerStatManager
 # ============================================================================ #
 #the import is like that since unlik the order db classes this one  has an actual class and its causing the issues
 #fixed the serverstats i think
-errorHandler = ErrorHandler()
 class ServerStat(commands.Cog):
     def __init__(self, client):
         self.client = client
@@ -37,8 +36,8 @@ class ServerStat(commands.Cog):
                     try:
                         category = await guild.create_category(category_name)
                     except Exception as e:
-                        errorHandler.handle_exception(e)
-                        continue  # Skip if category creation fails
+                        ErrorHandler().handle(e, context="Error creating category for server stats")
+                        continue
                 else:
                     category = existing_category
 
@@ -47,7 +46,7 @@ class ServerStat(commands.Cog):
                     try:
                         await channel.delete()
                     except Exception as e:
-                        errorHandler.handle_exception(e)
+                        ErrorHandler().handle(e, context="Error deleting existing channels in server stats category")
 
                 # Define permission overwrites
                 overwrites = {
@@ -69,7 +68,7 @@ class ServerStat(commands.Cog):
                             name, category=category, overwrites=overwrites
                         )
                     except Exception as e:
-                        errorHandler.handle_exception(e)
+                        ErrorHandler.handle(e, context="Error creating voice channel for server stats")
 
     @update_stats.before_loop
     async def before_update_stats(self):
@@ -98,8 +97,7 @@ class ServerStat(commands.Cog):
             or role.permissions.kick_members
             or role.name == "Tour manager"
             or interaction.user.id == interaction.user.guild.owner_id
-            for role in interaction.user.roles
-        ):
+            for role in interaction.user.roles):
             embed = discord.Embed(
                 title="Permission Denied",
                 description="You are not allowed to invoke this command.",
@@ -107,18 +105,16 @@ class ServerStat(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        await interaction.response.defer()
-        guild_id = interaction.guild.id
-        state = "on" if state == "on" else "off"  # Ensures only "on" or "off" is stored
-        ServerStatManager.set_server_state(
-            guild_id, state
-        )  # Use DatabaseManager to set server state
+        try:
+            await interaction.response.defer()
+            guild_id = interaction.guild.id
+            state = "on" if state == "on" else "off"  # Ensures only "on" or "off" is stored
+            ServerStatManager.set_server_state(guild_id, state)  # Use DatabaseManager to set server state
 
-        await interaction.followup.send(
-            f"Server_stat set to '{state}' for {interaction.guild.name}"
-        )
-
-        await self.update_stats()
+            await interaction.followup.send(f"Server_stat set to '{state}' for {interaction.guild.name}")
+            await self.update_stats()
+        except Exception as e:
+            ErrorHandler().handle(e, context="Error in server_stats command")
 
     @server_stats.autocomplete("state")
     async def state_autocomplete(self, interaction: discord.Interaction, current: str):

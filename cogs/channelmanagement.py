@@ -80,16 +80,15 @@ class ChannelManagement(commands.Cog):
                 f"I do not have permission to delete the channel {channels.name}.",
                 ephemeral=True,
             )
-            errorHandler.handle_exception(e)
         except discord.HTTPException as e:
             await interaction.followup.send(
                 f"An error occurred while trying to delete the channel {channels.name}.",
                 ephemeral=True,
             )
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="ChannelManagement.delete_channels")
         except Exception as e:
             embed = errorHandler.help_embed()
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="ChannelManagement.delete_channels final except")
             await interaction.response.send_message(embed=embed)
 
 
@@ -148,16 +147,15 @@ class ChannelManagement(commands.Cog):
                 f"I do not have permission to delete the category {category.name}.",
                 ephemeral=True,
             )
-            errorHandler.handle_exception(e)
         except discord.HTTPException as e:
             await interaction.followup.send(
                 f"An error occurred while trying to delete the category {category.name}.",
                 ephemeral=True,
             )
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="ChannelManagement.delete_categories")
         except Exception as e:
             embed = errorHandler.help_embed()
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="ChannelManagement.delete_categories")
             await interaction.response.send_message(embed=embed)
     # ============================================================================
     #                             CLEAR MESSAGES COMMAND                         =
@@ -209,14 +207,13 @@ class ChannelManagement(commands.Cog):
                     f"Deleted {deleted_count} messages from {channel.mention}."
                 )
             except discord.Forbidden as e:
-                errorHandler.handle_exception(e)
                 await interaction.followup.send(
                     f"I do not have permission to clear messages in {channel.mention}.",
                     ephemeral=True,
                 )
             except Exception as e:
                 embed = errorHandler.help_embed()
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e, context="ChannelManagement.clear_messages")
                 await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="hi", description="To esatblish a dm connection")
@@ -262,11 +259,11 @@ class ChannelManagement(commands.Cog):
                 inline=False,
             )
             error_embed.set_footer(text="Once updated, try using /hi again!")
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="ChannelManagement.hi could not send DM")
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
         except Exception as e:
             embed = errorHandler.help_embed()
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="ChannelManagement.hi final except")
             await interaction.response.send_message(embed=embed)
    
     @app_commands.command(name="cleandms", description="Clean the bot dms")

@@ -262,6 +262,7 @@ class MediaListPaginationView(discord.ui.View):
 class Movies(commands.Cog):
     def __init__(self, client):
         self.client = client
+        self.loop_lock = asyncio.Lock()
         self.media_reminder_loop.start()
         self.check_completion_loop.start()
 
@@ -277,6 +278,7 @@ class Movies(commands.Cog):
     @app_commands.command(name="delete_media", description="Must be invoked delete a record")
     @app_commands.describe(title="If you just need to delete your record leave empty or specify title")
     @app_commands.describe(media_type="Movie or series")
+    @app_commands.dm_only()
     async def delete_media(
         self,
         interaction: discord.Interaction,
@@ -308,9 +310,9 @@ class Movies(commands.Cog):
                 else:
                     await interaction.followup.send("No records found to delete")
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in delete_media command")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in delete_media command final block")
             
 
     # ============================================================================ #
@@ -320,13 +322,8 @@ class Movies(commands.Cog):
     @app_commands.describe(title="If movie add the descritption if a part or a version of the moive")
     @app_commands.describe(season="If not in seasons 0")
     @app_commands.describe(episode="If not in episodes 0")
-    async def add_media(
-        self,
-        interaction: discord.Interaction,
-        title: str,
-        media_type: str,
-        season: str,
-        episode: str,):
+    @app_commands.dm_only()
+    async def add_media(self,interaction: discord.Interaction,title: str,media_type: str,season: str,episode: str,):
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer(thinking=True, ephemeral=True)
@@ -345,52 +342,33 @@ class Movies(commands.Cog):
             date_watched = date.today()
             title = title.lower()  # Standardize title for storage
             if media_type.lower() == "series":
-                next_release_date = await MoviesManager.add_or_update_series(
-                    interaction.user.id,
-                    title=title,
-                    season=season,
-                    episode=episode,
-                    date=date_watched,
-                )
-                await MoviesManager.delete_from_watchlist(
-                    interaction.user.id, title=title, media_type=media_type
-                )
+                next_release_date = await MoviesManager.add_or_update_series(interaction.user.id,title=title,season=season,episode=episode,date=date_watched,)
+                await MoviesManager.delete_from_watchlist(interaction.user.id, title=title, media_type=media_type)
                 embed = discord.Embed(
                 title="Series Updated",
                 description=f"Your series **{title}** has been added/updated.\n Details: S{season}|| E{episode}\n“… Watched on: {date_watched}",
-                color=discord.Color.blue(),
-            )
+                color=discord.Color.blue(),)
                 if next_release_date:
-                    embed.add_field(
-                    name="Next Expected Release",
-                    value=f"{next_release_date}",
-                    inline=False,
-                )
-                
+                    embed.add_field(name="Next Expected Release",value=f"{next_release_date}",inline=False,)
                 await interaction.followup.send(embed=embed)
             elif media_type.lower() == "movie":
-                await MoviesManager.add_or_update_movie(
-                    interaction.user.id, title=title, date=date_watched
-                )
-                await MoviesManager.delete_from_watchlist(
-                    interaction.user.id, title=title, media_type=media_type
-                )
-
+                await MoviesManager.add_or_update_movie(interaction.user.id, title=title, date=date_watched)
+                await MoviesManager.delete_from_watchlist(interaction.user.id, title=title, media_type=media_type)
                 embed = discord.Embed(
                 title="Movie Updated",
                 description=f"Your movie **{title}** has been added/updated.\n“… Watched on: {date_watched}",
-                color=discord.Color.green(),
-            )
+                color=discord.Color.green(),)
                 await interaction.followup.send(embed=embed)
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="Error in add_media command")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="Error in add_media command final block")
     # ============================================================================ #
     #                               LOOK UP MEDIA CMD                              #
     # ============================================================================ #
     @app_commands.command(name="search_saved_media", description="Search for a movie or series by title")
     @app_commands.describe(title="Title of the movie or series to search")
+    @app_commands.dm_only()
     async def search_saved_media(
         self, interaction: discord.Interaction, title: str, media_type: str):
         """Search for movies or series based on a partial title match."""
@@ -403,17 +381,10 @@ class Movies(commands.Cog):
                 )
                 return
             
-            data = await MoviesManager.search_media(
-                interaction.user.id, title.lower(), media_type
-            )
+            data = await MoviesManager.search_media(interaction.user.id, title.lower(), media_type)
             result = data.get('api_data')
             db_data = data.get('db_data')
-            name,last_watched, current_season, current_episode = (
-                db_data.get('title'),
-                db_data.get('date', "Unknown date"),
-                db_data.get('season', 1),
-                db_data.get('episode', 1)
-            )
+            name,last_watched, current_season, current_episode = (db_data.get('title'),db_data.get('date', "Unknown date"),db_data.get('season', 1),db_data.get('episode', 1))
             embed = discord.Embed(
                     title=name,
                     description=(
@@ -433,41 +404,15 @@ class Movies(commands.Cog):
                     value=", ".join(result["genres"]) if result["genres"] else "N/A",
                     inline=True,
                 )
-            embed.add_field(
-                    name="Release Date",
-                    value=(
-                        result["release_date"] if result.get("release_date") else "N/A"
-                    ),
-                    inline=True,
-                )
+            embed.add_field(name="Release Date",value=(result["release_date"] if result.get("release_date") else "N/A"),inline=True,)
             if media_type == "series":
-                embed.add_field(
-                    name="Last Aired",
-                    value=(
-                        result["last_air_date"]
-                        if result.get("last_air_date")
-                        else "N/A"
-                    ),
-                    inline=True,
-                )
-                embed.add_field(
-                            name="Current Details",
-                            value=f"S{current_season} E{current_episode} \n Last Watched {last_watched}",
-                            inline=True,
-                        )
-
-                
-                embed.add_field(
-                    name="Next Episode", value=result["next_episode_date"], inline=True
-                )
+                embed.add_field(name="Last Aired",value=(result["last_air_date"] if result.get("last_air_date") else "N/A"),inline=True,)
+                embed.add_field(name="Current Details",value=f"S{current_season} E{current_episode} \n Last Watched {last_watched}",inline=True,)
+                embed.add_field(name="Next Episode", value=result["next_episode_date"], inline=True)
                 last_released = result['last_episode']
                 last_season = last_released.get("season", 0)
                 last_episode = last_released.get("episode", 0)
-                embed.add_field(
-                name="Last realesed Details",
-                value=f"S{last_season} E{last_episode}",
-                inline=True,
-                        )
+                embed.add_field(name="Last realesed Details",value=f"S{last_season} E{last_episode}",inline=True,)
                 embed.add_field(name="Status", value=result["status"], inline=True)
                 
             else:
@@ -479,14 +424,15 @@ class Movies(commands.Cog):
                 embed.add_field(name="Wacthed On",value=f"{last_watched}",inline =True)
             await interaction.followup.send(embed=embed)
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in search_saved_media command")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in search_saved_media command final block")
 
     @app_commands.command(
         name="search_anime",
         description="This command only looks the anime up on hanime only",)
     @app_commands.describe(media_name="name of the anime you are looking for")
+    @app_commands.dm_only()
     async def search_anime(self, interaction: discord.Interaction, media_name: str):
         try:
             if not interaction.response.is_done():
@@ -501,14 +447,15 @@ class Movies(commands.Cog):
             view = MediaSearchPaginator(tv_data, interaction.user)
             await interaction.followup.send(embed=view.get_embed(), view=view)
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in search_anime command")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in search_anime command final block")
 
     
         
     @app_commands.command(name="all_media", description="List Of all movies or series")
     @app_commands.describe(media_type="movie or series")
+    @app_commands.dm_only()
     async def all_media(self, interaction: discord.Interaction, media_type: str):
         """All movies and series"""
         try:
@@ -529,15 +476,16 @@ class Movies(commands.Cog):
             pagination_view.message = await interaction.original_response()
 
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in all_media command")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="Error in all_media command final block")
 
     # ============================================================================ #
     #                                WACTH_LIST CMDS                               #
     # ============================================================================ #
     @app_commands.command(name="watch_list", description="List Of all watchlist movies or series")
     @app_commands.describe(media_type="movie or series")
+    @app_commands.dm_only()
     async def watch_list(self, interaction: discord.Interaction, media_type: str):
         """This function shows the uers wacthlist based on movie typ"""
         try:
@@ -557,14 +505,15 @@ class Movies(commands.Cog):
             # Then fetch the sent message object if you want to store it for later editing:
             pagination_view.message = await interaction.original_response()
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="Error in watch_list command")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="Error in watch_list command final block")
 
     @app_commands.command(name="update_watchlist", description="Add or update the watchlist")
     @app_commands.describe(media_type="movie or series")
     @app_commands.describe(title="Media title")
     @app_commands.describe(extra="Any additional details (optional)")
+    @app_commands.dm_only()
     async def update_watchlist(
         self,
         interaction: discord.Interaction,
@@ -598,13 +547,14 @@ class Movies(commands.Cog):
                 f"Your {media_type} '{title}' has been added/updated."
             ) 
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in update_watchlist command")
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="Error in update_watchlist command final block")
 
 
     @app_commands.command(name="search_movie_or_series",description="The more refined the name is the more refined the search will be",)
     @app_commands.describe(media_name="what you are looking for")
+    @app_commands.dm_only()
     async def search_movie_or_series(self, interaction: discord.Interaction, media_name: str, media_type: str):
         if media_type == "series":
             media_type = "tv"
@@ -693,9 +643,9 @@ class Movies(commands.Cog):
 
             await interaction.followup.send(embed=embed)
         except discord.DiscordException as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in search_movie_or_series command")
         except Exception as e:
-            errorHandler.handle_exception(e) 
+            errorHandler.handle(e, context="Error in search_movie_or_series command final block") 
 
     # ============================================================================ #
     #                                   reminder                                   #
@@ -707,146 +657,148 @@ class Movies(commands.Cog):
             return int(dt.timestamp())
         except (TypeError, ValueError):
             return None
-    @tasks.loop(hours=168)
+    @tasks.loop(hours=48)
     async def media_reminder_loop(self):
-        upcoming = await MoviesManager.check_upcoming_dates()
-        id_list = set()
-        for reminder in upcoming:
-            user_id = reminder.get("user_id")
-            id_list.add(user_id)
-            if user_id is None:
-                continue
+        async with self.loop_lock:
+            upcoming = await MoviesManager.check_upcoming_dates()
+            id_list = set()
+            for reminder in upcoming:
+                user_id = reminder.get("user_id")
+                id_list.add(user_id)
+                if user_id is None:
+                    continue
 
-            user = await self.client.fetch_user(user_id) 
-            if user:
-                try:
-                    title = reminder.get("name", "Unknown Title")
-                    if reminder.get('movie'):
-                        date_str = reminder.get('release_date')
-                        media_data = await MoviesManager.get_media_details("movie", reminder["name"])
-                    else:
-                        date_str = reminder.get('next_release_date')
-                        media_data = await MoviesManager.get_media_details("tv", reminder["name"])
-                    timestamp = await self.parse_date_to_timestamp(date_str)
+                user = await self.client.fetch_user(user_id) 
+                if user:
+                    try:
+                        title = reminder.get("name", "Unknown Title")
+                        if reminder.get('movie'):
+                            date_str = reminder.get('release_date')
+                            media_data = await MoviesManager.get_media_details("movie", reminder["name"])
+                        else:
+                            date_str = reminder.get('next_release_date')
+                            media_data = await MoviesManager.get_media_details("tv", reminder["name"])
+                        timestamp = await self.parse_date_to_timestamp(date_str)
 
-                    if timestamp:
-                        title_text = f"**Media Reminder:**\n{title} coming up on <t:{timestamp}:D>"
-                    else:
-                        title_text = f"**Media Reminder:**\n{title} coming up soon"
+                        if timestamp:
+                            title_text = f"**Media Reminder:**\n{title} coming up on <t:{timestamp}:D>"
+                        else:
+                            title_text = f"**Media Reminder:**\n{title} coming up soon"
 
-                    embed = discord.Embed(
-                        title=title_text,
-                        description="**Media Details**",
-                        color=discord.Color.blue()
-                    )
-
-                    poster_url = media_data.get("poster_url")
-                    if poster_url:
-                        embed.set_thumbnail(url=poster_url)
-
-                    # Current media details
-                    current_season = reminder.get('season', '?')
-                    current_episode = reminder.get('episode', '?')
-                    current_status = media_data.get("status", "No idea")
-
-                    embed.add_field(name="Status", value=current_status, inline=False)
-                    embed.add_field(
-                        name="Current Details",
-                        value=f"S{current_season} E{current_episode}",
-                        inline=False,
-                    )
-                    if not reminder.get('movie'):
-                        next_episode = media_data.get('next_episode_number', '?')
-                        next_season = media_data.get('next_season_number', '?')
-                        embed.add_field(
-                            name="Expected Details",
-                            value=f"S{next_season} E{next_episode}",
-                            inline=False,
-                        )
-
-                
-                    await user.send(embed=embed)
-                    await asyncio.sleep(0.5)
-                except discord.DiscordException as e:
-                    errorHandler.handle_exception(e)
-                except Exception as e:
-                    errorHandler.handle_exception(e)
-        for id in id_list:
-            user = await self.client.fetch_user(id) 
-            if user:
-                embed = discord.Embed(
-                    title=f"Upcoming Updates complete",
-                    description=f"New Reminders received on <t:{int(datetime.now().timestamp())}:R>",
-                    color=discord.Color.blue(),
-                
-                )
-
-                await user.send(embed=embed)
-        await MoviesManager.refresh_tmdb_dates()
-
-    @tasks.loop(hours=760)
-    async def check_completion_loop(self):  
-        uncompleted = await MoviesManager.check_completion()
-        id_list = set()
-        for reminder in uncompleted:
-            user_id = reminder.get("user_id")
-            id_list.add(user_id)
-            if user_id is None:
-                continue
-
-            user = await self.client.fetch_user(user_id)
-            try:
-                if user:               
                         embed = discord.Embed(
-                            title=reminder["name"],
+                            title=title_text,
                             description="**Media Details**",
                             color=discord.Color.blue()
                         )
-                        poster_url = reminder.get("poster_url")
+
+                        poster_url = media_data.get("poster_url")
                         if poster_url:
                             embed.set_thumbnail(url=poster_url)
 
                         # Current media details
-                        watched_value = reminder.get("watched")
-                        if watched_value is not None:
-                            current_season, current_episode = watched_value
-                        else:
-                            current_season, current_episode = None, None
-                        unwatched_value = reminder.get("unwatched")
-                        if unwatched_value is not None:
-                            last_season, last_episode = unwatched_value
-                        else:
-                            last_season, last_episode = None, None
-                        
+                        current_season = reminder.get('season', '?')
+                        current_episode = reminder.get('episode', '?')
+                        current_status = media_data.get("status", "No idea")
+
+                        embed.add_field(name="Status", value=current_status, inline=False)
                         embed.add_field(
                             name="Current Details",
                             value=f"S{current_season} E{current_episode}",
                             inline=False,
                         )
+                        if not reminder.get('movie'):
+                            next_episode = media_data.get('next_episode_number', '?')
+                            next_season = media_data.get('next_season_number', '?')
+                            embed.add_field(
+                                name="Expected Details",
+                                value=f"S{next_season} E{next_episode}",
+                                inline=False,
+                            )
 
-                        embed.add_field(
-                            name="Last realesed Details",
-                            value=f"S{last_season} E{last_episode}",
-                            inline=False,
-                        )
-
-                        await user.send(embed=embed)
-            except discord.DiscordException as e:
-                errorHandler.handle_exception(e)
-            except Exception as e:
-                errorHandler.handle_exception(e)
-        
-        for id in id_list:
-            user = await self.client.fetch_user(id) 
-            if user:
-                embed = discord.Embed(
-                    title=f"Unfinished Series and Watch list",
-                    description=f"New Reminders recieved <t:{int(datetime.now().timestamp())}:R>",
-                    color=discord.Color.green(),
                     
-                )
-                await user.send(embed=embed)
-        await MoviesManager.refresh_tmdb_dates()
+                        await user.send(embed=embed)
+                        await asyncio.sleep(0.5)
+                    except discord.DiscordException as e:
+                        errorHandler.handle(e, context="Error in media_reminder_loop")
+                    except Exception as e:
+                        errorHandler.handle(e, context="Error in media_reminder_loop final block")
+            for id in id_list:
+                user = await self.client.fetch_user(id) 
+                if user:
+                    embed = discord.Embed(
+                        title=f"Upcoming Updates complete",
+                        description=f"New Reminders received on <t:{int(datetime.now().timestamp())}:R>",
+                        color=discord.Color.blue(),
+                    
+                    )
+
+                    await user.send(embed=embed)
+            await MoviesManager.refresh_tmdb_dates()
+
+    @tasks.loop(hours=760)
+    async def check_completion_loop(self):  
+        async with self.loop_lock:
+            uncompleted = await MoviesManager.check_completion()
+            id_list = set()
+            for reminder in uncompleted:
+                user_id = reminder.get("user_id")
+                id_list.add(user_id)
+                if user_id is None:
+                    continue
+
+                user = await self.client.fetch_user(user_id)
+                try:
+                    if user:               
+                            embed = discord.Embed(
+                                title=reminder["name"],
+                                description="**Media Details**",
+                                color=discord.Color.blue()
+                            )
+                            poster_url = reminder.get("poster_url")
+                            if poster_url:
+                                embed.set_thumbnail(url=poster_url)
+
+                            # Current media details
+                            watched_value = reminder.get("watched")
+                            if watched_value is not None:
+                                current_season, current_episode = watched_value
+                            else:
+                                current_season, current_episode = None, None
+                            unwatched_value = reminder.get("unwatched")
+                            if unwatched_value is not None:
+                                last_season, last_episode = unwatched_value
+                            else:
+                                last_season, last_episode = None, None
+                            
+                            embed.add_field(
+                                name="Current Details",
+                                value=f"S{current_season} E{current_episode}",
+                                inline=False,
+                            )
+
+                            embed.add_field(
+                                name="Last realesed Details",
+                                value=f"S{last_season} E{last_episode}",
+                                inline=False,
+                            )
+
+                            await user.send(embed=embed)
+                except discord.DiscordException as e:
+                    errorHandler.handle(e, context="Error in check_completion_loop")
+                except Exception as e:
+                    errorHandler.handle(e, context="Error in check_completion_loop final block")
+            
+            for id in id_list:
+                user = await self.client.fetch_user(id) 
+                if user:
+                    embed = discord.Embed(
+                        title=f"Unfinished Series and Watch list",
+                        description=f"New Reminders recieved <t:{int(datetime.now().timestamp())}:R>",
+                        color=discord.Color.green(),
+                        
+                    )
+                    await user.send(embed=embed)
+            await MoviesManager.refresh_tmdb_dates()
     # ============================================================================ #
     #                                 AUTOCOMPLETE                                 #
     # ============================================================================ #
@@ -871,10 +823,9 @@ class Movies(commands.Cog):
             # Ignore the "Unknown interaction" error
             return []
         except Exception as e:
-            errorHandler.handle_exception(e)
+     
             return []
         except discord.errors.HTTPException as e:
-            errorHandler.handle_exception(e)
             if "Interaction has already been acknowledged" in str(e):
                 pass
 
@@ -906,10 +857,8 @@ class Movies(commands.Cog):
             # Ignore the "Unknown interaction" error
             return []
         except Exception as e:
-            errorHandler.handle_exception(e)
             return []
         except discord.errors.HTTPException as e:
-            errorHandler.handle_exception(e)
             if "Interaction has already been acknowledged" in str(e):
                 pass
 

@@ -1,8 +1,8 @@
-import os, logging, pathlib, discord,traceback,os,smtplib
+import os, logging, pathlib, discord,traceback,os,resend,base64
+from threading import Thread
 from datetime import datetime
 from dotenv import load_dotenv
-from email.message import EmailMessage
-import re
+
 load_dotenv()
 
 
@@ -31,7 +31,8 @@ MOVIE_API_KEY = os.getenv("MOVIE_API_KEY")
 H_BASE_URL = os.getenv("HANIME_BASE_URL")
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS") 
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  
-
+DEFAULT_FROM_EMAIL=os.getenv("DEFAULT_FROM_EMAIL") 
+RESEND_API=os.getenv("RESEND_API")
 
 
 BASE_DIR = pathlib.Path(__file__).parent
@@ -79,63 +80,90 @@ LOGGING_CONFIG = {
     },
 }
 
-
+LOG_BASE_DIR =BASE_DIR / "errors"
 
 class ErrorHandler:
-    def __init__(self, log_dir="errors"):
-        """
-        Initializes the ErrorHandler class.
-        :param log_dir: The directory where logs will be stored.
-        """
-        self.log_dir = log_dir
-        os.makedirs(log_dir, exist_ok=True)  # Ensure log directory exists
+    """
+    Handles exceptions by logging error details to timestamped daily files.
+    Optionally sends asynchronous email notifications with the log attached.
+    Also provides a Discord embed for user-friendly error feedback.
 
-        # Set up logging
-        self.logger = logging.getLogger("Ouroboros")
-        self.logger.setLevel(logging.INFO)
+    Attributes:
+        NOTIFY_EMAIL (str): Email address to receive error notifications.
+        notify (bool): Whether to send email notifications on errors.
 
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    Methods:
+        handle(error, context=""): Logs error info and triggers notification if enabled.
+        notify_admin(file_path): Sends an email with the error log attachment asynchronously.
+        help_embed(): Returns a Discord embed for displaying error contact info.
+    """
 
-        # Avoid adding duplicate handlers
-        if not self.logger.handlers:
-            # File handler
-            file_handler = logging.FileHandler(self.get_log_file())
-            file_handler.setFormatter(formatter)
-            self.logger.addHandler(file_handler)
-
-            # Console handler
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(formatter)
-            self.logger.addHandler(console_handler)
-
-
-    def get_log_file(self):
-        """Generates a log file name based on the current date."""
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        return os.path.join(self.log_dir, f"{date_str}.txt")
+    NOTIFY_EMAIL = 'dwomohaustin14@gmail.com'
     
-
-    def handle_exception(self, exception):
-        """
-        Handles exceptions by logging the error message along with traceback.
-        :param exception: The exception instance to be logged.
-        """
-        error_message = f"Exception occurred on {datetime.now()}:\n{exception}\n{traceback.format_exc()}"
-        log_file_path = self.get_log_file()
+    def __init__(self, notify=True):
+        self.notify = notify
        
-        # Write to file
-        with open(log_file_path, "a") as log_file:
-            log_file.write(error_message + "\n")
-        
-        # Log to console
-        self.logger.error(error_message)
-        self.send_error_log(EMAIL_ADDRESS,EMAIL_PASSWORD)
+        os.makedirs(LOG_BASE_DIR, exist_ok=True)
+
+    def handle(self, error, context=""):
+        """
+        Handles exceptions by logging error details to a timestamped file 
+        and optionally notifying the admin via email.
+
+        Args:
+            error (Exception): The caught exception.
+            context (str): Optional context string describing where the error occurred.
+        """
+        now = datetime.now()
+        day_folder = now.strftime("%Y-%m-%d")
+        time_stamp = now.strftime("%H-%M-%S")
+
+        folder_path = os.path.join(LOG_BASE_DIR, day_folder)
+        os.makedirs(folder_path, exist_ok=True)
+        file_path = os.path.join(folder_path, f"error_{time_stamp}.txt")
+
+        error_message = (
+            f"Timestamp: {now}\n"
+            f"Context: {context}\n"
+            f"Exception: {str(error)}\n\n"
+            f"Traceback:\n{traceback.format_exc()}\n"
+        )
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(error_message)
+
+        if self.notify:
+            self.notify_admin(file_path)
+
+    def notify_admin(self, file_path):
+        """
+        Sends an email to the admin with the error log attached.
+        Runs asynchronously in a separate thread.
+
+        Args:
+            file_path (str): Path to the error log file to attach.
+        """
+        subject = '[ALERT] Discord Bot Error'
+        body = 'An error occurred. Please see the attached log file.'
+
+        Thread(
+            target=self.send_email_with_attachment,
+            kwargs={
+                "subject": subject,
+                "body": body,
+                "to_email": self.NOTIFY_EMAIL,
+                "file_path": file_path,
+            },
+        ).start()
 
     def help_embed(self):
-        """Returns a Discord embed with help information."""
+        """
+        Returns a Discord embed with help information.
+        This is meant to be sent to users when an error occurs.
+        """
         embed = discord.Embed(
             title="Error Handling",
-            description="If an error occured feel free to let me know, please contact:\n**Inphinithy**",
+            description="An error occurred. Please contact the admin if it persists:\n**Inphinithy**",
             color=0xFF0000
         )
         embed.add_field(
@@ -146,34 +174,52 @@ class ErrorHandler:
         return embed
 
 
-    def send_error_log(self, email_address, email_password):
+    def send_email_with_attachment(self,subject, body, to_email, file_path=None, from_email=None, html_content=None):
         """
-        Sends the latest error log file via email.
-        :param email_address: Sender's email address.
-        :param email_password: Sender's email password.
+        Sends an email using the Resend API, optionally with an attachment and HTML content.
+        Falls back to logging errors in a local file if the email fails to send.
+
+        Args:
+            subject (str): Subject line of the email.
+            body (str): Plain text body of the email.
+            to_email (str or list): Recipient email address(es).
+            file_path (str, optional): Path to a file to attach.
+            from_email (str, optional): Sender's email address. Defaults to settings.DEFAULT_FROM_EMAIL.
+            html_content (str, optional): HTML content of the email. If provided, overrides plain text body.
         """
-        if state != "testing":
-            log_file_path = self.get_log_file()
-            if not os.path.exists(log_file_path):
-                return
+        from_email = from_email or DEFAULT_FROM_EMAIL
+        fallback_path = os.path.join(LOG_BASE_DIR, "notify_failures.txt")
+        resend.api_key = RESEND_API  # Ensure the Resend API key is set
 
-            msg = EmailMessage()
-            msg["From"] = email_address
-            msg["To"] = email_address  # Send to self or an admin
-            msg["Subject"] = f"Error Log - {datetime.now().strftime('%Y-%m-%d')}"
-            msg.set_content("Please find the attached error log.")
+        if not isinstance(to_email, (list, tuple)):
+            to_email = [to_email]
 
-            # Attach the log file
-            try:
-                with open(log_file_path, "rb") as f:
-                    msg.add_attachment(f.read(), maintype="application", subtype="txt", filename=os.path.basename(log_file_path))
-            except FileNotFoundError:
-                return
+        # Prepare attachments payload for Resend
+        attachments = []
+        if file_path and os.path.isfile(file_path):
+            with open(file_path, "rb") as f:
+                file_data = f.read()
+                encoded_content = base64.b64encode(file_data).decode("ascii")
+                attachments.append({
+                    "filename": os.path.basename(file_path),
+                    "content": encoded_content,
+                    "disposition": "attachment",
+                    
+                })
 
-            # Send email
-            with smtplib.SMTP("smtp.gmail.com", 587) as server:
-                server.starttls()
-                server.login(email_address, email_password)
-                server.send_message(msg)
-        
+        try:
+            resend.Emails.send({
+                "from": from_email,
+                "to": to_email,
+                "subject": subject,
+                **({"html": html_content} if html_content else {}),
+                **({"text": body} if not html_content else {}),
+                **({"attachments": attachments} if attachments else {}),
+            })
+        except Exception as e:
+            os.makedirs(os.path.dirname(fallback_path), exist_ok=True)
+            with open(fallback_path, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.now()} - Failed to notify admin: {str(e)}\n")
+          
+
 

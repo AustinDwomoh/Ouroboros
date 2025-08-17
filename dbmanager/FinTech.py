@@ -132,17 +132,17 @@ def update_payment_status(user_id, payment_name, status):
         conn.commit()
 
 def check_due_dates():
-    today = datetime.today().strftime("%Y-%m-%d")
-    upcoming_date = (datetime.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-    reminders = []
-    create_money_table()
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute("SELECT DISTINCT user_id FROM user_payments")
-        user_ids = [row[0] for row in c.fetchall()]
-        for user_id in user_ids:
-            table_name = f'"{user_id}_fintech"'
-            try:
+    try:
+        today = datetime.today().strftime("%Y-%m-%d")
+        upcoming_date = (datetime.today() + timedelta(days=7)).strftime("%Y-%m-%d")
+        reminders = []
+        create_money_table()
+        with create_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT DISTINCT user_id FROM user_payments")
+            user_ids = [row[0] for row in c.fetchall()]
+            for user_id in user_ids:
+                table_name = f'"{user_id}_fintech"'
                 c.execute(
                     f"""
                 SELECT name, category, amount, due_date, status
@@ -151,7 +151,7 @@ def check_due_dates():
                 AND due_date IS NOT NULL 
                 AND due_date BETWEEN ? AND ? 
                 ORDER BY due_date ASC
-            """,
+                """,
                     (today, upcoming_date),
                 )
 
@@ -168,10 +168,8 @@ def check_due_dates():
                             "status": status,
                         }
                     )
-
-            except sqlite3.OperationalError as e:
-                errorHandler = ErrorHandler()
-                errorHandler.handle_exception(e)
-
-    return reminders
+        return reminders
+    except Exception as e:
+        ErrorHandler().handle(e, context="Error in check_due_dates function")
+        return []
 

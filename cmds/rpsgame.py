@@ -114,7 +114,7 @@ class RPSView(ui.View):
         except Exception as e:
             errorHandler = ErrorHandler()
             embed = errorHandler.help_embed()
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context='RPS game round interaction')
             await interaction.response.send_message(embed=embed)
 
     # ================================ UI BUTTONS ================================ #
@@ -148,6 +148,7 @@ class RPS(commands.Cog):
 
     # ================================ ACTIVATION ================================ #
     @app_commands.command(name="rps", description="Rock Paper Game vs Ouroboros")
+    @app_commands.dm_only()
     async def rps(self, interaction: discord.Interaction):
         """Start the Rock, Paper, Scissors game against the bot."""
         # Start

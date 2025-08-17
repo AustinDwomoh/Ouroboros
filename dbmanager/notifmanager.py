@@ -65,8 +65,7 @@ def create_platform_table(platform_name, platform_column):
 
 # Function to add or update a channel and link any platform accounts
 def add_or_update_channel(
-    channel_id, guild_id, channel_name, platform_name, platform_id
-):
+    channel_id, guild_id, channel_name, platform_name, platform_id):
     """
     Adds or updates a channel in the channels table, and links platform accounts if provided.
     """

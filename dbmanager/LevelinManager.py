@@ -1,5 +1,5 @@
 import sqlite3
-from settings import ErrorHandler
+
 
 def create_connection(db_path="data/leveling.db"):
     return sqlite3.connect(db_path)

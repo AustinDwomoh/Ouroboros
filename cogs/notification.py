@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import notifmanager
 
-errorHandler = ErrorHandler()
+
 
 # ============================================================================ #
 #                             YOUTUBE NOTIFICATION                             #
@@ -123,7 +123,7 @@ class YoutubeNotif(commands.Cog):  # WORKS ALLRIGHT NEED TO STRESS TEST
             embed.set_footer(text="YouTube Notifications")
             await interaction.followup.send(embed=embed)
         except Exception as e:
-            errorHandler.handle_exception(e)
+            ErrorHandler().handle(e, context="Error in setup_youtube_notification command")
 
     @tasks.loop(minutes=10)
     async def check_new_videos(self):
@@ -138,10 +138,7 @@ class YoutubeNotif(commands.Cog):  # WORKS ALLRIGHT NEED TO STRESS TEST
                 if not discord_channels_to_notify:
                     continue
                 for channel_id in discord_channels_to_notify:
-                    youtube_channel_id = notifmanager.get_platform_ids_for_channel(
-                        channel_id, "YouTube"
-                    )
-
+                    youtube_channel_id = notifmanager.get_platform_ids_for_channel(channel_id, "YouTube")
                     if not youtube_channel_id:
                         continue
                     feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={youtube_channel_id}"
@@ -176,10 +173,166 @@ class YoutubeNotif(commands.Cog):  # WORKS ALLRIGHT NEED TO STRESS TEST
                                 f"@everyone \n**{video_title}**\n{latest_video.link}"
                             )
         except (discord.HTTPException, googleapiclient.errors.HttpError, KeyError, Exception) as e:
-            errorHandler.handle_exception(e)
+            ErrorHandler().handle(e,context="Error in check_new_videos task")
         
 
+class Xnotif(commands.Cog):
+    def __init__(self, client):
+        self.bearer_token = os.environ.get("BEARER_TOKEN")
+        self.client = client
+        self.check_x_notification.start()  # Start the periodic check
 
+    def get_user_id(self, username):
+        """Fetch the user ID for a given X username."""
+        username = username.split('@')[1]
+        url = f"https://api.twitter.com/2/users/by/username/{username}"
+        headers = {"Authorization": f"Bearer {self.bearer_token}"}
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch user ID: {response.status_code} {response.text}")
+        return response.json()["data"]["id"]
+
+    def bearer_oauth(self, r):
+        """Bearer token authentication method."""
+        r.headers["Authorization"] = f"Bearer {self.bearer_token}"
+        r.headers["User-Agent"] = "v2UserTweetsPython"
+        return r
+
+    async def connect_to_endpoint(self, channel_id):
+        """Connect to the X API and fetch tweets."""
+        url = f"https://api.twitter.com/2/users/{channel_id}/tweets"
+        params = {"tweet.fields": "created_at,attachments"}
+        response = requests.get(url, auth=self.bearer_oauth, params=params)
+        if response.status_code != 200:
+            raise Exception(
+                "Request returned an error: {} {}".format(response.status_code, response.text)
+            )
+        return response.json()
+
+    def get_media_url_from_key(self, media_key):
+        """Fetch media URL from media key."""
+        url = f"https://api.twitter.com/2/media/{media_key}"
+        response = requests.get(url, auth=self.bearer_oauth)
+        if response.status_code == 200:
+            return response.json().get('data', {}).get('url')
+        return None
+    
+    @tasks.loop(minutes=10)
+    async def check_x_notification(self):
+        """Periodically check for new updates and notify subscribed Discord channels."""
+        try:
+            print("Checking for X updates...")
+            for guild in self.client.guilds:
+                discord_channels_to_notify = notifmanager.get_channel_for_notification(guild.id, 'X')
+                if not discord_channels_to_notify:
+                    continue
+
+                for channel_id in discord_channels_to_notify:
+                    x_channel_id = notifmanager.get_platform_ids_for_channel(channel_id, 'X')
+
+                    if not x_channel_id:
+                        continue
+
+                    response = await self.connect_to_endpoint(x_channel_id)
+
+                    # Assuming response has tweets data
+                    tweets = response.get("data", [])
+                    if not tweets:
+                        continue
+
+                    latest_tweet = tweets[0]
+                    tweet_id = latest_tweet["id"]
+                    tweet_text = latest_tweet["text"]
+                    tweet_url = f"https://twitter.com/{x_channel_id}/status/{tweet_id}"
+
+                    # Check if the tweet is new
+                    latest_notified_id = notifmanager.get_last_updated_content(channel_id, platform_name="X")
+                    if tweet_id == latest_notified_id:
+                        continue
+
+                    # Update last notified tweet ID
+                    notifmanager.update_last_updated_content(channel_id, platform_name="X", content_id=tweet_id)
+
+                    # Prepare media (images) if any
+                    media_urls = []
+                    if "attachments" in latest_tweet:
+                        media_keys = latest_tweet["attachments"].get("media_keys", [])
+                        for media_key in media_keys:
+                            media_url = self.get_media_url_from_key(media_key)
+                            if media_url:
+                                media_urls.append(media_url)
+
+                    # Create the embed
+                    embed = discord.Embed(
+                        title="New Tweet",
+                        description=tweet_text,
+                        url=tweet_url,
+                        color=discord.Color.blue()
+                    )
+
+                    # Add images to embed if they exist
+                    if media_urls:
+                        for media_url in media_urls:
+                            embed.set_image(url=media_url)  # Add each image to the embed
+
+                    # Notify all channels for this guild
+                    for discord_channel_id in discord_channels_to_notify:
+                        discord_channel = self.client.get_channel(discord_channel_id)
+                        if discord_channel:
+                            try:
+                                await discord_channel.send(embed=embed)
+                            except Exception as e:
+                                pass
+                        
+
+        except Exception as e:
+            ErrorHandler().handle(e, context="Error in check_x_notification task")
+
+    @check_x_notification.before_loop
+    async def before_check_x_notification(self):
+        """Ensure the loop starts after bot is ready."""
+        await self.client.wait_until_ready()
+
+    @app_commands.command(name="setup_x_notification", description="Activate notifications for an X channel and Discord channel.")
+    @app_commands.guild_only()
+    @app_commands.describe(channel="The channel to receive notifications.")
+    @app_commands.describe(x_handle="e.g., username")
+    async def setup_x_notification(self, interaction: discord.Interaction, channel: discord.TextChannel, x_handle: str):
+        """Set up X notifications for a specified Discord channel."""
+        try:
+            guild_id = interaction.guild.id
+            channel_id = channel.id
+            channel_name = channel.name
+
+            if not x_handle:
+                await interaction.response.send_message(
+                    "The X handle is invalid. Please provide a valid handle (e.g., @username).",
+                    ephemeral=True
+                )
+                return None
+
+            notif_type_id = self.get_user_id(x_handle)
+
+            # Link the guild, channel, and notification type
+            notifmanager.add_or_update_channel(
+                channel_id, guild_id, channel_name, platform_name="X", platform_id=notif_type_id
+            )
+
+            # Send confirmation message
+            await interaction.response.send_message(
+                f"X notifications have been set up for channel {channel.mention}."
+            )
+        except Exception as e:
+            # Handle errors and send an error message
+            ErrorHandler().handle(e, context="Error in setup_x_notification command")
+ 
+
+            """ embed = discord.Embed(title="Error Occurred",description="An error occurred while trying delete your movie records",
+                    color=discord.Color.red())
+                    embed.add_field(name="Contact for Help", value="Please reach out to me:\n**inphinithy**\n[Send a DM](https://discord.com/users/755872891601551511)", inline=False)
+                    await interaction.followup.send(embed=embed) """
+            
 async def setup(client):
-    await client.add_cog(YoutubeNotif(client))
+    pass
+    #await client.add_cog(YoutubeNotif(client))
     # await client.add_cog(Xnotif(client))

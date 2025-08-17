@@ -97,7 +97,7 @@ def set_role(guild_id, role_column, role_value):
             conn.commit()
 
         except Exception as e:
-            errorHandler.handle_exception(f"Error setting role for guild {guild_id}: {e}")
+            errorHandler.handle(e,f"Error setting role for guild {guild_id}: {e}")
 
 def get_server_tourstate(guild_id):
     setup_database()
@@ -127,7 +127,7 @@ def set_server_state(guild_id, state):
             )
             conn.commit()
     except Exception as e:
-        errorHandler.handle_exception(f"Error setting server state for guild {guild_id}: {e}")
+        errorHandler.handle(e,f"Error setting server state for guild {guild_id}: {e}")
      
 
 def set_server_tourstate( guild_id, state):
@@ -145,7 +145,7 @@ def set_server_tourstate( guild_id, state):
         )
         conn.commit()
     except Exception as e:
-        errorHandler.handle_exception(f"Error setting server state for guild {guild_id}: {e}")
+        errorHandler.handle(e,f"Error setting server state for guild {guild_id}: {e}")
 
 
 def set_channel_id( guild_id, channel_type, channel_id):
@@ -174,7 +174,7 @@ def set_channel_id( guild_id, channel_type, channel_id):
         )
         conn.commit()
     except Exception as e:
-        errorHandler.handle_exception(f"Error setting {channel_type} channel for guild {guild_id}: {e}")
+        errorHandler.handle(e,f"Error setting {channel_type} channel for guild {guild_id}: {e}")
 
 
 def get_greetings_channel_ids( guild_id):
@@ -195,7 +195,7 @@ def get_greetings_channel_ids( guild_id):
             else {"welcome": None, "goodbye": None}
         )
     except Exception as e:
-        errorHandler.handle_exception(f"Error fetching channel IDs for guild {guild_id}: {e}")
+        errorHandler.handle(e,f"Error fetching channel IDs for guild {guild_id}: {e}")
     
         return {"welcome": None, "goodbye": None}
 
@@ -221,7 +221,7 @@ def get_tour_channel_ids( guild_id):
                 "guidelines": result[3],
             }
         else:
-            errorHandler.handle_exception(f"No tour channel IDs found for guild {guild_id}")
+            errorHandler.handle(e,f"No tour channel IDs found for guild {guild_id}")
             return {
                 "chat": None,
                 "signup": None,
@@ -230,7 +230,7 @@ def get_tour_channel_ids( guild_id):
             }
 
     except Exception as e:
-        errorHandler.handle_exception(f"Error fetching tour channel IDs for guild {guild_id}: {e}")
+        errorHandler.handle(e,f"Error fetching tour channel IDs for guild {guild_id}: {e}")
         return {"chat": None, "signup": None, "fixtures": None, "guidelines": None}
 
 def get_all_server_states():
@@ -242,7 +242,7 @@ def get_all_server_states():
             cursor.execute("SELECT guild_id, state FROM serverstats")
         return dict(cursor.fetchall())
     except Exception as e:
-        errorHandler.handle_exception(f"Error retrieving all server states: {e}")
+        errorHandler.handle(e,f"Error retrieving all server states: {e}")
         return {}
 
 def get_all_server_tourstates(self):
@@ -254,6 +254,6 @@ def get_all_server_tourstates(self):
             cursor.execute("SELECT guild_id, tourstate FROM serverstats")
         return dict(cursor.fetchall())
     except Exception as e:
-        errorHandler.handle_exception(f"Error retrieving all server tour states: {e}")
+        errorHandler.handle(e,f"Error retrieving all server tour states: {e}")
         return {}
 

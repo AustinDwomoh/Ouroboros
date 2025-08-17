@@ -13,7 +13,6 @@ async def create_connection(db_path="data/mediarecords.db"):
     # Database file
     return await aiosqlite.connect(db_path)
 
-
 async def create_user_tables(user_id=None):
     """Creates tables for a user based on their user ID."""
     table_name_movies = f'"{user_id}_Movies"'
@@ -22,75 +21,71 @@ async def create_user_tables(user_id=None):
     table_name_watch_list_series = f'"{user_id}_watch_list_Series"'
 
     conn = await create_connection()
-    try:
-        async with conn.cursor() as cursor:
-            # Create movies table
-            if user_id:
-                await cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {table_name_movies} (
-                        id INTEGER PRIMARY KEY,
-                        title TEXT,
-                        date TEXT
-                    )
-                """
-                )
-
-                await cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {table_name_series} (
-                        id INTEGER PRIMARY KEY,
-                        title TEXT,
-                        season INTEGER,
-                        episode INTEGER,
-                        date TEXT,
-                        status TEXT,
-                        next_release_date TEXT
-                    )
-                """
-                )
-                #added later on 
-                await cursor.execute(f"PRAGMA table_info({table_name_series})")
-
-                await cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {table_name_watch_list_movies} (
-                        id INTEGER PRIMARY KEY,
-                        title TEXT,
-                        extra TEXT,
-                        status TEXT,
-                        release_date TEXT,
-                        added_date TEXT,
-                        next_release_date TEXT
-                    )
-                """
-                )
-                
-                await cursor.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {table_name_watch_list_series} (
-                        id INTEGER PRIMARY KEY,
-                        title TEXT,
-                        extra TEXT,
-                        status TEXT,
-                        release_date TEXT,
-                        added_date TEXT,
-                        next_release_date TEXT
-                    )
-                """
-                )
+   
+    async with conn.cursor() as cursor:
+        # Create movies table
+        if user_id:
             await cursor.execute(
                 f"""
-            CREATE TABLE IF NOT EXISTS user_media (  
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER  NOT NULL
-            )"""
+                CREATE TABLE IF NOT EXISTS {table_name_movies} (
+                    id INTEGER PRIMARY KEY,
+                    title TEXT,
+                    date TEXT
+                )
+            """
             )
 
-            await conn.commit()
-    finally:
-        await conn.close()
+            await cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {table_name_series} (
+                    id INTEGER PRIMARY KEY,
+                    title TEXT,
+                    season INTEGER,
+                    episode INTEGER,
+                    date TEXT,
+                    status TEXT,
+                    next_release_date TEXT
+                )
+            """
+            )
+            #added later on 
+            await cursor.execute(f"PRAGMA table_info({table_name_series})")
 
+            await cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {table_name_watch_list_movies} (
+                    id INTEGER PRIMARY KEY,
+                    title TEXT,
+                    extra TEXT,
+                    status TEXT,
+                    release_date TEXT,
+                    added_date TEXT,
+                    next_release_date TEXT
+                )
+            """
+            )
+            
+            await cursor.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {table_name_watch_list_series} (
+                    id INTEGER PRIMARY KEY,
+                    title TEXT,
+                    extra TEXT,
+                    status TEXT,
+                    release_date TEXT,
+                    added_date TEXT,
+                    next_release_date TEXT
+                )
+            """
+            )
+        await cursor.execute(
+            f"""
+        CREATE TABLE IF NOT EXISTS user_media (  
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER  NOT NULL
+        )"""
+        )
+        await conn.commit()
 
 async def delete_user_database(user_id):
     """Deletes the user's movie and series tables."""
@@ -99,18 +94,16 @@ async def delete_user_database(user_id):
     table_name_series = f'"{user_id}_Series"'
 
     conn = await create_connection()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(f"DROP TABLE IF EXISTS {table_name_movies}")
-            await cursor.execute(f"DROP TABLE IF EXISTS {table_name_series}")
-            await cursor.execute(
-                f"DELETE FROM user_media WHERE user_id LIKE ?", (user_id,)
-            )
-            await conn.commit()
-    finally:
-        await conn.close()
-    return "Your movie and series record has been deleted."
+   
+    async with conn.cursor() as cursor:
+        await cursor.execute(f"DROP TABLE IF EXISTS {table_name_movies}")
+        await cursor.execute(f"DROP TABLE IF EXISTS {table_name_series}")
+        await cursor.execute(
+            f"DELETE FROM user_media WHERE user_id LIKE ?", (user_id,)
+        )
+        await conn.commit()
 
+    return "Your movie and series record has been deleted."
 
 async def add_or_update_movie(user_id, title, date=None):
     """
@@ -124,35 +117,32 @@ async def add_or_update_movie(user_id, title, date=None):
     await create_user_tables(user_id)
     await update_user_ids(user_id)
     conn = await create_connection()
-    try:
-        async with conn.cursor() as cursor:
+    
+    async with conn.cursor() as cursor:
+        await cursor.execute(
+            f"SELECT * FROM {table_name} WHERE title LIKE ?", ("%" + title + "%",)
+        )
+        existing = await cursor.fetchone()
+        if existing:
+            # Update existing movie
             await cursor.execute(
-                f"SELECT * FROM {table_name} WHERE title LIKE ?", ("%" + title + "%",)
+                f"""
+                UPDATE {table_name}
+                SET date = COALESCE(?, date)
+                WHERE title = ?
+            """,
+                (date, title),
             )
-            existing = await cursor.fetchone()
-            if existing:
-                # Update existing movie
-                await cursor.execute(
-                    f"""
-                    UPDATE {table_name}
-                    SET date = COALESCE(?, date)
-                    WHERE title = ?
-                """,
-                    (date, title),
-                )
-            else:
-                # Insert new movie
-                await cursor.execute(
-                    f"""
-                    INSERT INTO {table_name} (title, date)
-                    VALUES (?,?)
-                """,
-                    (title, date),
-                )
-            await conn.commit()
-    finally:
-        await conn.close()
-
+        else:
+            # Insert new movie
+            await cursor.execute(
+                f"""
+                INSERT INTO {table_name} (title, date)
+                VALUES (?,?)
+            """,
+                (title, date),
+            )
+        await conn.commit()
 
 async def add_or_update_series(user_id, title, season=None, episode=None, date=None):
     """
@@ -168,45 +158,41 @@ async def add_or_update_series(user_id, title, season=None, episode=None, date=N
     await create_user_tables(user_id)
     await update_user_ids(user_id)
     conn = await create_connection()
-    try:
-        async with conn.cursor() as cursor:
+    async with conn.cursor() as cursor:
+        await cursor.execute(
+            f"SELECT * FROM {table_name} WHERE title LIKE ?", ("%" + title + "%",)
+        )
+        existing = await cursor.fetchone()
+        first_value = await get_media_details("tv", title)
+        next_release_date = first_value.get("next_episode_date")
+        
+        status = first_value.get("status","watching")
+        if existing:
+            # Update existing series
             await cursor.execute(
-                f"SELECT * FROM {table_name} WHERE title LIKE ?", ("%" + title + "%",)
+                f"""
+                UPDATE {table_name}
+                SET season = COALESCE(?, season),
+                    episode = COALESCE(?, episode),
+                    date = COALESCE(?, date),
+                    status = COAlESCE(?, status),
+                    next_release_date = COALESCE(?, next_release_date)
+                WHERE title = ?
+            """,
+                (season, episode, date,status,next_release_date,title),
             )
-            existing = await cursor.fetchone()
-            first_value = await get_media_details("tv", title)
-            next_release_date = first_value.get("next_episode_date")
             
-            status = first_value.get("status","watching")
-            if existing:
-                # Update existing series
-                await cursor.execute(
-                    f"""
-                    UPDATE {table_name}
-                    SET season = COALESCE(?, season),
-                        episode = COALESCE(?, episode),
-                        date = COALESCE(?, date),
-                        status = COAlESCE(?, status),
-                        next_release_date = COALESCE(?, next_release_date)
-                    WHERE title = ?
-                """,
-                    (season, episode, date,status,next_release_date,title),
-                )
-                
-            else:
-                # Insert new series
-                await cursor.execute(
-                    f"""
-                    INSERT INTO {table_name} (title, season, episode, date,status,next_release_date)
-                    VALUES (?, ?, ?, ?,?,?)
-                """,
-                    (title, season, episode, date,status, next_release_date),
-                )
-            await conn.commit()
-            return next_release_date
-    finally: 
-        await conn.close()
-
+        else:
+            # Insert new series
+            await cursor.execute(
+                f"""
+                INSERT INTO {table_name} (title, season, episode, date,status,next_release_date)
+                VALUES (?, ?, ?, ?,?,?)
+            """,
+                (title, season, episode, date,status, next_release_date),
+            )
+        await conn.commit()
+        return next_release_date
 
 async def delete_media(user_id, title, media_type):
     """
@@ -222,15 +208,13 @@ async def delete_media(user_id, title, media_type):
 
     await create_user_tables(user_id)
     conn = await create_connection()
-    try:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                f"DELETE FROM {table_name} WHERE title LIKE ?", ("%" + title + "%",)
-            )
-            await conn.commit()
-    finally:
-        await conn.close()
-
+    
+    async with conn.cursor() as cursor:
+        await cursor.execute(
+            f"DELETE FROM {table_name} WHERE title LIKE ?", ("%" + title + "%",)
+        )
+        await conn.commit()
+   
 
 async def search_media(user_id, title, media_type):
     """
@@ -469,7 +453,6 @@ async def view_watch_list(user_id, media_type):
                 try:
                     api_data = await get_media_details(media_type, title)
                 except Exception as e:
-                    print(f"[WARN] Failed to fetch API for '{title}': {e}")
                     api_data = None
 
                 # Combine DB + API data
@@ -712,7 +695,7 @@ async def check_upcoming_dates():
                         })
 
                 except aiosqlite.OperationalError as e:
-                    errorHandler.handle_exception(e)
+                    errorHandler.handle(e, context=f"Error processing user {user_id} in check_upcoming_dates")
     finally:
         await conn.close()
     return reminders
@@ -757,7 +740,7 @@ async def check_completion():
             json.dump(show, f, indent=4) """
                
     except Exception as e:
-        errorHandler.handle_exception(e)
+        errorHandler.handle(e, context="Error in check_completion")
         await conn.commit()
     finally:
         await conn.close()
@@ -789,7 +772,7 @@ async def refresh_tmdb_dates():
                     await conn.commit()
 
     except Exception as e:
-        errorHandler.handle_exception(e)
+        errorHandler.handle(e, context="Error in refresh_tmdb_dates")
         await conn.commit()
     finally:
         await conn.close()

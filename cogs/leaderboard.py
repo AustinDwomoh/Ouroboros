@@ -49,7 +49,6 @@ class Leaderboard(commands.Cog):
                 rows = c.fetchall()
             except sqlite3.OperationalError as e:
                 await interaction.followup.send("No Leaderboard available.")
-                errorHandler.handle_exception(e)
                 return
         leaderboard_data = []
         for idx, (player_id, score) in enumerate(rows, start=1):
@@ -104,9 +103,9 @@ class Leaderboard(commands.Cog):
                     [app_commands.Choice(name="No matches found", value="none")]
                 )
         except discord.errors.NotFound as e:
-            errorHandler.handle_exception(e)
+           pass
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e,context="leaderboard_autocomplete")
 
     # ================================ RANK SCRIPT =============================== #
     async def fetch_player_score(self, cursor, table_name, player_id):
@@ -119,7 +118,6 @@ class Leaderboard(commands.Cog):
             score_row = cursor.fetchone()
             return score_row[0] if score_row else 0
         except Games.sqlite3.OperationalError as e:
-            errorHandler.handle_exception(e)
             return 0
 
     @app_commands.guild_only()
@@ -160,8 +158,7 @@ class Leaderboard(commands.Cog):
                         break
                 rank = player_position
             except Games.sqlite3.OperationalError as e:
-                errorHandler.handle_exception(e)
-                rank = 0
+                rank = 'None'
             # banner making code
             pvp_text = f"PvP: {pvp_score}pts"
             pvb_text = f"PvB: {pvb_score}pts"

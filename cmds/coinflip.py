@@ -124,7 +124,7 @@ class Coinflip(commands.Cog):
                         )
                     except Exception as e:
                        embed = errorHandler.help_embed()
-                       errorHandler.handle_exception(e)
+                       errorHandler.handle(e,context=f'Coinflip start command interaction')
                        await interaction.response.send_message(embed=embed)
 
 
@@ -136,7 +136,7 @@ class Coinflip(commands.Cog):
             await interaction.response.send_message(embed=embed, view=CoinFlipView())
         except Exception as e:
             embed = errorHandler.help_embed()
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context='Coinflip command interaction')
             await interaction.response.send_message(embed=embed)
 
 # ============================================================================ #

@@ -30,25 +30,32 @@ class WelcomeGoodbyeCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        channels = ServerStatManager.get_greetings_channel_ids(member.guild.id)
-        channel_id = channels.get("welcome")
+        try:
+            channels = ServerStatManager.get_greetings_channel_ids(member.guild.id)
+            channel_id = channels.get("welcome")
 
-        if channel_id:
-            channel = member.guild.get_channel(channel_id)
-            if channel:
-                await self.send_welcome_banner(channel, member)
+            if channel_id:
+                channel = member.guild.get_channel(channel_id)
+                if channel:
+                    await self.send_welcome_banner(channel, member)
+        except Exception as e:
+            errorHandler.handle(e, context="Error in on_member_join listener")
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        channels = ServerStatManager.get_greetings_channel_ids(member.guild.id)
-        channel_id = channels.get("goodbye")
+        try:
+            channels = ServerStatManager.get_greetings_channel_ids(member.guild.id)
+            channel_id = channels.get("goodbye")
 
-        if channel_id:
-            channel = member.guild.get_channel(channel_id)
-            if channel:
-                await self.send_goodbye_banner(channel, member)
+            if channel_id:
+                channel = member.guild.get_channel(channel_id)
+                if channel:
+                    await self.send_goodbye_banner(channel, member)
+        except Exception as e:
+            errorHandler.handle(e, context="Error in on_member_remove listener")
 
     async def send_welcome_banner(self, channel, member):
+        
         if not channel:
             return
 
@@ -59,7 +66,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 avatar = Image.open(avatar_bytes).convert("RGB").resize((167, 167))
             except Exception as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e, context="Error loading avatar image")
                 return
 
             # Apply circular mask to avatar
@@ -72,7 +79,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 banner = Image.open(img_dir / "default.png").convert("RGBA")
             except Exception as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e, context="Error loading banner image")
                 return
 
             overlay = Image.new("RGBA", banner.size, (0, 0, 0, 0))
@@ -86,7 +93,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 font = ImageFont.truetype("arial.ttf", 60)
             except IOError as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e, context="Error loading font")
                 font = ImageFont.load_default()
 
             main_color = "white"  # Primary text color
@@ -108,7 +115,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             await channel.send(file=discord.File(welcome_file_path))
 
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Error in send_welcome_banner method")
 
         finally:
             # Ensure cleanup of the banner file
@@ -126,7 +133,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 avatar = Image.open(avatar_bytes).convert("RGB").resize((167, 167))
             except Exception as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e,context="Error loading avatar image for goodbye")
                 return
 
             # Apply circular mask to avatar
@@ -139,7 +146,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 banner = Image.open(img_dir / "default.png").convert("RGBA")
             except Exception as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e, context="Error loading banner image for goodbye")
                 return
 
             overlay = Image.new("RGBA", banner.size, (0, 0, 0, 0))
@@ -153,7 +160,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             try:
                 font = font = ImageFont.truetype("arial.ttf", 60)
             except IOError as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e, context="Error loading font for goodbye")
                 font = ImageFont.load_default()
             # Define text and shadow colors
             main_color = "white"  # Primary text color
@@ -176,7 +183,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             await channel.send(file=discord.File(goodbye_file_path))
 
         except Exception as e:
-           errorHandler.handle_exception(e)
+           errorHandler.handle(e, context="Error in send_goodbye_banner method")
 
         finally:
             # Ensure cleanup of the banner file

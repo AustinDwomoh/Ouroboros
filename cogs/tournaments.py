@@ -142,7 +142,7 @@ class MatchView(ui.View):
                         f"Unable to send a DM to <@{opponent_id}>. Please ensure their DMs are open.",
                         delete_after=300,
                     )
-                    errorHandler.handle_exception(e)
+                    errorHandler.handle(e, context="DM Error in Tournament Ready")
 
             await interaction.message.edit(view=self)
         else:
@@ -409,7 +409,7 @@ class DailyTournament(commands.Cog):
             await self.prepare_registration(signup_channel)
 
         except (discord.Forbidden,discord.HTTPException) as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Setup Guild Channel Error")
 
 
     async def send_guidelines(self, chat_channel, interaction):
@@ -596,7 +596,7 @@ class DailyTournament(commands.Cog):
                 await chat_channel.send(embed=embed)
                 await self.run_round(signup_channel)
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="End Registration Error")
 
     async def run_round(self, signup_channel):
         """Creates fixtures and sends fixtures and handles unmantched players as well the fixtures get sent to the fixtures channel"""
@@ -651,7 +651,7 @@ class DailyTournament(commands.Cog):
                 match_view.message = message
                 await asyncio.sleep(match_view.timeout)
             except Exception as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e, context="Match View Error")
 
             # Handle players who couldn't be paired
             if len(tournament_data["registered_players"]) > 0:
@@ -784,7 +784,7 @@ class DailyTournament(commands.Cog):
                     await self.declare_winner(fixtures_channel)
 
             except Exception as e:
-                errorHandler.handle_exception(e)
+                errorHandler.handle(e, context="Prepare Next Round Error")
 
             except FileNotFoundError:
                 pass
@@ -856,7 +856,7 @@ class DailyTournament(commands.Cog):
             await self.prepare_next_round(fixtures_channel)
 
         except Exception as e:
-            errorHandler.handle_exception(e)
+            errorHandler.handle(e, context="Start Results Delay Error")
 
     async def declare_winner(self, fixtures_channel):
         tournament_data = load_tournament_data(fixtures_channel.guild.id)
@@ -926,6 +926,7 @@ class DailyTournament(commands.Cog):
     @app_commands.command(
         name="activate_tournament", description="Activate or deactivate the tournament."
     )
+    @app_commands.guild_only()
     async def activate_tournament(self, interaction: discord.Interaction, state: str):
         """Start or stop the tournament"""
         if interaction.user.id not in ALLOWED_ID and not any(
@@ -992,6 +993,7 @@ class DailyTournament(commands.Cog):
     @app_commands.command(
         name="set_tour_role", description="Change the role for the tournaments"
     )
+    @app_commands.guild_only()
     async def set_tour_role(
         self, interaction: discord.Interaction, new_role: str, role_type: str
     ):
@@ -1066,7 +1068,7 @@ class DailyTournament(commands.Cog):
                 await self.prepare_registration(signup_channel)
 
         except Exception as e:
-           errorHandler.handle_exception(e)
+           errorHandler.handle(e, context="Daily Tournament Loop Error")
     @daily_tournament_loop.before_loop
     async def before_daily_tournament_loop(self):
         await self.client.wait_until_ready()

@@ -72,13 +72,13 @@ class Update(commands.Cog):
         except discord.errors.NotFound:
             # Ignore the "Unknown interaction" error
             return []
-        except Exception as e:
-            errorHandler = ErrorHandler()
-            errorHandler.handle_exception(e)
-            return []
         except discord.errors.HTTPException as e:
             if "Interaction has already been acknowledged" in str(e):#this helps avoid it keep calling it self which it keeps doing for some reason
                 pass
+        except Exception as e:
+            ErrorHandler().handle(e,context="Update Version Data Autocomplete")
+            return []
+        
 
 
 async def setup(client):
