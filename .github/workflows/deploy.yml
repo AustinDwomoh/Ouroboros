@@ -1,0 +1,62 @@
+# =========================================
+# GitHub Actions Workflow: Ouroboros CI/CD
+# Deploys Discord bot via SSH + PM2
+# Features:
+# - Installs dependencies in existing venv
+# - Restarts bot with PM2
+# - Discord notifications
+# =========================================
+name: Ouroboros CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Deploy to server
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            cd ~/Ourobors-fixed
+
+            # Activate virtualenv
+            source ouroboros/bin/activate
+
+            # Pull latest code
+            git pull origin main
+
+            # Install/upgrade dependencies
+            pip install --upgrade -r requirements.txt
+
+            # Restart bot with PM2
+            pm2 restart main.py --update-env
+            pm2 save  # persist across reboots
+
+      # Step 3: Notify Discord on failure
+      - name: Notify Discord on failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"content\": \":x: Ouroboros bot deploy failed for **${{ github.repository }}** @ **${{ github.ref_name }}**\"}" \
+          ${{ secrets.DISCORD_WEBHOOK }}
+
+      # Step 4: Notify on success
+      - name: Notify Discord on success
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d "{\"content\": \":white_check_mark: Ouroboros bot deployed successfully on **${{ github.repository }}** @ **${{ github.ref_name }}**\"}" \
+          ${{ secrets.DISCORD_WEBHOOK }}

@@ -1,3 +1,4 @@
+from operator import ne
 import aiohttp
 from settings import ErrorHandler,FONT_DIR  # for Dir
 import discord, typing,asyncio,requests
@@ -42,7 +43,7 @@ class MediaSearchPaginator(discord.ui.View):
                 inline=False,
             )
         embed.set_footer(
-            text=f"Page {self.index//5 + 1} of {(len(self.results) // 5) + 1}"
+            text=f"Page {self.index//5 + 1} of {((len(self.results) - 1) // 5) + 1}"
         )
         return embed
 
@@ -346,7 +347,7 @@ class Movies(commands.Cog):
                 await MoviesManager.delete_from_watchlist(interaction.user.id, title=title, media_type=media_type)
                 embed = discord.Embed(
                 title="Series Updated",
-                description=f"Your series **{title}** has been added/updated.\n Details: S{season}|| E{episode}\n“… Watched on: {date_watched}",
+                description=f"Your series **{title}** has been added/updated.\n Details: S{season} - E{episode}\n“… Watched on: {date_watched}",
                 color=discord.Color.blue(),)
                 if next_release_date:
                     embed.add_field(name="Next Expected Release",value=f"{next_release_date}",inline=False,)
@@ -412,7 +413,7 @@ class Movies(commands.Cog):
                 last_released = result['last_episode']
                 last_season = last_released.get("season", 0)
                 last_episode = last_released.get("episode", 0)
-                embed.add_field(name="Last realesed Details",value=f"S{last_season} E{last_episode}",inline=True,)
+                embed.add_field(name="Last released Details",value=f"S{last_season} E{last_episode}",inline=True,)
                 embed.add_field(name="Status", value=result["status"], inline=True)
                 
             else:
@@ -421,7 +422,7 @@ class Movies(commands.Cog):
                     collection = result["belongs_to_collection"]
                     collection_name = collection.get("name", "Unknown Collection")
                     embed.add_field(name="Collection", value=collection_name, inline=False)
-                embed.add_field(name="Wacthed On",value=f"{last_watched}",inline =True)
+                embed.add_field(name="Watched On", value=f"{last_watched}", inline=True)
             await interaction.followup.send(embed=embed)
         except discord.DiscordException as e:
             errorHandler.handle(e, context="Error in search_saved_media command")
@@ -481,13 +482,13 @@ class Movies(commands.Cog):
             errorHandler.handle(e,context="Error in all_media command final block")
 
     # ============================================================================ #
-    #                                WACTH_LIST CMDS                               #
+    #                                WATCH_LIST CMDS                               #
     # ============================================================================ #
     @app_commands.command(name="watch_list", description="List Of all watchlist movies or series")
     @app_commands.describe(media_type="movie or series")
     @app_commands.dm_only()
     async def watch_list(self, interaction: discord.Interaction, media_type: str):
-        """This function shows the uers wacthlist based on movie typ"""
+        """This function shows the user's watchlist based on movie type"""
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer(thinking=True, ephemeral=True)
@@ -664,9 +665,9 @@ class Movies(commands.Cog):
             id_list = set()
             for reminder in upcoming:
                 user_id = reminder.get("user_id")
-                id_list.add(user_id)
                 if user_id is None:
                     continue
+                id_list.add(user_id)
 
                 user = await self.client.fetch_user(user_id) 
                 if user:
@@ -701,11 +702,14 @@ class Movies(commands.Cog):
                         current_status = media_data.get("status", "No idea")
 
                         embed.add_field(name="Status", value=current_status, inline=False)
-                        embed.add_field(
-                            name="Current Details",
-                            value=f"S{current_season} E{current_episode}",
-                            inline=False,
-                        )
+                        if not reminder.get('movie'):
+                            embed.add_field(
+                                name="Current Details",
+                                value=f"S{current_season} E{current_episode}",
+                                inline=False,
+                            )
+                        next_episode = current_episode
+                        next_season = current_season
                         if not reminder.get('movie'):
                             next_episode = media_data.get('next_episode_number', '?')
                             next_season = media_data.get('next_season_number', '?')
@@ -715,8 +719,20 @@ class Movies(commands.Cog):
                                 inline=False,
                             )
 
-                    
-                        await user.send(embed=embed)
+                        if reminder.get('movie'):
+                            await user.send(embed=embed)
+                        else:
+                            try:
+                                cs = int(current_season)
+                                ce = int(current_episode)
+                                ns = int(next_season)
+                                ne = int(next_episode)
+                                if cs == ns and ne != ce:
+                                    await user.send(embed=embed)
+                            except (TypeError, ValueError):
+                                # If any value is missing or not an integer, still send the reminder
+                                await user.send(embed=embed)
+
                         await asyncio.sleep(0.5)
                     except discord.DiscordException as e:
                         errorHandler.handle(e, context="Error in media_reminder_loop")
@@ -727,8 +743,8 @@ class Movies(commands.Cog):
                 if user:
                     embed = discord.Embed(
                         title=f"Upcoming Updates complete",
-                        description=f"New Reminders received on <t:{int(datetime.now().timestamp())}:R>",
-                        color=discord.Color.blue(),
+                        description=f"New reminders received on <t:{int(datetime.now().timestamp())}:F> (<t:{int(datetime.now().timestamp())}:R>)",
+                        color=discord.Color.blue()
                     
                     )
 
@@ -742,9 +758,9 @@ class Movies(commands.Cog):
             id_list = set()
             for reminder in uncompleted:
                 user_id = reminder.get("user_id")
-                id_list.add(user_id)
                 if user_id is None:
                     continue
+                id_list.add(user_id)
 
                 user = await self.client.fetch_user(user_id)
                 try:
@@ -770,15 +786,17 @@ class Movies(commands.Cog):
                             else:
                                 last_season, last_episode = None, None
                             
+                            if (last_episode - current_episode) < 5:
+                                continue
                             embed.add_field(
                                 name="Current Details",
-                                value=f"S{current_season} E{current_episode}",
+                                value=f"S{current_season if current_season is not None else '?'} E{current_episode if current_episode is not None else '?'}",
                                 inline=False,
                             )
 
                             embed.add_field(
-                                name="Last realesed Details",
-                                value=f"S{last_season} E{last_episode}",
+                                name="Last released Details",
+                                value=f"S{last_season if last_season is not None else '?'} E{last_episode if last_episode is not None else '?'}",
                                 inline=False,
                             )
 
@@ -793,7 +811,7 @@ class Movies(commands.Cog):
                 if user:
                     embed = discord.Embed(
                         title=f"Unfinished Series and Watch list",
-                        description=f"New Reminders recieved <t:{int(datetime.now().timestamp())}:R>",
+                        description=f"New Reminders received <t:{int(datetime.now().timestamp())}:R>",
                         color=discord.Color.green(),
                         
                     )
@@ -864,4 +882,5 @@ class Movies(commands.Cog):
 
 
 async def setup(client):
+    """Asynchronously adds the Movies cog to the Discord client."""
     await client.add_cog(Movies(client))
