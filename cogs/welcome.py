@@ -55,140 +55,41 @@ class WelcomeGoodbyeCog(commands.Cog):
             errorHandler.handle(e, context="Error in on_member_remove listener")
 
     async def send_welcome_banner(self, channel, member):
-        
         if not channel:
             return
-
-        welcome_file_path = None
         try:
             # Fetch and prepare the avatar image
-            avatar_bytes = requests.get(str(member.display_avatar.url), stream=True).raw
-            try:
-                avatar = Image.open(avatar_bytes).convert("RGB").resize((167, 167))
-            except Exception as e:
-                errorHandler.handle(e, context="Error loading avatar image")
-                return
-
-            # Apply circular mask to avatar
-            alpha = Image.new("L", avatar.size, 0)
-            draw = ImageDraw.Draw(alpha)
-            draw.ellipse([(0, 0), avatar.size], fill=255)
-            avatar.putalpha(alpha)
-
-            # Load and overlay avatar on the banner
-            try:
-                banner = Image.open(img_dir / "default.png").convert("RGBA")
-            except Exception as e:
-                errorHandler.handle(e, context="Error loading banner image")
-                return
-
-            overlay = Image.new("RGBA", banner.size, (0, 0, 0, 0))
-            x_position = (banner.width - avatar.width) // 2
-            y_position = (banner.height - avatar.height) // 2
-            overlay.paste(avatar, (x_position, y_position), avatar)
-            banner = Image.alpha_composite(banner, overlay)
-
-            # Add welcome text
-            draw = ImageDraw.Draw(banner)
-            try:
-                font = ImageFont.truetype("arial.ttf", 60)
-            except IOError as e:
-                errorHandler.handle(e, context="Error loading font")
-                font = ImageFont.load_default()
-
-            main_color = "white"  # Primary text color
-            shadow_color = "gray"  # Shadow color
-            text = f"Welcome, {member.name}!"
-            text_x = (banner.width - draw.textbbox((0, 0), text, font=font)[2]) // 2
-            text_y = banner.height - 60
-            draw.text((text_x + 2, text_y + 2), text, font=font, fill=shadow_color)
-            draw.text((text_x, text_y), text, font=font, fill=main_color)
-            # Save banner image
-            welcome_file_path = img_dir / f"welcome_{member.name}.jpg"
-            banner.convert("RGB").save(welcome_file_path)
-
-            # Send message and banner in Discord channel
-            welcome_message = random.choice(self.welcome_messages).format(
+            embed = discord.Embed(
+                title=f"Welcome To {member.guild.name}",
+                description=(f"{random.choice(self.welcome_messages).format(
                 server_name=member.guild.name, member=member
+            )}"),color=discord.Color.purple()
             )
-            await channel.send(welcome_message)
-            await channel.send(file=discord.File(welcome_file_path))
+            embed.set_thumbnail(url=member.display_avatar.url)
+
+            await channel.send(embed=embed)
 
         except Exception as e:
             errorHandler.handle(e, context="Error in send_welcome_banner method")
 
-        finally:
-            # Ensure cleanup of the banner file
-            if welcome_file_path and os.path.exists(welcome_file_path):
-                os.remove(welcome_file_path)
-
     async def send_goodbye_banner(self, channel, member):
         if not channel:
             return
-
-        goodbye_file_path = None
         try:
             # Fetch and prepare the avatar image
-            avatar_bytes = requests.get(str(member.display_avatar.url), stream=True).raw
-            try:
-                avatar = Image.open(avatar_bytes).convert("RGB").resize((167, 167))
-            except Exception as e:
-                errorHandler.handle(e,context="Error loading avatar image for goodbye")
-                return
-
-            # Apply circular mask to avatar
-            alpha = Image.new("L", avatar.size, 0)
-            draw = ImageDraw.Draw(alpha)
-            draw.ellipse([(0, 0), avatar.size], fill=255)
-            avatar.putalpha(alpha)
-
-            # Load and overlay avatar on the banner
-            try:
-                banner = Image.open(img_dir / "default.png").convert("RGBA")
-            except Exception as e:
-                errorHandler.handle(e, context="Error loading banner image for goodbye")
-                return
-
-            overlay = Image.new("RGBA", banner.size, (0, 0, 0, 0))
-            x_position = (banner.width - avatar.width) // 2
-            y_position = (banner.height - avatar.height) // 2
-            overlay.paste(avatar, (x_position, y_position), avatar)
-            banner = Image.alpha_composite(banner, overlay)
-
-            # Add goodbye text
-            draw = ImageDraw.Draw(banner)
-            try:
-                font = font = ImageFont.truetype("arial.ttf", 60)
-            except IOError as e:
-                errorHandler.handle(e, context="Error loading font for goodbye")
-                font = ImageFont.load_default()
-            # Define text and shadow colors
-            main_color = "white"  # Primary text color
-            shadow_color = "gray"  # Shadow color
-            text = f"Goodbye, {member.name}!"
-            text_x = (banner.width - draw.textbbox((0, 0), text, font=font)[2]) // 2
-            text_y = banner.height - 60
-            draw.text((text_x + 2, text_y + 2), text, font=font, fill=shadow_color)
-            draw.text((text_x, text_y), text, font=font, fill=main_color)
-
-            # Save banner image
-            goodbye_file_path = img_dir / f"goodbye_{member.name}.jpg"
-            banner.convert("RGB").save(goodbye_file_path)
-
-            # Send message and banner in Discord channel
-            goodbye_message = random.choice(self.goodbye_messages).format(
+            embed = discord.Embed(
+                title=f"Goodbye {member.guild.name}",
+                description=(f"{random.choice(self.goodbye_messages).format(
                 server_name=member.guild.name, member=member
+            )}"),color=discord.Color.purple()
             )
-            await channel.send(goodbye_message)
-            await channel.send(file=discord.File(goodbye_file_path))
+            embed.set_thumbnail(url=member.display_avatar.url)
+
+            await channel.send(embed=embed)
 
         except Exception as e:
            errorHandler.handle(e, context="Error in send_goodbye_banner method")
 
-        finally:
-            # Ensure cleanup of the banner file
-            if goodbye_file_path and os.path.exists(goodbye_file_path):
-                os.remove(goodbye_file_path)
 
     @app_commands.command(
         name="set_welcome_channel",

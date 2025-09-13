@@ -19,7 +19,7 @@ else:
 
 
 CREATOR_ID = os.getenv("CREATOR")
-ALLOWED_ID = [755872891601551511]
+ALLOWED_ID = [CREATOR_ID]
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 BEARER_TOKEN = os.getenv("BEARER_TOKEN")
 X_API_KEY = os.getenv("X_API_KEY")
@@ -28,7 +28,7 @@ X_ACCESS_TOKEN = os.getenv("X_ACCESS_TOKEN")
 X_ACCESS_SECRET = os.getenv("X_ACCESS_SECRET")
 MOVIE_BASE_URL = os.getenv("MOVIE_BASE_URL")
 MOVIE_API_KEY = os.getenv("MOVIE_API_KEY")
-H_BASE_URL = os.getenv("HANIME_BASE_URL")
+H_BASE_URL = os.getenv("HIANIME_BASE_URL")
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS") 
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  
 DEFAULT_FROM_EMAIL=os.getenv("DEFAULT_FROM_EMAIL") 
@@ -100,8 +100,8 @@ class ErrorHandler:
 
     NOTIFY_EMAIL = 'dwomohaustin14@gmail.com'
     
-    def __init__(self, notify=True):
-        self.notify = notify
+    def __init__(self):
+        self.notify = True if state == "production" else False
        
         os.makedirs(LOG_BASE_DIR, exist_ok=True)
 

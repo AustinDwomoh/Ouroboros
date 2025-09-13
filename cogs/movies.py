@@ -320,7 +320,7 @@ class Movies(commands.Cog):
     #                               INSERT MEDIA  CMD                              #
     # ============================================================================ #
     @app_commands.command(name="add_media",description="Add or update movies.All data entered must match the initial inputs especially titles ",)
-    @app_commands.describe(title="If movie add the descritption if a part or a version of the moive")
+    @app_commands.describe(title="If movie add the description if a part or a version of the movie")
     @app_commands.describe(season="If not in seasons 0")
     @app_commands.describe(episode="If not in episodes 0")
     @app_commands.dm_only()
@@ -751,7 +751,7 @@ class Movies(commands.Cog):
                     await user.send(embed=embed)
             await MoviesManager.refresh_tmdb_dates()
 
-    @tasks.loop(hours=760)
+    @tasks.loop(hours=380)
     async def check_completion_loop(self):  
         async with self.loop_lock:
             uncompleted = await MoviesManager.check_completion()

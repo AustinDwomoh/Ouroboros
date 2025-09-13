@@ -1,5 +1,4 @@
 import sqlite3
-from settings import ErrorHandler
 
 def create_connection():
     conn = sqlite3.connect("data/game_records.db")  # Database file
@@ -18,7 +17,6 @@ def create_guild_table(guild_id, game_type):
         """
         )
         conn.commit()
-
 
 def create_leaderboard_table(guild_id):
     table_name = f"leaderboard_{guild_id}"
