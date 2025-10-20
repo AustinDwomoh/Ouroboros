@@ -751,6 +751,60 @@ class Movies(commands.Cog):
                     await user.send(embed=embed)
             await MoviesManager.refresh_tmdb_dates()
 
+    @app_commands.command(name="check_completion",description="Check for uncompleted series",)
+    @app_commands.dm_only()
+    async def check_Completion(self, interaction: discord.Interaction):
+        """Check for uncompleted series and notify the user."""
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True, ephemeral=True)
+            if not await self.is_dm(interaction):
+                await interaction.followup.send(
+                    "This command can only be used in DMs!", ephemeral=True
+                )
+                return
+            uncompleted = await MoviesManager.check_completion()
+            if not uncompleted:
+                await interaction.followup.send("You have no uncompleted series.", ephemeral=True)
+                return
+
+            for reminder in uncompleted:
+                name = reminder.get("name", "Unknown Title")
+                watched_value = reminder.get("watched")
+                if watched_value is not None:
+                    current_season, current_episode = watched_value
+                else:
+                    current_season, current_episode = None, None
+                unwatched_value = reminder.get("unwatched")
+                if unwatched_value is not None:
+                    last_season, last_episode = unwatched_value
+                else:
+                    last_season, last_episode = None, None
+
+                embed = discord.Embed(
+                    title=name,
+                    description="**Media Details**",
+                    color=discord.Color.blue()
+                )
+
+                embed.add_field(
+                    name="Current Details",
+                    value=f"S{current_season if current_season is not None else '?'} E{current_episode if current_episode is not None else '?'}",
+                    inline=False,
+                )
+
+                embed.add_field(
+                    name="Last released Details",
+                    value=f"S{last_season if last_season is not None else '?'} E{last_episode if last_episode is not None else '?'}",
+                    inline=False,
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+        except discord.DiscordException as e:
+            errorHandler.handle(e, context="Error in check_Completion command")
+        except Exception as e:
+            errorHandler.handle(e, context="Error in check_Completion command final block")
+            await interaction.followup.send("An error occurred while checking your uncompleted series.", ephemeral=True)
+
     @tasks.loop(hours=380)
     async def check_completion_loop(self):  
         async with self.loop_lock:
