@@ -1,4 +1,4 @@
-import os, logging, pathlib, discord,traceback,os,resend,base64
+import os, pathlib, discord,traceback,requests,json
 from threading import Thread
 from datetime import datetime
 from dotenv import load_dotenv
@@ -29,10 +29,7 @@ X_ACCESS_SECRET = os.getenv("X_ACCESS_SECRET")
 MOVIE_BASE_URL = os.getenv("MOVIE_BASE_URL")
 MOVIE_API_KEY = os.getenv("MOVIE_API_KEY")
 H_BASE_URL = os.getenv("HIANIME_BASE_URL")
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS") 
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  
-DEFAULT_FROM_EMAIL=os.getenv("DEFAULT_FROM_EMAIL") 
-RESEND_API=os.getenv("RESEND_API")
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 
 BASE_DIR = pathlib.Path(__file__).parent
@@ -85,34 +82,17 @@ LOG_BASE_DIR =BASE_DIR / "errors"
 class ErrorHandler:
     """
     Handles exceptions by logging error details to timestamped daily files.
-    Optionally sends asynchronous email notifications with the log attached.
+    Optionally sends asynchronous Discord webhook notifications.
     Also provides a Discord embed for user-friendly error feedback.
-
-    Attributes:
-        NOTIFY_EMAIL (str): Email address to receive error notifications.
-        notify (bool): Whether to send email notifications on errors.
-
-    Methods:
-        handle(error, context=""): Logs error info and triggers notification if enabled.
-        notify_admin(file_path): Sends an email with the error log attachment asynchronously.
-        help_embed(): Returns a Discord embed for displaying error contact info.
     """
 
-    NOTIFY_EMAIL = 'dwomohaustin14@gmail.com'
-    
     def __init__(self):
-        self.notify = True if state == "production" else False
-       
+        self.notify = True #if state == "production" else False
         os.makedirs(LOG_BASE_DIR, exist_ok=True)
 
     def handle(self, error, context=""):
         """
-        Handles exceptions by logging error details to a timestamped file 
-        and optionally notifying the admin via email.
-
-        Args:
-            error (Exception): The caught exception.
-            context (str): Optional context string describing where the error occurred.
+        Logs error details and notifies via Discord if enabled.
         """
         now = datetime.now()
         day_folder = now.strftime("%Y-%m-%d")
@@ -133,33 +113,64 @@ class ErrorHandler:
             f.write(error_message)
 
         if self.notify:
-            self.notify_admin(file_path)
+            Thread(target=self.send_discord_alert, args=(error, context, file_path)).start()
 
-    def notify_admin(self, file_path):
+    def send_discord_alert(self, error, context, file_path):
         """
-        Sends an email to the admin with the error log attached.
-        Runs asynchronously in a separate thread.
-
-        Args:
-            file_path (str): Path to the error log file to attach.
+        Sends a formatted embed to a Discord webhook with error details.
+        Runs in a separate thread to avoid blocking.
         """
-        subject = '[ALERT] Discord Bot Error'
-        body = 'An error occurred. Please see the attached log file.'
+        try:
+            # Build the embed
+            embed = {
+                "title": "🚨 Bot Error Alert",
+                "color": 0xFF0000,
+                "fields": [
+                    {"name": "Context", "value": context or "N/A", "inline": False},
+                    {"name": "Error", "value": str(error)[:1024], "inline": False},
+                ],
+                "footer": {"text": datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
+            }
 
-        Thread(
-            target=self.send_email_with_attachment,
-            kwargs={
-                "subject": subject,
-                "body": body,
-                "to_email": self.NOTIFY_EMAIL,
-                "file_path": file_path,
-            },
-        ).start()
+            # Attach a truncated traceback (Discord has a 6000 char limit)
+            tb = traceback.format_exc()
+            if tb:
+                embed["fields"].append({
+                    "name": "Traceback",
+                    "value": f"```{tb[-1800:]}```",  # keep last part for relevance
+                    "inline": False
+                })
+
+            # Send the webhook message
+            data = {
+                "username": "Ouroboros Error Bot",
+                "embeds": [embed],
+            }
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Include full log as a text file
+            files = {"file": (os.path.basename(file_path), content)}
+
+            # FIXED: Use json.dumps() instead of str() to create valid JSON
+            response = requests.post(
+                DISCORD_WEBHOOK_URL, 
+                data={"payload_json": json.dumps(data)}, 
+                files=files
+            )
+
+            if response.status_code >= 300:
+                print(f"[ErrorHandler] Discord alert failed: {response.status_code} {response.text}")
+
+        except Exception as e:
+            fallback_path = os.path.join(LOG_BASE_DIR, "webhook_failures.txt")
+            with open(fallback_path, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.now()} - Failed to send Discord alert: {str(e)}\n")
 
     def help_embed(self):
         """
-        Returns a Discord embed with help information.
-        This is meant to be sent to users when an error occurs.
+        Returns a Discord embed for user-facing error display.
         """
         embed = discord.Embed(
             title="Error Handling",
@@ -172,54 +183,3 @@ class ErrorHandler:
             inline=False
         )
         return embed
-
-
-    def send_email_with_attachment(self,subject, body, to_email, file_path=None, from_email=None, html_content=None):
-        """
-        Sends an email using the Resend API, optionally with an attachment and HTML content.
-        Falls back to logging errors in a local file if the email fails to send.
-
-        Args:
-            subject (str): Subject line of the email.
-            body (str): Plain text body of the email.
-            to_email (str or list): Recipient email address(es).
-            file_path (str, optional): Path to a file to attach.
-            from_email (str, optional): Sender's email address. Defaults to settings.DEFAULT_FROM_EMAIL.
-            html_content (str, optional): HTML content of the email. If provided, overrides plain text body.
-        """
-        from_email = from_email or DEFAULT_FROM_EMAIL
-        fallback_path = os.path.join(LOG_BASE_DIR, "notify_failures.txt")
-        resend.api_key = RESEND_API  # Ensure the Resend API key is set
-
-        if not isinstance(to_email, (list, tuple)):
-            to_email = [to_email]
-
-        # Prepare attachments payload for Resend
-        attachments = []
-        if file_path and os.path.isfile(file_path):
-            with open(file_path, "rb") as f:
-                file_data = f.read()
-                encoded_content = base64.b64encode(file_data).decode("ascii")
-                attachments.append({
-                    "filename": os.path.basename(file_path),
-                    "content": encoded_content,
-                    "disposition": "attachment",
-                    
-                })
-
-        try:
-            resend.Emails.send({
-                "from": from_email,
-                "to": to_email,
-                "subject": subject,
-                **({"html": html_content} if html_content else {}),
-                **({"text": body} if not html_content else {}),
-                **({"attachments": attachments} if attachments else {}),
-            })
-        except Exception as e:
-            os.makedirs(os.path.dirname(fallback_path), exist_ok=True)
-            with open(fallback_path, "a", encoding="utf-8") as f:
-                f.write(f"{datetime.now()} - Failed to notify admin: {str(e)}\n")
-          
-
-

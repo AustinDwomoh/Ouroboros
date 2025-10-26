@@ -5,6 +5,7 @@
 import random, discord
 from discord import app_commands
 from discord.ext import commands
+from settings import ErrorHandler
 
 # ============================================================================ #
 #                                   OUROBOROS                                  #
@@ -60,6 +61,7 @@ class Ouroboros(commands.Cog):
                 color=discord.Color.red(),
             )
         await interaction.response.send_message(embed=embed)
+        ErrorHandler().handle(Exception("Test Error"), context="Ouroboros Command")
 
 
 # The required setup function for loading this command
