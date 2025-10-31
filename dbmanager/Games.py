@@ -1,119 +1,75 @@
-import sqlite3
-
-def create_connection():
-    conn = sqlite3.connect("data/game_records.db")  # Database file
-    return conn
-
-def create_guild_table(guild_id, game_type):
-    table_name = f"{game_type}_scores_{guild_id}"
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                player_id INTEGER PRIMARY KEY,
-                player_score INTEGER
-            )
-        """
-        )
-        conn.commit()
-
-def create_leaderboard_table(guild_id):
-    table_name = f"leaderboard_{guild_id}"
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                player_id INTEGER PRIMARY KEY,
-                total_score INTEGER DEFAULT 0
-            )
-        """
-        )
-        conn.commit()
+from .pg_client import create_connection as _create_connection, USE_PG
 
 
-def update_score(table_name, player_id, score):
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            f"SELECT player_score FROM {table_name} WHERE player_id = :player_id",
-            {"player_id": player_id},
-        )
-        result = c.fetchone()
+def create_connection(db_path: str = "data/game_records.db"):
+    return _create_connection(db_path)
 
-        if result:
-            # Update existing score
-            new_score = result[0] + score
-            c.execute(
-                f"UPDATE {table_name} SET player_score = :new_score WHERE player_id = :player_id",
-                {"new_score": new_score, "player_id": player_id},
-            )
-        else:
-            # Insert new player score
-            c.execute(
-                f"INSERT INTO {table_name} (player_id, player_score) VALUES (:player_id, :player_score)",
-                {"player_id": player_id, "player_score": score},
-            )
+
+def _ph():
+    return "%s" if USE_PG else "?"
 
 
 def update_player_score(guild_id, player_id, player_score, game_type):
-    table_name = f"{game_type}_scores_{guild_id}" 
-    leaderboard_table = f"leaderboard_{guild_id}" 
+    """Record a player's score into the centralized `game_scores` and `leaderboard` tables.
 
-    create_guild_table(guild_id, game_type)  # Ensure game-specific table exists
-    create_leaderboard_table(guild_id)  # Ensure leaderboard table exists
-    # Update player score in game-specific table
-    update_score(table_name, player_id, player_score)
-
-    # Update total score in the leaderboard
+    This replaces the per-guild/per-game tables used by the old SQLite implementation.
+    """
     with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            f"SELECT total_score FROM {leaderboard_table} WHERE player_id = :player_id",
-            {"player_id": player_id},
-        )
-        leaderboard_result = c.fetchone()
-
-        if leaderboard_result:
-            # Update existing total score
-            new_total_score = leaderboard_result[0] + player_score
-            c.execute(
-                f"UPDATE {leaderboard_table} SET total_score = :new_total_score WHERE player_id = :player_id",
-                {"new_total_score": new_total_score, "player_id": player_id},
+        cur = conn.cursor()
+        if USE_PG:
+            # Upsert into game_scores
+            cur.execute(
+                "INSERT INTO game_scores (guild_id, game_type, player_id, player_score) VALUES (%s,%s,%s,%s) ON CONFLICT (guild_id, game_type, player_id) DO UPDATE SET player_score = game_scores.player_score + EXCLUDED.player_score",
+                (guild_id, game_type, player_id, player_score or 0),
+            )
+            # Upsert into leaderboard
+            cur.execute(
+                "INSERT INTO leaderboard (guild_id, player_id, total_score) VALUES (%s,%s,%s) ON CONFLICT (guild_id, player_id) DO UPDATE SET total_score = EXCLUDED.total_score",
+                (guild_id, player_id, player_score or 0),
             )
         else:
-            # Insert new player total score
-            c.execute(
-                f"INSERT INTO {leaderboard_table} (player_id, total_score) VALUES (:player_id, :total_score)",
-                {"player_id": player_id, "total_score": player_score},
-            )
+            # SQLite path: emulate same logic using SELECT/INSERT/UPDATE
+            ph = _ph()
+            cur.execute(f"SELECT player_score FROM game_scores WHERE guild_id = {ph} AND game_type = {ph} AND player_id = {ph}", (guild_id, game_type, player_id))
+            r = cur.fetchone()
+            if r:
+                new_score = (r[0] or 0) + (player_score or 0)
+                cur.execute(f"UPDATE game_scores SET player_score = ? WHERE guild_id = ? AND game_type = ? AND player_id = ?", (new_score, guild_id, game_type, player_id))
+            else:
+                cur.execute(f"INSERT INTO game_scores (guild_id, game_type, player_id, player_score) VALUES ({ph},{ph},{ph},{ph})", (guild_id, game_type, player_id, player_score or 0))
+
+            cur.execute(f"SELECT total_score FROM leaderboard WHERE guild_id = {ph} AND player_id = {ph}", (guild_id, player_id))
+            r2 = cur.fetchone()
+            if r2:
+                new_total = (r2[0] or 0) + (player_score or 0)
+                cur.execute(f"UPDATE leaderboard SET total_score = ? WHERE guild_id = ? AND player_id = ?", (new_total, guild_id, player_id))
+            else:
+                cur.execute(f"INSERT INTO leaderboard (guild_id, player_id, total_score) VALUES ({ph},{ph},{ph})", (guild_id, player_id, player_score or 0))
 
         conn.commit()
 
 
 def save_game_result(guild_id, player_id, player_score, game_type):
-    create_guild_table(guild_id, game_type)  # Ensure the table exists
     update_player_score(guild_id, player_id, player_score, game_type)
 
 
 def get_player_scores(guild_id, game_type):
-    """Get player scores for a specific game type."""
-    table_name = f"{game_type}_scores_{guild_id}"
     with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            f"SELECT player_id, player_score FROM {table_name} ORDER BY player_score DESC"
-        )
-        return c.fetchall()
+        cur = conn.cursor()
+        if USE_PG:
+            cur.execute("SELECT player_id, player_score FROM game_scores WHERE guild_id = %s AND game_type = %s ORDER BY player_score DESC", (guild_id, game_type))
+            return cur.fetchall()
+        else:
+            cur.execute("SELECT player_id, player_score FROM game_scores WHERE guild_id = ? AND game_type = ? ORDER BY player_score DESC", (guild_id, game_type))
+            return cur.fetchall()
 
 
 def get_leaderboard(guild_id):
-    """Get the overall leaderboard for a guild."""
-    leaderboard_table = f"leaderboard_{guild_id}" 
     with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            f"SELECT player_id, total_score FROM {leaderboard_table} ORDER BY total_score DESC"
-        )
-        return c.fetchall()
+        cur = conn.cursor()
+        if USE_PG:
+            cur.execute("SELECT player_id, total_score FROM leaderboard WHERE guild_id = %s ORDER BY total_score DESC", (guild_id,))
+            return cur.fetchall()
+        else:
+            cur.execute("SELECT player_id, total_score FROM leaderboard WHERE guild_id = ? ORDER BY total_score DESC", (guild_id,))
+            return cur.fetchall()

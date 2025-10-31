@@ -5,7 +5,6 @@ webguild/
 Pc/
 lapworld/
 .env
-data/
 ouroboros/
 errors/
 errors/.env.save

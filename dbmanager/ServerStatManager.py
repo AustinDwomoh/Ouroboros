@@ -1,10 +1,12 @@
-import sqlite3
 from settings import ErrorHandler
+from .pg_client import create_connection as _create_connection, USE_PG
+import sqlite3
 
 errorHandler = ErrorHandler()
 
-def create_connection(db_path="data/serverstats.db"):
-    return sqlite3.connect(db_path)
+
+def create_connection(db_path: str = "data/serverstats.db"):
+    return _create_connection(db_path)
 
 def setup_database():
     with create_connection() as conn:
