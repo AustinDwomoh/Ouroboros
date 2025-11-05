@@ -1,134 +1,126 @@
-from .pg_client import create_connection as _create_connection
+from settings import create_async_pg_conn, ErrorHandler
 
+error_handler = ErrorHandler()
 
-def create_connection(db_path: str = "data/notifications_records.db"):
-    # db_path ignored in Postgres-only mode
-    return _create_connection()
-
-
-# Function to create all static tables
-def create_static_tables():
+# -------------------------------------------------------------
+# CHANNEL MANAGEMENT
+# -------------------------------------------------------------
+async def add_or_update_channel(channel_id: int, guild_id: int, channel_name: str):
     """
-    Creates static tables:
-    - channels: Stores metadata about channels linked to guilds.
+    Upsert a channel into the `channels` table.
     """
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS channels (
-                channel_id BIGINT PRIMARY KEY,
-                guild_id BIGINT NOT NULL,
-                channel_name VARCHAR(255) NOT NULL
-            );
-            """
-        )
-        # platform_accounts is centralized; ensure it exists
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS platform_accounts (
-                channel_id BIGINT NOT NULL REFERENCES channels(channel_id) ON DELETE CASCADE,
-                platform_name TEXT NOT NULL,
-                platform_id VARCHAR(255) NOT NULL,
-                last_updated_content_id VARCHAR(255),
-                PRIMARY KEY (channel_id, platform_name, platform_id)
-            );
-            """
-        )
-        conn.commit()
+    conn = await create_async_pg_conn()
+    try:
+        await conn.execute("""
+            INSERT INTO channels (channel_id, guild_id, channel_name)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (channel_id)
+            DO UPDATE SET guild_id = EXCLUDED.guild_id,
+                          channel_name = EXCLUDED.channel_name,
+                          updated_at = now();
+        """, channel_id, guild_id, channel_name)
+    except Exception as e:
+        error_handler.handle(e, context="add_or_update_channel")
+    finally:
+        await conn.close()
 
 
-# Function to dynamically create platform-specific tables
-def create_platform_table(platform_name, platform_column):
-    # No dynamic per-platform tables in Postgres-only mode; platform_accounts is centralized.
-    return
-
-
-# Function to add or update a channel and link any platform accounts
-def add_or_update_channel(
-    channel_id, guild_id, channel_name, platform_name, platform_id):
+# -------------------------------------------------------------
+# PLATFORM ACCOUNT MANAGEMENT
+# -------------------------------------------------------------
+async def add_platform_account(channel_id: int, platform_name: str, platform_id: str):
     """
-    Adds or updates a channel in the channels table, and links platform accounts if provided.
-    """
-    create_static_tables()
-    with create_connection() as conn:
-        c = conn.cursor()
-        # Upsert channel
-        c.execute(
-            "INSERT INTO channels (channel_id, guild_id, channel_name) VALUES (%s,%s,%s) ON CONFLICT (channel_id) DO UPDATE SET guild_id = EXCLUDED.guild_id, channel_name = EXCLUDED.channel_name",
-            (channel_id, guild_id, channel_name),
-        )
-        if platform_name and platform_id:
-            add_platform_account(channel_id, platform_name, platform_id)
-        conn.commit()
-
-
-# Function to add a platform account ID for a specific channel
-def add_platform_account(channel_id, platform_name, platform_id):
-    """
-    Adds a platform account ID (e.g., YouTube channel ID, Twitter handle) to the dynamic platform table for a specific channel.
+    Link a platform account (e.g. YouTube, Twitter) to a Discord channel.
     """
     if not platform_id:
         return
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            "INSERT INTO platform_accounts (channel_id, platform_name, platform_id) VALUES (%s,%s,%s) ON CONFLICT (channel_id, platform_name, platform_id) DO UPDATE SET last_updated_content_id = EXCLUDED.last_updated_content_id",
-            (channel_id, platform_name, platform_id),
-        )
-        conn.commit()
+    conn = await create_async_pg_conn()
+    try:
+        await conn.execute("""
+            INSERT INTO platform_accounts (channel_id, platform_name, platform_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (channel_id, platform_name, platform_id)
+            DO NOTHING;
+        """, channel_id, platform_name.lower(), platform_id)
+    except Exception as e:
+        error_handler.handle(e, context="add_platform_account")
+    finally:
+        await conn.close()
 
 
-# Function to get platform IDs for a specific channel
-def get_platform_ids_for_channel(channel_id, platform_name):
+async def update_last_updated_content(channel_id: int, platform_name: str, content_id: str):
     """
-    Retrieves the platform IDs (e.g., YouTube channel ID, Twitter handle) linked to a specific channel dynamically.
+    Update the last known content ID (e.g. latest YouTube video or Tweet) for a channel+platform.
     """
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute("SELECT platform_id FROM platform_accounts WHERE channel_id = %s AND platform_name = %s", (channel_id, platform_name))
-        r = c.fetchone()
-        return r[0] if r else None
+    conn = await create_async_pg_conn()
+    try:
+        await conn.execute("""
+            UPDATE platform_accounts
+            SET last_updated_content_id = $1,
+                updated_at = now()
+            WHERE channel_id = $2 AND platform_name = $3;
+        """, content_id, channel_id, platform_name.lower())
+    except Exception as e:
+        error_handler.handle(e, context="update_last_updated_content")
+    finally:
+        await conn.close()
 
 
-# Ensure static tables are created
-def get_channel_for_notification(guild_id, platform_name):
+async def get_last_updated_content(channel_id: int, platform_name: str):
     """
-    Retrieves a list of channel_ids that are subscribed to notifications for the given platform.
-    Assumes that platform-specific tables exist and contain relevant platform IDs.
+    Retrieve the last known content ID for a channel/platform combination.
     """
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            "SELECT c.channel_id FROM channels c JOIN platform_accounts p ON c.channel_id = p.channel_id WHERE c.guild_id = %s AND p.platform_name = %s",
-            (guild_id, platform_name),
-        )
-        return [r[0] for r in c.fetchall()]
+    conn = await create_async_pg_conn()
+    try:
+        value = await conn.fetchval("""
+            SELECT last_updated_content_id
+            FROM platform_accounts
+            WHERE channel_id = $1 AND platform_name = $2;
+        """, channel_id, platform_name.lower())
+        return value
+    except Exception as e:
+        error_handler.handle(e, context="get_last_updated_content")
+        return None
+    finally:
+        await conn.close()
 
 
-def update_last_updated_content(channel_id, platform_name, content_id):
+# -------------------------------------------------------------
+# LOOKUPS
+# -------------------------------------------------------------
+async def get_platform_ids_for_channel(channel_id: int, platform_name: str):
+    """Return all external platform IDs linked to a given Discord channel."""
+    conn = await create_async_pg_conn()
+    try:
+        rows = await conn.fetch("""
+            SELECT platform_id
+            FROM platform_accounts
+            WHERE channel_id = $1 AND platform_name = $2;
+        """, channel_id, platform_name.lower())
+        return [r["platform_id"] for r in rows]
+    except Exception as e:
+        error_handler.handle(e, context="get_platform_ids_for_channel")
+        return []
+    finally:
+        await conn.close()
+
+
+async def get_channels_for_notification(guild_id: int, platform_name: str):
     """
-    Updates the last_updated_content_id for a specific channel in the platform table.
+    Return all channel IDs in a guild that are subscribed to a given platform.
     """
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            "UPDATE platform_accounts SET last_updated_content_id = %s WHERE channel_id = %s AND platform_name = %s",
-            (content_id, channel_id, platform_name),
-        )
-        conn.commit()
-
-
-def get_last_updated_content(channel_id, platform_name):
-    """
-    Retrieves the last updated video ID for a specific channel in the platform table.
-    """
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute("SELECT last_updated_content_id FROM platform_accounts WHERE channel_id = %s AND platform_name = %s", (channel_id, platform_name))
-        r = c.fetchone()
-        return r[0] if r else None
-
-
-create_connection()
-create_static_tables()
+    conn = await create_async_pg_conn()
+    try:
+        rows = await conn.fetch("""
+            SELECT c.channel_id
+            FROM channels c
+            JOIN platform_accounts p ON c.channel_id = p.channel_id
+            WHERE c.guild_id = $1 AND p.platform_name = $2;
+        """, guild_id, platform_name.lower())
+        return [r["channel_id"] for r in rows]
+    except Exception as e:
+        error_handler.handle(e, context="get_channels_for_notification")
+        return []
+    finally:
+        await conn.close()
+#TODO add a “global notification audit” helper that lists all registered platforms and channels across all guilds (for admin/debug dashboards

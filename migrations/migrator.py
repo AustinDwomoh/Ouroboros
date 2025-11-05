@@ -1,21 +1,55 @@
 #!/usr/bin/env python3
-"""Migration v2: improved SQLite -> Postgres migrator
+"""Migration v2.1: improved SQLite -> Postgres migrator
 
 Features:
 - Dry-run mode (--dry-run) that prints planned operations without executing them
 - Per-module safe transactions with clear logging
 - Robust media discovery (movies, series, watchlists) and user_media registry population
+- Ensures users table is populated before inserting foreign keys
 - Verbose output for troubleshooting
 
 Usage:
-  & .\lapworld\Scripts\python.exe .\migrations\migrate_sqlite_to_postgres_v2.py [--dry-run] [--modules serverstats,media]
+  python migrate_sqlite_to_postgres_v2.py [--dry-run] [--modules serverstats,media]
 """
-import os,sqlite3
-from settings import get_pg_conn, SQLITE_DATA_DIR
+import os,psycopg2
+import sqlite3
+import argparse
+from dotenv import load_dotenv
+
+
+# ---------------------------
+# Environment Loading
+# ---------------------------
+load_dotenv()
+# ---------------------------
+# Database Config
+# ---------------------------
+PGHOST = os.getenv("PGHOST")
+PGPORT = int(os.getenv("PGPORT", "5432"))
+PGUSER = os.getenv("PGUSER")
+PGPASSWORD = os.getenv("PGPASSWORD")
+PGDATABASE = os.getenv("PGDATABASE")
+SQLITE_DATA_DIR = os.getenv("SQLITE_DATA_DIR", "data")
+
+def create_pg_conn():
+    """
+    Blocking (synchronous) Postgres connection for scripts, migrations, etc.
+    """
+    if not all([PGHOST, PGUSER, PGPASSWORD, PGDATABASE]):
+        raise RuntimeError("Postgres credentials missing in .env")
+    return psycopg2.connect(
+    host=PGHOST,
+    port=PGPORT,
+    sslmode="require",
+    dbname=PGDATABASE,
+    user=PGUSER,
+    password=PGPASSWORD
+)
 
 
 class Migrator:
-    def __init__(self, verbose=True):
+    def __init__(self, dry_run=False, verbose=True):
+        self.dry_run = dry_run
         self.verbose = verbose
 
     def log(self, *args, **kwargs):
@@ -23,8 +57,37 @@ class Migrator:
             print(*args, **kwargs)
 
     def _pg_execute(self, cur, sql, params=None):
+        if self.dry_run:
+            self.log(f"  [DRY-RUN] SQL: {sql[:100]}... PARAMS: {params}")
+            return cur
         cur.execute(sql, params)
         return cur
+
+    def _sanitize_value(self, val):
+        """Sanitize value for insertion into Postgres."""
+        if val is None:
+            return None
+        if isinstance(val, str):
+            v = val.strip()
+            # treat case-insensitive 'null' or empty as None
+            if v.lower() in ('', 'null', 'none', 'nil', 'nan'):
+                return None
+            return v
+        return val
+
+
+    def _ensure_user(self, cur, user_id):
+        """Ensure user exists in users table before inserting related records."""
+        if self.dry_run:
+            return
+        try:
+            user_id_int = int(user_id)
+            cur.execute(
+                "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING",
+                (user_id_int,)
+            )
+        except (ValueError, TypeError):
+            self.log(f"  ⚠️  Invalid user_id: {user_id}")
 
     # ---------------- serverstats ----------------
     def migrate_serverstats(self):
@@ -33,6 +96,7 @@ class Migrator:
         if not os.path.exists(sqlite_path):
             self.log('  no serverstats.db found, skipping')
             return 0
+        
         sconn = sqlite3.connect(sqlite_path)
         scur = sconn.cursor()
         try:
@@ -48,12 +112,12 @@ class Migrator:
             sconn.close()
             return 0
 
-        pg = get_pg_conn()
+        pg = create_pg_conn()
         migrated = 0
         try:
             with pg.cursor() as cur:
                 for r in rows:
-                    params = tuple(_sanitize_value(x) for x in r)
+                    params = tuple(self._sanitize_value(x) for x in r)
                     sql = '''
                     INSERT INTO serverstats (
                       guild_id, welcome_channel_id, goodbye_channel_id, chat_channel_id,
@@ -71,15 +135,17 @@ class Migrator:
                       state = EXCLUDED.state,
                       player_role = EXCLUDED.player_role,
                       tour_manager_role = EXCLUDED.tour_manager_role,
-                      winner_role = EXCLUDED.winner_role
+                      winner_role = EXCLUDED.winner_role,
+                      updated_at = now()
                     '''
                     self._pg_execute(cur, sql, params)
                     migrated += 1
             if not self.dry_run:
                 pg.commit()
         finally:
-            pg.close(); sconn.close()
-        self.log(f'  migrated serverstats rows: {migrated}')
+            pg.close()
+            sconn.close()
+        self.log(f'  ✅ migrated serverstats rows: {migrated}')
         return migrated
 
     # ---------------- leveling ----------------
@@ -89,6 +155,7 @@ class Migrator:
         if not os.path.exists(sqlite_path):
             self.log('  no leveling.db found, skipping')
             return 0
+        
         sconn = sqlite3.connect(sqlite_path)
         scur = sconn.cursor()
         scur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'levels_%'")
@@ -98,7 +165,7 @@ class Migrator:
             sconn.close()
             return 0
 
-        pg = get_pg_conn()
+        pg = create_pg_conn()
         migrated = 0
         try:
             with pg.cursor() as cur:
@@ -106,19 +173,28 @@ class Migrator:
                     guild_id = table.split('_', 1)[1]
                     scur.execute(f"SELECT user_id, xp, level FROM '{table}'")
                     for user_id, xp, level in scur.fetchall():
+                        # Ensure user exists first
+                        self._ensure_user(cur, user_id)
+                        
                         params = (guild_id, user_id, xp or 0, level or 1)
                         sql = '''
                         INSERT INTO levels (guild_id, user_id, xp, level)
                         VALUES (%s,%s,%s,%s)
-                        ON CONFLICT (guild_id, user_id) DO UPDATE SET xp = EXCLUDED.xp, level = EXCLUDED.level
+                        ON CONFLICT (guild_id, user_id) DO UPDATE SET 
+                          xp = EXCLUDED.xp, 
+                          level = EXCLUDED.level,
+                          updated_at = now()
                         '''
                         self._pg_execute(cur, sql, params)
+                        print()
                         migrated += 1
+                        print(migrated)
             if not self.dry_run:
                 pg.commit()
         finally:
-            pg.close(); sconn.close()
-        self.log(f'  migrated leveling rows: {migrated}')
+            pg.close()
+            sconn.close()
+        self.log(f'  ✅ migrated leveling rows: {migrated}')
         return migrated
 
     # ---------------- games ----------------
@@ -128,11 +204,13 @@ class Migrator:
         if not os.path.exists(sqlite_path):
             self.log('  no game_records.db found, skipping')
             return 0
+        
         sconn = sqlite3.connect(sqlite_path)
         scur = sconn.cursor()
         scur.execute("SELECT name FROM sqlite_master WHERE type='table'")
         all_tables = [r[0] for r in scur.fetchall()]
-        pg = get_pg_conn()
+
+        pg = create_pg_conn()
         migrated = 0
         try:
             with pg.cursor() as cur:
@@ -144,10 +222,15 @@ class Migrator:
                         game_type, guild_id = parts
                         scur.execute(f"SELECT player_id, player_score FROM '{t}'")
                         for player_id, player_score in scur.fetchall():
+                            # Ensure user exists first
+                            self._ensure_user(cur, player_id)
+                            
                             sql = '''
                             INSERT INTO game_scores (guild_id, game_type, player_id, player_score)
                             VALUES (%s,%s,%s,%s)
-                            ON CONFLICT (guild_id, game_type, player_id) DO UPDATE SET player_score = EXCLUDED.player_score
+                            ON CONFLICT (guild_id, game_type, player_id) DO UPDATE SET 
+                              player_score = EXCLUDED.player_score,
+                              updated_at = now()
                             '''
                             self._pg_execute(cur, sql, (guild_id, game_type, player_id, player_score or 0))
                             migrated += 1
@@ -155,18 +238,24 @@ class Migrator:
                         guild_id = t.split('leaderboard_')[1]
                         scur.execute(f"SELECT player_id, total_score FROM '{t}'")
                         for player_id, total_score in scur.fetchall():
+                            # Ensure user exists first
+                            self._ensure_user(cur, player_id)
+                            
                             sql = '''
                             INSERT INTO leaderboard (guild_id, player_id, total_score)
                             VALUES (%s,%s,%s)
-                            ON CONFLICT (guild_id, player_id) DO UPDATE SET total_score = EXCLUDED.total_score
+                            ON CONFLICT (guild_id, player_id) DO UPDATE SET 
+                              total_score = EXCLUDED.total_score,
+                              updated_at = now()
                             '''
                             self._pg_execute(cur, sql, (guild_id, player_id, total_score or 0))
                             migrated += 1
             if not self.dry_run:
                 pg.commit()
         finally:
-            pg.close(); sconn.close()
-        self.log(f'  migrated game rows: {migrated}')
+            pg.close()
+            sconn.close()
+        self.log(f'  ✅ migrated game rows: {migrated}')
         return migrated
 
     # ---------------- fintech ----------------
@@ -176,53 +265,104 @@ class Migrator:
         if not os.path.exists(sqlite_path):
             self.log('  no finance.db found, skipping')
             return 0
+        
         sconn = sqlite3.connect(sqlite_path)
         scur = sconn.cursor()
         migrated = 0
-        pg = get_pg_conn()
+        pg = create_pg_conn()
+        
         try:
-            # user_payments
-            try:
-                scur.execute("SELECT user_id FROM user_payments")
-                with pg.cursor() as cur:
-                    for (user_id,) in scur.fetchall():
-                        self._pg_execute(cur, "INSERT INTO user_payments (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING", (user_id,))
-            except sqlite3.OperationalError:
-                self.log('  no user_payments table in sqlite')
-
-            # dynamic fintech tables
-            scur.execute("SELECT name FROM sqlite_master WHERE name LIKE '%_fintech'")
-            tables = [r[0] for r in scur.fetchall()]
             with pg.cursor() as cur:
+                # Dynamic fintech tables (user-specific payment tables)
+                scur.execute("SELECT name FROM sqlite_master WHERE name LIKE '%_fintech'")
+                tables = [r[0] for r in scur.fetchall()]
+                
                 for t in tables:
                     try:
                         scur.execute(f"SELECT name, category, amount, total_paid, status, frequency, due_date, last_paid_date FROM '{t}'")
-                    except Exception:
+                    except Exception as e:
+                        self.log(f'  ⚠️  Error reading table {t}: {e}')
                         continue
+                    
                     user_id = t.split('_fintech')[0]
                     try:
                         user_id_int = int(user_id)
                     except Exception:
-                        user_id_int = None
-                    if user_id_int is None:
-                        self.log(f'  skipping fintech table {t}: cannot derive user_id')
+                        self.log(f'  ⚠️  Skipping fintech table {t}: cannot derive user_id')
                         continue
+                    
+                    # Ensure user exists first
+                    self._ensure_user(cur, user_id_int)
+                    
                     for row in scur.fetchall():
+                        row = list(row)
+                        # row = [name, category, amount, total_paid, status, frequency, due_date, last_paid_date]
+                        
+                        # -------------------------
+                        # Normalize schema enums
+                        # -------------------------
+                        status = str(row[4]).strip().lower() if row[4] else None
+                        freq   = str(row[5]).strip().lower() if row[5] else None
+
+                        # Status normalization
+                        if status in ('reminded', 'remind', 'notify', 'active'):
+                            status = 'pending'
+                        elif status in ('done', 'complete', 'finished', 'success', 'paid_off'):
+                            status = 'paid'
+                        elif status in ('late', 'missed', 'unpaid'):
+                            status = 'overdue'
+                        elif status not in ('pending', 'paid', 'overdue', 'cancelled'):
+                            status = 'pending'
+
+                        # Frequency normalization
+                        if freq:
+                            freq = freq.lower()
+                        if freq not in ('once', 'daily', 'weekly', 'monthly', 'yearly'):
+                            # Catch uppercase or misspelled variants
+                            if freq in ('one-time', 'one time', 'single'):
+                                freq = 'once'
+                            elif freq in ('month', 'months', 'every month'):
+                                freq = 'monthly'
+                            elif freq in ('week', 'weeks'):
+                                freq = 'weekly'
+                            elif freq in ('day', 'days'):
+                                freq = 'daily'
+                            elif freq in ('year', 'years', 'annually'):
+                                freq = 'yearly'
+                            else:
+                                freq = 'monthly'  # sensible default
+
+                        # Apply normalized values back to row
+                        row[4] = status
+                        row[5] = freq
+
+                        # -------------------------
+                        # Build parameter tuple
+                        # -------------------------
                         params = (user_id_int, *row)
+
                         sql = '''
                         INSERT INTO fintech_payments (user_id, name, category, amount, total_paid, status, frequency, due_date, last_paid_date)
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         ON CONFLICT (user_id, name) DO UPDATE SET
-                          amount = EXCLUDED.amount, total_paid = EXCLUDED.total_paid, status = EXCLUDED.status,
-                          frequency = EXCLUDED.frequency, due_date = EXCLUDED.due_date, last_paid_date = EXCLUDED.last_paid_date
+                        category = EXCLUDED.category,
+                        amount = EXCLUDED.amount,
+                        total_paid = EXCLUDED.total_paid,
+                        status = EXCLUDED.status,
+                        frequency = EXCLUDED.frequency,
+                        due_date = EXCLUDED.due_date,
+                        last_paid_date = EXCLUDED.last_paid_date,
+                        updated_at = now()
                         '''
                         self._pg_execute(cur, sql, params)
                         migrated += 1
+
             if not self.dry_run:
                 pg.commit()
         finally:
-            pg.close(); sconn.close()
-        self.log(f'  migrated fintech rows: {migrated}')
+            pg.close()
+            sconn.close()
+        self.log(f'  ✅ migrated fintech rows: {migrated}')
         return migrated
 
     # ---------------- media (robust) ----------------
@@ -232,124 +372,185 @@ class Migrator:
         if not os.path.exists(sqlite_path):
             self.log('  no mediarecords.db found, skipping')
             return 0
+        
         sconn = sqlite3.connect(sqlite_path)
         scur = sconn.cursor()
         scur.execute("SELECT name FROM sqlite_master WHERE type IN ('table','view')")
         all_tables = [r[0] for r in scur.fetchall()]
+        
         movie_tables = [t for t in all_tables if t.lower().endswith('_movies') and 'watch' not in t.lower()]
         series_tables = [t for t in all_tables if t.lower().endswith('_series') and 'watch' not in t.lower()]
         watchlist_tables = [t for t in all_tables if 'watch_list' in t.lower() or 'watchlist' in t.lower()]
 
-        pg = get_pg_conn()
+        pg = create_pg_conn()
         migrated = 0
 
-        def upsert_movie(cur, title):
-            title = _sanitize_value(title)
+        def upsert_movie(cur, title, media_id=None):
+            """Insert or update movie, return internal movie.id"""
+            title = self._sanitize_value(title)
             if title is None:
                 return None
             if self.dry_run:
-                self.log('  DRY upsert movie', title)
+                self.log(f'  [DRY-RUN] upsert movie: {title}')
                 return None
+            
+            # Try to find by media_id first (external API ID)
+            if media_id:
+                cur.execute("SELECT id FROM movies WHERE media_id=%s", (media_id,))
+                r = cur.fetchone()
+                if r:
+                    return r[0]
+            
+            # Fall back to title lookup
             cur.execute("SELECT id FROM movies WHERE title=%s", (title,))
             r = cur.fetchone()
             if r:
                 return r[0]
-            cur.execute("INSERT INTO movies (title) VALUES (%s) RETURNING id", (title,))
+            
+            # Insert new movie (media_id required by schema, generate placeholder if missing)
+            if not media_id:
+                media_id = f"unknown_{title.lower().replace(' ', '_')}"
+            
+            cur.execute(
+                "INSERT INTO movies (title, media_id) VALUES (%s,%s) RETURNING id",
+                (title, media_id)
+            )
             return cur.fetchone()[0]
 
-        def upsert_series(cur, title):
-            title = _sanitize_value(title)
+        def upsert_series(cur, title, media_id=None):
+            """Insert or update series, return internal series.id"""
+            title = self._sanitize_value(title)
             if title is None:
                 return None
             if self.dry_run:
-                self.log('  DRY upsert series', title)
+                self.log(f'  [DRY-RUN] upsert series: {title}')
                 return None
+            
+            # Try to find by media_id first
+            if media_id:
+                cur.execute("SELECT id FROM series WHERE media_id=%s", (media_id,))
+                r = cur.fetchone()
+                if r:
+                    return r[0]
+            
+            # Fall back to title lookup
             cur.execute("SELECT id FROM series WHERE title=%s", (title,))
             r = cur.fetchone()
             if r:
                 return r[0]
-            cur.execute("INSERT INTO series (title) VALUES (%s) RETURNING id", (title,))
+            
+            # Insert new series (media_id required by schema)
+            if not media_id:
+                media_id = f"unknown_{title.lower().replace(' ', '_')}"
+            
+            cur.execute(
+                "INSERT INTO series (title, media_id) VALUES (%s,%s) RETURNING id",
+                (title, media_id)
+            )
             return cur.fetchone()[0]
 
         try:
             with pg.cursor() as cur:
                 # Movies
                 for t in movie_tables:
-                    user_raw = t.rsplit('_Movies', 1)[0]
+                    user_raw = t.rsplit('_Movies', 1)[0] if '_Movies' in t else t.rsplit('_movies', 1)[0]
                     try:
                         user_id = int(user_raw)
                     except Exception:
-                        user_id = user_raw
+                        self.log(f'  ⚠️  Cannot parse user_id from table {t}')
+                        continue
+                    
+                    # Ensure user exists
+                    self._ensure_user(cur, user_id)
+                    
                     scur.execute(f"PRAGMA table_info('{t}')")
                     cols = [r[1] for r in scur.fetchall()]
                     title_idx = cols.index('title') if 'title' in cols else 0
                     date_idx = None
-                    for cand in ('date','watched_date','added_date','timestamp'):
+                    for cand in ('date', 'watched_date', 'added_date', 'timestamp'):
                         if cand in cols:
-                            date_idx = cols.index(cand); break
+                            date_idx = cols.index(cand)
+                            break
+                    
                     rows = scur.execute(f"SELECT * FROM '{t}'").fetchall()
                     for row in rows:
                         title = row[title_idx] if len(row) > title_idx else None
                         date = row[date_idx] if (date_idx is not None and len(row) > date_idx) else None
-                        title_s = _sanitize_value(title)
+                        title_s = self._sanitize_value(title)
                         if not title_s:
                             continue
+                        
                         mid = upsert_movie(cur, title_s)
-                        if not self.dry_run:
-                            cur.execute("INSERT INTO user_movies_watched (user_id, movie_id, watched_date) VALUES (%s,%s,%s) ON CONFLICT (user_id, movie_id) DO NOTHING", (user_id, mid, _sanitize_value(date)))
-                            cur.execute("INSERT INTO user_media (user_id, media_type, media_id) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", (user_id, 'movie', mid))
+                        if not self.dry_run and mid:
+                            cur.execute(
+                                "INSERT INTO user_movies_watched (user_id, movie_id, watched_date) VALUES (%s,%s,%s) ON CONFLICT (user_id, movie_id) DO NOTHING",
+                                (user_id, mid, self._sanitize_value(date))
+                            )
+                            cur.execute(
+                                "INSERT INTO user_media (user_id, media_type, media_id) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+                                (user_id, 'movie', mid)
+                            )
                         migrated += 1
 
                 # Series
                 for t in series_tables:
-                    user_raw = t.rsplit('_Series', 1)[0]
+                    user_raw = t.rsplit('_Series', 1)[0] if '_Series' in t else t.rsplit('_series', 1)[0]
                     try:
                         user_id = int(user_raw)
                     except Exception:
-                        user_id = user_raw
+                        self.log(f'  ⚠️  Cannot parse user_id from table {t}')
+                        continue
+                    
+                    # Ensure user exists
+                    self._ensure_user(cur, user_id)
+                    
                     scur.execute(f"PRAGMA table_info('{t}')")
                     cols = [r[1] for r in scur.fetchall()]
                     title_idx = cols.index('title') if 'title' in cols else 0
                     season_idx = cols.index('season') if 'season' in cols else None
                     episode_idx = cols.index('episode') if 'episode' in cols else None
-                    progress_idx = cols.index('progress') if 'progress' in cols else None
+                    status_idx = cols.index('status') if 'status' in cols else None
                     date_idx = None
-                    for cand in ('date','watched_date','last_watched','timestamp'):
+                    for cand in ('date', 'watched_date', 'last_watched', 'timestamp'):
                         if cand in cols:
-                            date_idx = cols.index(cand); break
+                            date_idx = cols.index(cand)
+                            break
+                    
                     rows = scur.execute(f"SELECT * FROM '{t}'").fetchall()
                     for row in rows:
                         title = row[title_idx] if len(row) > title_idx else None
-                        season = row[season_idx] if (season_idx is not None and len(row) > season_idx) else None
-                        episode = row[episode_idx] if (episode_idx is not None and len(row) > episode_idx) else None
-                        progress = row[progress_idx] if (progress_idx is not None and len(row) > progress_idx) else None
+                        season = row[season_idx] if (season_idx is not None and len(row) > season_idx) else 0
+                        episode = row[episode_idx] if (episode_idx is not None and len(row) > episode_idx) else 0
+                        status = row[status_idx] if (status_idx is not None and len(row) > status_idx) else 'watching'
                         date = row[date_idx] if (date_idx is not None and len(row) > date_idx) else None
-                        title_s = _sanitize_value(title)
+                        
+                        title_s = self._sanitize_value(title)
                         if not title_s:
                             continue
+                        
+                        # Map old status values to new schema constraints
+                        if status not in ('watching', 'completed', 'dropped', 'on_hold'):
+                            status = 'watching'
+                        
                         sid = upsert_series(cur, title_s)
-                        # schema v2 stores 'status' rather than a raw 'progress' numeric column
-                        status_val = None
-                        if progress is not None:
-                            # coerce numeric progress to a short status string if needed
-                            try:
-                                status_val = str(progress)
-                            except Exception:
-                                status_val = progress
-                        if not self.dry_run:
+                        if not self.dry_run and sid:
                             cur.execute(
                                 """
-                                INSERT INTO user_series_progress (user_id, series_id, season, episode, status, updated_at)
+                                INSERT INTO user_series_progress (user_id, series_id, season, episode, status, last_updated)
                                 VALUES (%s,%s,%s,%s,%s,%s)
                                 ON CONFLICT (user_id, series_id) DO UPDATE SET
                                   season = EXCLUDED.season,
                                   episode = EXCLUDED.episode,
                                   status = EXCLUDED.status,
-                                  updated_at = EXCLUDED.updated_at
+                                  last_updated = EXCLUDED.last_updated,
+                                  updated_at = now()
                                 """,
-                                (user_id, sid, season, episode, status_val, _sanitize_value(date)),
+                                (user_id, sid, season, episode, status, self._sanitize_value(date))
                             )
-                            cur.execute("INSERT INTO user_media (user_id, media_type, media_id) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", (user_id, 'series', sid))
+                            cur.execute(
+                                "INSERT INTO user_media (user_id, media_type, media_id) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+                                (user_id, 'series', sid)
+                            )
                         migrated += 1
 
                 # Watchlists
@@ -369,81 +570,113 @@ class Migrator:
                     else:
                         user_raw = t.split('_', 1)[0]
                         media_kind = 'movie'
+                    
                     try:
                         user_id = int(user_raw)
                     except Exception:
-                        user_id = user_raw
+                        self.log(f'  ⚠️  Cannot parse user_id from watchlist table {t}')
+                        continue
+                    
+                    # Ensure user exists
+                    self._ensure_user(cur, user_id)
+                    
                     scur.execute(f"PRAGMA table_info('{t}')")
                     cols = [r[1] for r in scur.fetchall()]
                     title_idx = cols.index('title') if 'title' in cols else 0
                     date_idx = None
-                    for cand in ('date','added_date','timestamp'):
+                    for cand in ('date', 'added_date', 'timestamp'):
                         if cand in cols:
-                            date_idx = cols.index(cand); break
+                            date_idx = cols.index(cand)
+                            break
+                    
                     rows = scur.execute(f"SELECT * FROM '{t}'").fetchall()
                     for row in rows:
                         title = row[title_idx] if len(row) > title_idx else None
                         date = row[date_idx] if (date_idx is not None and len(row) > date_idx) else None
-                        title_s = _sanitize_value(title)
+                        title_s = self._sanitize_value(title)
                         if not title_s:
                             continue
+                        
                         if media_kind == 'movie':
                             mid = upsert_movie(cur, title_s)
-                            if not self.dry_run:
+                            if not self.dry_run and mid:
                                 cur.execute(
-                                    "INSERT INTO user_watchlist (user_id, media_type, media_id, added_date) VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-                                    (user_id, 'movie', mid, _sanitize_value(date)),
+                                    "INSERT INTO user_watchlist (user_id, media_type, media_id, added_date) VALUES (%s,%s,%s,%s) ON CONFLICT (user_id, media_type, media_id) DO NOTHING",
+                                    (user_id, 'movie', mid, self._sanitize_value(date))
                                 )
-                                cur.execute("INSERT INTO user_media (user_id, media_type, media_id) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", (user_id, 'movie', mid))
+                                cur.execute(
+                                    "INSERT INTO user_media (user_id, media_type, media_id) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+                                    (user_id, 'movie', mid)
+                                )
                         else:
                             sid = upsert_series(cur, title_s)
-                            if not self.dry_run:
+                            if not self.dry_run and sid:
                                 cur.execute(
-                                    "INSERT INTO user_watchlist (user_id, media_type, media_id, added_date) VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-                                    (user_id, 'series', sid, _sanitize_value(date)),
+                                    "INSERT INTO user_watchlist (user_id, media_type, media_id, added_date) VALUES (%s,%s,%s,%s) ON CONFLICT (user_id, media_type, media_id) DO NOTHING",
+                                    (user_id, 'series', sid, self._sanitize_value(date))
                                 )
-                                cur.execute("INSERT INTO user_media (user_id, media_type, media_id) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", (user_id, 'series', sid))
+                                cur.execute(
+                                    "INSERT INTO user_media (user_id, media_type, media_id) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+                                    (user_id, 'series', sid)
+                                )
                         migrated += 1
 
             if not self.dry_run:
                 pg.commit()
         finally:
-            pg.close(); sconn.close()
-        self.log(f'  migrated media rows: {migrated}')
+            pg.close()
+            sconn.close()
+        self.log(f'  ✅ migrated media rows: {migrated}')
         return migrated
 
-    @DeprecationWarning
-    def inspect_sqlite_schema(self, tables: list = None, dump_file: str = None):
-        """
-        Inspects the schemas of the given tables in the SQLite databases.
-        If no tables are given, inspects all tables in all module databases.
+    def run_all(self, modules=None):
+        """Run all migrations or specified modules."""
+        all_modules = {
+            #'serverstats': self.migrate_serverstats,
+            #'leveling': self.migrate_leveling,
+            #'games': self.migrate_games,
+            'fintech': self.migrate_fintech,
+            #'media': self.migrate_media,
+        }
+        
+        if modules:
+            modules_to_run = {k: v for k, v in all_modules.items() if k in modules}
+        else:
+            modules_to_run = all_modules
+        
+        self.log('\n' + '='*50)
+        self.log('🚀 Starting migration...')
+        if self.dry_run:
+            self.log('⚠️  DRY-RUN MODE - No changes will be committed')
+        self.log('='*50)
+        
+        total = 0
+        for name, func in modules_to_run.items():
+            try:
+                count = func()
+                total += count
+            except Exception as e:
+                self.log(f'\n❌ Error in {name}: {e}')
+                import traceback
+                traceback.print_exc()
+        
+        self.log('\n' + '='*50)
+        self.log(f'✅ Migration complete! Total rows migrated: {total}')
+        self.log('='*50)
+        return total
 
-        Args:
-            tables (list, optional): List of table names to inspect. Defaults to None.
-            dump_file (str, optional): Path to a file to dump the schema info as JSON. Defaults to None.
-        Returns:
-            dict: A dictionary with database filenames as keys and their table schemas as values.
-        result = {}
-        """
-        result = {}
-        for fn in tables:
-            path = os.path.abspath(os.path.join(SQLITE_DATA_DIR, fn))
-            info = {'exists': os.path.exists(path), 'tables': {}}
-            if os.path.exists(path):
-                conn = sqlite3.connect(path)
-                cur = conn.cursor()
-                cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                tables = [r[0] for r in cur.fetchall()]
-                for t in tables:
-                    try:
-                        cur.execute(f"PRAGMA table_info('{t}')")
-                        cols = cur.fetchall()
-                        info['tables'][t] = [{'cid': c[0], 'name': c[1], 'type': c[2], 'notnull': c[3], 'dflt_value': c[4], 'pk': c[5]} for c in cols]
-                    except Exception as e:
-                        info['tables'][t] = {'error': str(e)}
-                conn.close()
-            result[fn] = info
-        if dump_file:
-            import json
-            with open(dump_file, 'w', encoding='utf-8') as f:
-                json.dump(result, f, indent=2)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Migrate SQLite data to Postgres')
+    parser.add_argument('--dry-run', action='store_true', help='Print operations without executing')
+    parser.add_argument('--modules', type=str, help='Comma-separated list of modules to migrate')
+    parser.add_argument('--quiet', action='store_true', help='Reduce output verbosity')
+    
+    args = parser.parse_args()
+    
+    modules_list = None
+    if args.modules:
+        modules_list = [m.strip() for m in args.modules.split(',')]
+    
+    migrator = Migrator(dry_run=args.dry_run, verbose=not args.quiet)
+    migrator.run_all(modules=modules_list)

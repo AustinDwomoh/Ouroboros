@@ -1057,7 +1057,8 @@ class DailyTournament(commands.Cog):
     async def daily_tournament_loop(self):
         try:
             for guild in self.client.guilds:
-                if ServerStatManager.get_server_tourstate(guild.id) != "on":
+                server_stat = await ServerStatManager.get_server_stats(guild.id)
+                if server_stat.get("tournament_state") != "on":
                     continue
                 signup_channel_id = ServerStatManager.get_tour_channel_ids(
                     guild.id

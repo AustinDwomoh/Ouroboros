@@ -1,261 +1,199 @@
-from settings import ErrorHandler
-from .pg_client import create_connection as _create_connection, USE_PG
-import sqlite3
+from settings import create_async_pg_conn, ErrorHandler
 
-errorHandler = ErrorHandler()
+error_handler = ErrorHandler()
 
-
-def create_connection(db_path: str = "data/serverstats.db"):
-    return _create_connection(db_path)
-
-def setup_database():
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS serverstats (
-                guild_id INTEGER PRIMARY KEY,
-                welcome_channel_id INTEGER,
-                goodbye_channel_id INTEGER,
-                chat_channel_id INTEGER,
-                signup_channel_id INTEGER,
-                fixtures_channel_id INTEGER,
-                guidelines_channel_id INTEGER,
-                tourstate TEXT DEFAULT 'off',
-                state TEXT DEFAULT 'off',
-                player_role TEXT DEFAULT 'Tour Player',
-                tour_manager_role TEXT DEFAULT 'Tour manager',
-                winner_role TEXT DEFAULT '🥇Champ'
-           
-            )
-        """
-        )
-
-        """ cursor.execute(f"PRAGMA table_info(serverstats)")
-        columns = [row[1] for row in cursor.fetchall()]  # Get column names
-
-        if "player_role" not in columns:
-            cursor.execute(
-                "ALTER TABLE serverstats ADD COLUMN player_role TEXT DEFAULT 'Tour Player'"
-            )
-
-        if "tour_manager_role" not in columns:
-            cursor.execute(
-                "ALTER TABLE serverstats ADD COLUMN tour_manager_role TEXT DEFAULT 'Tour manager'"
-            )
-
-        if "winner_role" not in columns:
-            cursor.execute(
-                "ALTER TABLE serverstats ADD COLUMN winner_role TEXT DEFAULT '🥇Champ'"
-            ) """#not needed for now
-        conn.commit()
-
-def get_server_state(guild_id):
-    setup_database()
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT state FROM serverstats WHERE guild_id = ?
-        """,
-            (guild_id,),
-        )
-        result = cursor.fetchone()
-        return result[0] if result else "off"
-
-def get_role(guild_id, role):
-    setup_database()
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"""
-            SELECT {role} FROM serverstats WHERE guild_id = ?
-        """,
-            (guild_id,),
-        )
-        result = cursor.fetchone()
-        return result[0] if result else "No_role"
-
-def set_role(guild_id, role_column, role_value):
-        """
-        Sets or updates a role in the serverstats table.
-
-        :param guild_id: The Discord guild ID.
-        :param role_column: The column name (player_role, tour_manager_role, or winner_role).
-        :param role_value: The role name or ID to be stored.
-        """
-        try:
-            setup_database()
-            with create_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                f"""
-                INSERT INTO serverstats (guild_id, {role_column})
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET {role_column} = excluded.{role_column}
-            """,
-                (guild_id, role_value),
-            )
-            conn.commit()
-
-        except Exception as e:
-            errorHandler.handle(e,f"Error setting role for guild {guild_id}: {e}")
-
-def get_server_tourstate(guild_id):
-    setup_database()
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-        """
-        SELECT tourstate FROM serverstats WHERE guild_id = ?
-    """,
-        (guild_id,),
-    )
-    result = cursor.fetchone()
-    return result[0] if result else "off"
-
-def set_server_state(guild_id, state):
+# -------------------------------------------------------------
+# STATE GETTERS / SETTERS
+# -------------------------------------------------------------
+async def get_server_state(guild_id: int):
+    """Return 'on' or 'off' state for a guild."""
+    conn = await create_async_pg_conn()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO serverstats (guild_id, state)
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET state = ?
-            """,
-                (guild_id, state, state),
-            )
-            conn.commit()
+        val = await conn.fetchval(
+            "SELECT state FROM serverstats WHERE guild_id=$1", guild_id
+        )
+        return val or "off"
     except Exception as e:
-        errorHandler.handle(e,f"Error setting server state for guild {guild_id}: {e}")
-     
+        error_handler.handle(e, context="get_server_state")
+        return "off"
+    finally:
+        await conn.close()
 
-def set_server_tourstate( guild_id, state):
+
+async def set_server_state(guild_id: int, state: str):
+    """Insert or update global on/off state for a guild."""
+    conn = await create_async_pg_conn()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-            """
+        await conn.execute("""
+            INSERT INTO serverstats (guild_id, state)
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id)
+            DO UPDATE SET state = EXCLUDED.state, updated_at = now();
+        """, guild_id, state)
+    except Exception as e:
+        error_handler.handle(e, context="set_server_state")
+    finally:
+        await conn.close()
+
+
+async def get_server_tourstate(guild_id: int):
+    """Return 'on' or 'off' tournament state for a guild."""
+    conn = await create_async_pg_conn()
+    try:
+        val = await conn.fetchval(
+            "SELECT tourstate FROM serverstats WHERE guild_id=$1", guild_id
+        )
+        return val or "off"
+    except Exception as e:
+        error_handler.handle(e, context="get_server_tourstate")
+        return "off"
+    finally:
+        await conn.close()
+
+
+async def set_server_tourstate(guild_id: int, state: str):
+    """Insert or update tournament on/off state for a guild."""
+    conn = await create_async_pg_conn()
+    try:
+        await conn.execute("""
             INSERT INTO serverstats (guild_id, tourstate)
-            VALUES (?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET tourstate = ?
-        """,
-            (guild_id, state, state),
-        )
-        conn.commit()
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id)
+            DO UPDATE SET tourstate = EXCLUDED.tourstate, updated_at = now();
+        """, guild_id, state)
     except Exception as e:
-        errorHandler.handle(e,f"Error setting server state for guild {guild_id}: {e}")
+        error_handler.handle(e, context="set_server_tourstate")
+    finally:
+        await conn.close()
 
 
-def set_channel_id( guild_id, channel_type, channel_id):
-    if channel_type not in (
-        "welcome",
-        "goodbye",
-        "chat",
-        "signup",
-        "fixtures",
-        "guidelines",
-    ):
-        raise ValueError("Invalid channel type. Must be 'welcome' or 'goodbye'.")
+# -------------------------------------------------------------
+# ROLE MANAGEMENT
+# -------------------------------------------------------------
+async def get_role(guild_id: int, role_column: str):
+    """Return a specific role (player_role, tour_manager_role, or winner_role)."""
+    if role_column not in ("player_role", "tour_manager_role", "winner_role"):
+        raise ValueError("Invalid role column")
+    conn = await create_async_pg_conn()
+    try:
+        query = f"SELECT {role_column} FROM serverstats WHERE guild_id=$1"
+        val = await conn.fetchval(query, guild_id)
+        return val or "No_role"
+    except Exception as e:
+        error_handler.handle(e, context=f"get_role:{role_column}")
+        return "No_role"
+    finally:
+        await conn.close()
 
+
+async def set_role(guild_id: int, role_column: str, role_value: str):
+    """Insert or update a guild's stored role."""
+    if role_column not in ("player_role", "tour_manager_role", "winner_role"):
+        raise ValueError("Invalid role column")
+    conn = await create_async_pg_conn()
+    try:
+        await conn.execute(f"""
+            INSERT INTO serverstats (guild_id, {role_column})
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id)
+            DO UPDATE SET {role_column} = EXCLUDED.{role_column},
+                          updated_at = now();
+        """, guild_id, role_value)
+    except Exception as e:
+        error_handler.handle(e, context=f"set_role:{role_column}")
+    finally:
+        await conn.close()
+
+
+# -------------------------------------------------------------
+# CHANNEL MANAGEMENT
+# -------------------------------------------------------------
+async def set_channel_id(guild_id: int, channel_type: str, channel_id: int):
+    """Set or update a specific channel ID in the serverstats table."""
+    valid = ("welcome", "goodbye", "chat", "signup", "fixtures", "guidelines")
+    if channel_type not in valid:
+        raise ValueError(f"Invalid channel type: {channel_type}")
     column = f"{channel_type}_channel_id"
+    conn = await create_async_pg_conn()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-            f"""
+        await conn.execute(f"""
             INSERT INTO serverstats (guild_id, {column})
-            VALUES (?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET {column} = ?
-        """,
-            (guild_id, channel_id, channel_id),
-        )
-        conn.commit()
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id)
+            DO UPDATE SET {column} = EXCLUDED.{column},
+                          updated_at = now();
+        """, guild_id, channel_id)
     except Exception as e:
-        errorHandler.handle(e,f"Error setting {channel_type} channel for guild {guild_id}: {e}")
+        error_handler.handle(e, context=f"set_channel_id:{channel_type}")
+    finally:
+        await conn.close()
 
 
-def get_greetings_channel_ids( guild_id):
+async def get_greetings_channel_ids(guild_id: int):
+    """Return welcome and goodbye channel IDs for a guild."""
+    conn = await create_async_pg_conn()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-            """
-            SELECT welcome_channel_id, goodbye_channel_id FROM serverstats WHERE guild_id = ?
-        """,
-            (guild_id,),
-        )
-        result = cursor.fetchone()
-        return (
-            {"welcome": result[0], "goodbye": result[1]}
-            if result
-            else {"welcome": None, "goodbye": None}
-        )
+        row = await conn.fetchrow("""
+            SELECT welcome_channel_id, goodbye_channel_id
+            FROM serverstats WHERE guild_id=$1
+        """, guild_id)
+        if not row:
+            return {"welcome": None, "goodbye": None}
+        return {"welcome": row["welcome_channel_id"], "goodbye": row["goodbye_channel_id"]}
     except Exception as e:
-        errorHandler.handle(e,f"Error fetching channel IDs for guild {guild_id}: {e}")
-    
+        error_handler.handle(e, context="get_greetings_channel_ids")
         return {"welcome": None, "goodbye": None}
+    finally:
+        await conn.close()
 
-def get_tour_channel_ids( guild_id):
+
+async def get_tour_channel_ids(guild_id: int):
+    """Return all tournament-related channel IDs."""
+    conn = await create_async_pg_conn()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-            """
-            SELECT chat_channel_id, signup_channel_id, fixtures_channel_id, guidelines_channel_id 
-            FROM serverstats WHERE guild_id = ?
-        """,
-            (guild_id,),
-        )
-        result = cursor.fetchone()
-
-        if result:
-            return {
-                "chat": result[0],
-                "signup": result[1],
-                "fixtures": result[2],
-                "guidelines": result[3],
-            }
-        else:
-            errorHandler.handle(e,f"No tour channel IDs found for guild {guild_id}")
-            return {
-                "chat": None,
-                "signup": None,
-                "fixtures": None,
-                "guidelines": None,
-            }
-
+        row = await conn.fetchrow("""
+            SELECT chat_channel_id, signup_channel_id, fixtures_channel_id, guidelines_channel_id
+            FROM serverstats WHERE guild_id=$1
+        """, guild_id)
+        if not row:
+            return {"chat": None, "signup": None, "fixtures": None, "guidelines": None}
+        return {
+            "chat": row["chat_channel_id"],
+            "signup": row["signup_channel_id"],
+            "fixtures": row["fixtures_channel_id"],
+            "guidelines": row["guidelines_channel_id"],
+        }
     except Exception as e:
-        errorHandler.handle(e,f"Error fetching tour channel IDs for guild {guild_id}: {e}")
+        error_handler.handle(e, context="get_tour_channel_ids")
         return {"chat": None, "signup": None, "fixtures": None, "guidelines": None}
+    finally:
+        await conn.close()
 
-def get_all_server_states():
-    """Retrieve the on/off state for all guilds."""
+
+# -------------------------------------------------------------
+# GLOBAL OVERVIEW
+# -------------------------------------------------------------
+async def get_all_server_states():
+    """Return mapping of all guilds and their active states."""
+    conn = await create_async_pg_conn()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT guild_id, state FROM serverstats")
-        return dict(cursor.fetchall())
+        rows = await conn.fetch("SELECT guild_id, state FROM serverstats")
+        return {r["guild_id"]: r["state"] for r in rows}
     except Exception as e:
-        errorHandler.handle(e,f"Error retrieving all server states: {e}")
+        error_handler.handle(e, context="get_all_server_states")
         return {}
+    finally:
+        await conn.close()
 
-def get_all_server_tourstates(self):
-    """Retrieve the on/off tourstate for all guilds."""
+
+async def get_all_server_tourstates():
+    """Return mapping of all guilds and their tournament states."""
+    conn = await create_async_pg_conn()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT guild_id, tourstate FROM serverstats")
-        return dict(cursor.fetchall())
+        rows = await conn.fetch("SELECT guild_id, tourstate FROM serverstats")
+        return {r["guild_id"]: r["tourstate"] for r in rows}
     except Exception as e:
-        errorHandler.handle(e,f"Error retrieving all server tour states: {e}")
+        error_handler.handle(e, context="get_all_server_tourstates")
         return {}
-
+    finally:
+        await conn.close()

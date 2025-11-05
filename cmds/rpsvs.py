@@ -186,10 +186,10 @@ class RPSView(ui.View):
 
                 self.player1_score = self.player1_score * 2
                 self.player2_score = self.player2_score * 2
-                Games.save_game_result(
+                await Games.save_game_result(
                     interaction.guild.id, self.player1.id, self.player1_score, "pvp"
                 )
-                Games.save_game_result(
+                await Games.save_game_result(
                     interaction.guild.id, self.player2.id, self.player2_score, "pvp"
                 )
                 self.stop()

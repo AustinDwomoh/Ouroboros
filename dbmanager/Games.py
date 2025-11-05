@@ -1,75 +1,78 @@
-from .pg_client import create_connection as _create_connection, USE_PG
+from settings import create_async_pg_conn, ErrorHandler, ensure_user
+error_handler = ErrorHandler()
 
-
-def create_connection(db_path: str = "data/game_records.db"):
-    return _create_connection(db_path)
-
-
-def _ph():
-    return "%s" if USE_PG else "?"
-
-
-def update_player_score(guild_id, player_id, player_score, game_type):
-    """Record a player's score into the centralized `game_scores` and `leaderboard` tables.
-
-    This replaces the per-guild/per-game tables used by the old SQLite implementation.
+# -------------------------------------------------------------
+# Update / Save Scores
+# -------------------------------------------------------------
+async def save_game_result(guild_id: int, player_id: int, player_score: int, game_type: str):
     """
-    with create_connection() as conn:
-        cur = conn.cursor()
-        if USE_PG:
-            # Upsert into game_scores
-            cur.execute(
-                "INSERT INTO game_scores (guild_id, game_type, player_id, player_score) VALUES (%s,%s,%s,%s) ON CONFLICT (guild_id, game_type, player_id) DO UPDATE SET player_score = game_scores.player_score + EXCLUDED.player_score",
-                (guild_id, game_type, player_id, player_score or 0),
-            )
-            # Upsert into leaderboard
-            cur.execute(
-                "INSERT INTO leaderboard (guild_id, player_id, total_score) VALUES (%s,%s,%s) ON CONFLICT (guild_id, player_id) DO UPDATE SET total_score = EXCLUDED.total_score",
-                (guild_id, player_id, player_score or 0),
-            )
-        else:
-            # SQLite path: emulate same logic using SELECT/INSERT/UPDATE
-            ph = _ph()
-            cur.execute(f"SELECT player_score FROM game_scores WHERE guild_id = {ph} AND game_type = {ph} AND player_id = {ph}", (guild_id, game_type, player_id))
-            r = cur.fetchone()
-            if r:
-                new_score = (r[0] or 0) + (player_score or 0)
-                cur.execute(f"UPDATE game_scores SET player_score = ? WHERE guild_id = ? AND game_type = ? AND player_id = ?", (new_score, guild_id, game_type, player_id))
-            else:
-                cur.execute(f"INSERT INTO game_scores (guild_id, game_type, player_id, player_score) VALUES ({ph},{ph},{ph},{ph})", (guild_id, game_type, player_id, player_score or 0))
+    Record a player's score in centralized `game_scores` and update `leaderboard`.
+    If an entry exists, increment it; otherwise insert.
+    """
+    conn = await create_async_pg_conn()
+    await ensure_user(player_id)
+    try:
+        async with conn.transaction():
+            # increment existing game score
+            await conn.execute("""
+                INSERT INTO game_scores (guild_id, game_type, player_id, player_score)
+                VALUES ($1,$2,$3,$4)
+                ON CONFLICT (guild_id, game_type, player_id)
+                DO UPDATE SET player_score = game_scores.player_score + EXCLUDED.player_score,
+                              updated_at = now();
+            """, guild_id, game_type, player_id, player_score or 0)
 
-            cur.execute(f"SELECT total_score FROM leaderboard WHERE guild_id = {ph} AND player_id = {ph}", (guild_id, player_id))
-            r2 = cur.fetchone()
-            if r2:
-                new_total = (r2[0] or 0) + (player_score or 0)
-                cur.execute(f"UPDATE leaderboard SET total_score = ? WHERE guild_id = ? AND player_id = ?", (new_total, guild_id, player_id))
-            else:
-                cur.execute(f"INSERT INTO leaderboard (guild_id, player_id, total_score) VALUES ({ph},{ph},{ph})", (guild_id, player_id, player_score or 0))
-
-        conn.commit()
+            # increment leaderboard total
+            await conn.execute("""
+                INSERT INTO leaderboard (guild_id, player_id, total_score)
+                VALUES ($1,$2,$3)
+                ON CONFLICT (guild_id, player_id)
+                DO UPDATE SET total_score = leaderboard.total_score + EXCLUDED.total_score,
+                              updated_at = now();
+            """, guild_id, player_id, player_score or 0)
+    except Exception as e:
+        error_handler.handle(e, context="save_game_result")
+    finally:
+        await conn.close()
 
 
-def save_game_result(guild_id, player_id, player_score, game_type):
-    update_player_score(guild_id, player_id, player_score, game_type)
 
 
-def get_player_scores(guild_id, game_type):
-    with create_connection() as conn:
-        cur = conn.cursor()
-        if USE_PG:
-            cur.execute("SELECT player_id, player_score FROM game_scores WHERE guild_id = %s AND game_type = %s ORDER BY player_score DESC", (guild_id, game_type))
-            return cur.fetchall()
-        else:
-            cur.execute("SELECT player_id, player_score FROM game_scores WHERE guild_id = ? AND game_type = ? ORDER BY player_score DESC", (guild_id, game_type))
-            return cur.fetchall()
+
+# -------------------------------------------------------------
+# Fetch Scores / Leaderboards
+# -------------------------------------------------------------
+async def get_player_scores(guild_id: int, game_type: str):
+    """Return sorted list of (player_id, score) for a guild and game type."""
+    conn = await create_async_pg_conn()
+    try:
+        rows = await conn.fetch("""
+            SELECT player_id, player_score
+            FROM game_scores
+            WHERE guild_id = $1 AND game_type = $2
+            ORDER BY player_score DESC
+        """, guild_id, game_type)
+        return [dict(r) for r in rows]
+    except Exception as e:
+        error_handler.handle(e, context="get_player_scores")
+        return []
+    finally:
+        await conn.close()
 
 
-def get_leaderboard(guild_id):
-    with create_connection() as conn:
-        cur = conn.cursor()
-        if USE_PG:
-            cur.execute("SELECT player_id, total_score FROM leaderboard WHERE guild_id = %s ORDER BY total_score DESC", (guild_id,))
-            return cur.fetchall()
-        else:
-            cur.execute("SELECT player_id, total_score FROM leaderboard WHERE guild_id = ? ORDER BY total_score DESC", (guild_id,))
-            return cur.fetchall()
+async def get_leaderboard(guild_id: int):
+    """Return overall leaderboard totals for a guild."""
+    conn = await create_async_pg_conn()
+    try:
+        rows = await conn.fetch("""
+            SELECT player_id, total_score
+            FROM leaderboard
+            WHERE guild_id = $1
+            ORDER BY total_score DESC
+        """, guild_id)
+        return [dict(r) for r in rows]
+    except Exception as e:
+        error_handler.handle(e, context="get_leaderboard")
+        return []
+    finally:
+        await conn.close()

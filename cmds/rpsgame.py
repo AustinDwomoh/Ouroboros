@@ -108,7 +108,8 @@ class RPSView(ui.View):
                 await interaction.edit_original_response(content=final_message)
                 self.stop()
                 if not isinstance(interaction.channel, discord.DMChannel):
-                    Games.save_game_result(
+                    #if it is a dm we dont store it
+                    await Games.save_game_result(
                         interaction.guild.id, interaction.user.id, self.player_score, "pvb"
                     )
         except Exception as e:

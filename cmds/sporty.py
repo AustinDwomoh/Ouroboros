@@ -97,7 +97,7 @@ class EvenOddView(ui.View):
             self.stop()
             self.player_score = self.player_score * 2
             if not isinstance(interaction.channel, discord.DMChannel):
-                Games.save_game_result(
+                await Games.save_game_result(
                     interaction.guild.id,
                     interaction.user.id,
                     self.player_score,
@@ -162,7 +162,7 @@ class RedBlackView(ui.View):
             self.stop()
             self.player_score = self.player_score * 2
             if not isinstance(interaction.channel, discord.DMChannel):
-                Games.save_game_result(
+                await Games.save_game_result(
                     interaction.guild.id,
                     interaction.user.id,
                     self.player_score,
