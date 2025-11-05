@@ -10,48 +10,12 @@ Features:
 Usage:
   & .\lapworld\Scripts\python.exe .\migrations\migrate_sqlite_to_postgres_v2.py [--dry-run] [--modules serverstats,media]
 """
-import os
-import sqlite3
-import psycopg2
-import argparse
-from dotenv import load_dotenv
-
-load_dotenv()
-
-PGHOST = os.getenv("PGHOST")
-PGPORT = int(os.getenv("PGPORT", "5432"))
-PGUSER = os.getenv("PGUSER")
-PGPASSWORD = os.getenv("PGPASSWORD")
-PGDATABASE = os.getenv("PGDATABASE")
-SQLITE_DATA_DIR = os.getenv("SQLITE_DATA_DIR", "data")
-
-if not (PGHOST and PGUSER and PGPASSWORD and PGDATABASE):
-    raise SystemExit("Missing Postgres credentials. Set PGHOST, PGUSER, PGPASSWORD, PGDATABASE in .env")
-
-
-def get_pg_conn():
-    return psycopg2.connect(host=PGHOST, port=PGPORT, user=PGUSER, password=PGPASSWORD, dbname=PGDATABASE)
-
-
-def _sanitize_value(v):
-    if v is None:
-        return None
-    if isinstance(v, str):
-        s = v.strip()
-        if s == "" or s.lower() in ("null", "none", "n/a"):
-            return None
-        if s.isdigit():
-            try:
-                return int(s)
-            except Exception:
-                pass
-        return s
-    return v
+import os,sqlite3
+from settings import get_pg_conn, SQLITE_DATA_DIR
 
 
 class Migrator:
-    def __init__(self, dry_run=False, verbose=True):
-        self.dry_run = dry_run
+    def __init__(self, verbose=True):
         self.verbose = verbose
 
     def log(self, *args, **kwargs):
@@ -59,9 +23,6 @@ class Migrator:
             print(*args, **kwargs)
 
     def _pg_execute(self, cur, sql, params=None):
-        if self.dry_run:
-            self.log("DRY RUN SQL:", sql.strip().splitlines()[0], "... params=", params)
-            return None
         cur.execute(sql, params)
         return cur
 
@@ -451,42 +412,38 @@ class Migrator:
         self.log(f'  migrated media rows: {migrated}')
         return migrated
 
+    @DeprecationWarning
+    def inspect_sqlite_schema(self, tables: list = None, dump_file: str = None):
+        """
+        Inspects the schemas of the given tables in the SQLite databases.
+        If no tables are given, inspects all tables in all module databases.
 
-def parse_args():
-    p = argparse.ArgumentParser()
-    p.add_argument('--dry-run', action='store_true', help='Show planned operations without writing to Postgres')
-    p.add_argument('--modules', type=str, default='', help='Comma-separated list of modules to run (serverstats,leveling,games,fintech,media,notifications)')
-    return p.parse_args()
-
-
-def main():
-    args = parse_args()
-    modules = [m.strip() for m in args.modules.split(',') if m.strip()] if args.modules else []
-    migrator = Migrator(dry_run=args.dry_run, verbose=True)
-
-    sequence = [
-        #('serverstats', migrator.migrate_serverstats),
-        #('leveling', migrator.migrate_leveling),
-        #('games', migrator.migrate_games),
-        #('fintech', migrator.migrate_fintech),
-        ('media', migrator.migrate_media),
-    ]
-
-    print('🚀 Starting migration v2', '(DRY RUN)' if args.dry_run else '')
-    for name, fn in sequence:
-        if modules and name not in modules:
-            continue
-        print(f'-- {name.upper()} --')
-        try:
-            n = fn()
-            print(f'  -> {n} rows handled for {name}')
-        except Exception as e:
-            print(f'  ERROR in {name}:', e)
-            if not args.dry_run:
-                raise
-
-    print('\n✅ Migration v2 finished.')
-
-
-if __name__ == '__main__':
-    main()
+        Args:
+            tables (list, optional): List of table names to inspect. Defaults to None.
+            dump_file (str, optional): Path to a file to dump the schema info as JSON. Defaults to None.
+        Returns:
+            dict: A dictionary with database filenames as keys and their table schemas as values.
+        result = {}
+        """
+        result = {}
+        for fn in tables:
+            path = os.path.abspath(os.path.join(SQLITE_DATA_DIR, fn))
+            info = {'exists': os.path.exists(path), 'tables': {}}
+            if os.path.exists(path):
+                conn = sqlite3.connect(path)
+                cur = conn.cursor()
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [r[0] for r in cur.fetchall()]
+                for t in tables:
+                    try:
+                        cur.execute(f"PRAGMA table_info('{t}')")
+                        cols = cur.fetchall()
+                        info['tables'][t] = [{'cid': c[0], 'name': c[1], 'type': c[2], 'notnull': c[3], 'dflt_value': c[4], 'pk': c[5]} for c in cols]
+                    except Exception as e:
+                        info['tables'][t] = {'error': str(e)}
+                conn.close()
+            result[fn] = info
+        if dump_file:
+            import json
+            with open(dump_file, 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=2)

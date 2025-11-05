@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS platform_accounts (
 CREATE TABLE IF NOT EXISTS levels (
   id BIGSERIAL PRIMARY KEY,
   guild_id BIGINT NOT NULL,
-  user_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   xp INTEGER DEFAULT 0,
   level INTEGER DEFAULT 1,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -83,15 +83,15 @@ CREATE TABLE IF NOT EXISTS leaderboard (
   UNIQUE (guild_id, player_id)
 );
 
--- FINTECH
-CREATE TABLE IF NOT EXISTS user_payments (
+
+CREATE TABLE IF NOT EXISTS users (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS fintech_payments (
   id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   category TEXT,
   amount NUMERIC(12,2) NOT NULL,
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS series (
 
 CREATE TABLE IF NOT EXISTS user_movies_watched (
   id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   movie_id INTEGER REFERENCES movies(id) ON DELETE CASCADE,
   watched_date TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS user_movies_watched (
 
 CREATE TABLE IF NOT EXISTS user_series_progress (
   id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   series_id INTEGER REFERENCES series(id) ON DELETE CASCADE,
   season INTEGER DEFAULT 0,
   episode INTEGER DEFAULT 0,
@@ -173,7 +173,7 @@ ON user_watchlist (user_id, media_type, COALESCE(media_id::text, title));
 -- Registry table used by app code to quickly enumerate media per user
 CREATE TABLE IF NOT EXISTS user_media (
   id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   media_type TEXT NOT NULL CHECK(media_type IN ('movie','series')),
   media_id INTEGER NOT NULL,
   added_at TIMESTAMPTZ DEFAULT now(),
