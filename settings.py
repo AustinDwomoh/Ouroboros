@@ -3,7 +3,7 @@ settings.py — Central configuration and utilities for the Discord bot.
 Handles environment setup, DB connections, error logging, and notifications.
 """
 
-import os,logging,pathlib,traceback,base64,resend,discord,psycopg2,asyncpg,ssl
+import os,logging,pathlib,traceback,discord,psycopg2,asyncpg,ssl
 from threading import Thread
 from datetime import datetime
 from dotenv import load_dotenv

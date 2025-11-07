@@ -34,8 +34,8 @@ class ChannelManagement(commands.Cog):
     # ============================================================================
     #                               DELETE CHANNEL COMMAND                       =
     # ============================================================================
-    @app_commands.command(name="delete_channels", description="Delete specified channels.")
-    @app_commands.guild_only()
+    #@app_commands.command(name="delete_channels", description="Delete specified channels.")
+   #@app_commands.guild_only()
     async def delete_channels(self, interaction: discord.Interaction, channels: discord.TextChannel):
         """
         Deletes the specified text channels provided by the user.
@@ -95,8 +95,8 @@ class ChannelManagement(commands.Cog):
     # ============================================================================
     #                             DELETE CATEGORIES COMMAND                      =
     # ============================================================================
-    @app_commands.command( name="delete_categories", description="Delete specified categories." )
-    @app_commands.guild_only()
+    #@app_commands.command( name="delete_categories", description="Delete specified categories." )
+   # @app_commands.guild_only()
     async def delete_categories( self, interaction: discord.Interaction, category: discord.CategoryChannel):
         """
         Deletes the specified categories and all channels under them.
@@ -160,8 +160,8 @@ class ChannelManagement(commands.Cog):
     # ============================================================================
     #                             CLEAR MESSAGES COMMAND                         =
     # ============================================================================
-    @app_commands.command(name="clear_messages", description="Clear messages from a channel.")
-    @app_commands.guild_only()
+    #@app_commands.command(name="clear_messages", description="Clear messages from a channel.")
+    #@app_commands.guild_only()
     async def clear_messages( self, interaction: discord.Interaction, channel: discord.TextChannel, limit: int ):
         """
         Clears a specified number of messages from a given text channel or DMs.
@@ -277,6 +277,7 @@ class ChannelManagement(commands.Cog):
                     except discord.NotFound:
                         pass
                     await asyncio.sleep(2)
+                    
     @app_commands.command( name="help", description="Displays a list of commands and their descriptions")
     async def help(self, interaction: discord.Interaction):
         """Displays a list of commands categorized by DM and Server usage."""
