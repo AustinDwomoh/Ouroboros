@@ -283,8 +283,8 @@ class Movies(commands.Cog):
     async def delete_media(
         self,
         interaction: discord.Interaction,
-        title: str = None,
-        media_type: str = None,):
+        title: str ,
+        media_type: str):
         """Command for movie recording state management, only usable in DMs."""
         # Check if the command is invoked in a DM
         try:
@@ -303,13 +303,6 @@ class Movies(commands.Cog):
                     f"Your series '{title}' has been deleted."
                 )
 
-            else:
-                if await MoviesManager.delete_user_database(interaction.user.id):
-                    await interaction.followup.send(
-                        "Your media record has been deleted."
-                    )
-                else:
-                    await interaction.followup.send("No records found to delete")
         except discord.DiscordException as e:
             errorHandler.handle(e, context="Error in delete_media command")
         except Exception as e:
