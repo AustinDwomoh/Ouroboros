@@ -1,5 +1,6 @@
 from settings import create_async_pg_conn, ErrorHandler, ensure_user
 from movies.api_calls import get_media_details
+from models import Movie, Series,UserMedia
 
 error_handler = ErrorHandler()
 

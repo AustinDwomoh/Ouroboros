@@ -3,7 +3,7 @@ import aiohttp
 from difflib import SequenceMatcher
 from bs4 import BeautifulSoup
 from settings import MOVIE_BASE_URL, MOVIE_API_KEY, HIANIME_BASE_URL, ErrorHandler
-
+from models import Series, Movie
 # services/anime_service.py
 
 error_handler = ErrorHandler()
@@ -41,93 +41,8 @@ async def get_media_details(media, name):
     if data.get("status_code") == 34:
         return {}
 
-    return parse_tv(data) if media == "tv" else parse_movie(data)
+    return Series.build_series(data) if media == "tv" else Movie.build_movie(data)
 
-
-def parse_tv(data):
-    return {
-        "title": data.get("name"),
-        "overview": data.get("overview"),
-        "genres": [g["name"] for g in data.get("genres", [])],
-        "release_date": data.get("first_air_date"),
-        "release_date": data.get("first_air_date"),
-        "last_air_date": data.get("last_air_date"),
-        "next_episode_date": (
-            data.get("next_episode_to_air", {}).get("air_date")
-            if data.get("next_episode_to_air")
-            else None
-        ),
-        "next_episode_number": (
-            data.get("next_episode_to_air", {}).get("episode_number")
-            if data.get("next_episode_to_air")
-            else None
-        ),
-        "next_season_number": (
-            data.get("next_episode_to_air", {}).get("season_number")
-            if data.get("next_episode_to_air")
-            else None
-        ),
-        "seasons": [
-            {
-                "season_number": season.get("season_number"),
-                "episode_count": season.get("episode_count"),
-            }
-            for season in data.get("seasons", [])
-        ],
-        "last_episode": (
-            {
-                "episode": data.get("last_episode_to_air", {}).get("episode_number"),
-                "season": data.get("last_episode_to_air", {}).get("season_number"),
-                "air_date": data.get("last_episode_to_air", {}).get("air_date"),
-            }
-            if data.get("last_episode_to_air")
-            else None
-        ),
-        "poster_url": (
-            f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
-            if data.get("poster_path")
-            else None
-        ),
-        "homepage": data.get("homepage"),
-        "status": data.get("status"),
-    }
-
-
-def parse_movie(data):
-    collection = data.get("belongs_to_collection") or {}
-    return {
-        "title": data.get("title"),
-        "overview": data.get("overview"),
-        "genres": [g["name"] for g in data.get("genres", [])],
-        "release_date": data.get("release_date"),
-        "poster_url": (
-            f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
-            if data.get("poster_path")
-            else None
-        ),
-        "status": data.get("status"),
-        "homepage": data.get("homepage"),
-        "in_collection": (
-            [
-                {
-                    "id": collection.get("id"),
-                    "name": collection.get("name"),
-                    "poster_path": (
-                        f"https://image.tmdb.org/t/p/w500{collection['poster_path']}"
-                        if collection.get("poster_path")
-                        else None
-                    ),
-                    "backdrop_path": (
-                        f"https://image.tmdb.org/t/p/w500{collection['backdrop_path']}"
-                        if collection.get("backdrop_path")
-                        else None
-                    ),
-                }
-            ]
-            if collection
-            else []
-        ),
-    }
 
 
 async def search_hianime(keyword: str):

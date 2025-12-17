@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import aiohttp
 import asyncio
 
+
 # ---------------------------
 # Environment Loading
 # ---------------------------
@@ -133,17 +134,8 @@ async def create_async_pg_conn():
     ssl=ssl_context
 )
 
-async def ensure_user(user_id: int):
-    """Ensure the user exists in the users table."""
-    conn = await create_async_pg_conn()
-    try:
-        await conn.execute("""
-            INSERT INTO users (user_id)
-            VALUES ($1)
-            ON CONFLICT (user_id) DO NOTHING;
-        """, user_id)
-    finally:
-        await conn.close()
+
+
 # ---------------------------
 # Error Handling
 # ---------------------------
