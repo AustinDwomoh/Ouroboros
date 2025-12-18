@@ -1,7 +1,6 @@
 from time import time
-import settings
-import discord
-import logging
+
+import asyncpg, discord, logging, ssl
 from discord.ext import commands
 from settings import *
 
@@ -14,13 +13,15 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.guild_messages = True
 intents.members = True
-_seen_users: dict[int, float] = {}
-CACHE_TTL = 300 
-db_pool: asyncpg.Pool | None = None
+
+CACHE_TTL = 1
+
 class Client(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
         self.synced = False
+        self.db_pool: asyncpg.Pool | None = None
+        self._seen_users: dict[int, float] = {}
 
     async def setup_hook(self):
         await self.init_db_pool()
@@ -39,13 +40,12 @@ class Client(commands.Bot):
                 logger.error(f"Failed to sync slash commands: {e}")
                 await self.close()
 
-    async def init_db_pool():
-        global db_pool
+    async def init_db_pool(self):
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
 
-        db_pool = await asyncpg.create_pool(
+        self.db_pool = await asyncpg.create_pool(
             host=PGHOST,
             port=PGPORT,
             database=PGDATABASE,
@@ -56,35 +56,56 @@ class Client(commands.Bot):
             max_size=10,
         )
 
-    async def ensure_user(interaction):
-        uid = interaction.user.id
-        now = time.time()
-        user = interaction.user
+        logger.info("Database pool initialized")
 
-        if uid in _seen_users and now - _seen_users[uid] < CACHE_TTL:
+    # -------------------------------------------------
+    # DB Utilities
+    # -------------------------------------------------
+    async def ensure_user(self, interaction: discord.Interaction):
+        uid = interaction.user.id
+        now = time()
+
+        last_seen = self._seen_users.get(uid)
+        if last_seen and now - last_seen < CACHE_TTL:
             return
-        async with db_pool.acquire() as conn:
-            await conn.execute("""
-                INSERT INTO users (user_id, username)
+
+        async with self.db_pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO users (discord_id, username)
                 VALUES ($1, $2)
-                ON CONFLICT (user_id)
+                ON CONFLICT (discord_id)
                 DO UPDATE SET
                     username = EXCLUDED.username,
                     updated_at = NOW();
-            """, user.id, user.username)
+                """,
+                uid,
+                interaction.user.name,
+            )
 
+        self._seen_users[uid] = now
 
+    # -------------------------------------------------
+    # Discord Events
+    # -------------------------------------------------
     async def on_ready(self):
         await self.change_presence(activity=discord.Game(name="Eternal loop"))
-        #for guild in self.guilds:
-         #   await guild.leave()
-          #  print(f"Leaving {guild.name} ({guild.id})")
-		
-        logger.info("Ouroboros Is Ready")
+        logger.info("Ouroboros is ready")
+
+    async def on_interaction(self, interaction: discord.Interaction):
+        """Handle all interactions and ensure user exists in database."""
+        if interaction.user.bot:
+            return
+        
+        # Run ensure_user in background without blocking the interaction
+        self.loop.create_task(
+            self.ensure_user(interaction)
+        )
+
 
     async def load_commands(self):
         """Load command files from the commands directory."""
-        for cmd_file in settings.CMDS_DIR.glob("*.py"):
+        for cmd_file in CMDS_DIR.glob("*.py"):
             if cmd_file.name != "__init__.py":
                 try:
                     await self.load_extension(f"cmds.{cmd_file.name[:-3]}")
@@ -94,7 +115,7 @@ class Client(commands.Bot):
 
     async def load_cogs(self):
         """Load cog files from the cogs directory."""
-        for cog_file in settings.COGS_DIR.glob("*.py"):
+        for cog_file in COGS_DIR.glob("*.py"):
             if cog_file.name != "__init__.py":
                 try:
                     await self.load_extension(f"cogs.{cog_file.name[:-3]}")
@@ -109,14 +130,5 @@ class Client(commands.Bot):
         elif isinstance(error, commands.CheckFailure):
             await ctx.send("You do not have permission to use this command.")
 
-    async def on_interaction(self, interaction: discord.Interaction):
-        if interaction.user.bot:
-            return
-        uid = interaction.user.id
-        if uid in _seen_users:
-            return
-        _seen_users.add(uid)
-        await ensure_user(interaction)
-        await self.process_application_commands(interaction)
-
+  
 

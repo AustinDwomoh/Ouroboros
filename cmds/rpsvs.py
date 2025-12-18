@@ -5,7 +5,7 @@ import re, discord
 from discord import app_commands, ui
 from discord.ext import commands
 from settings import ErrorHandler
-from dbmanager import Games  # for database connection
+from dbmanager import Games 
 
 
 # ============================================================================ #
@@ -108,7 +108,7 @@ class RPSView(ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user == self.player1 or interaction.user == self.player2
 
-    async def determine_winner(player1_choice, player2_choice):
+    async def determine_winner(self, player1_choice, player2_choice):
         """This comapares and detemine the user choices
 
         Args:

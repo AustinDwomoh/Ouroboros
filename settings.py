@@ -3,7 +3,7 @@ settings.py — Central configuration and utilities for the Discord bot.
 Handles environment setup, DB connections, error logging, and notifications.
 """
 
-import os,logging,pathlib,traceback,discord,psycopg2,asyncpg,ssl
+import os,logging,pathlib,traceback,discord
 from threading import Thread
 from datetime import datetime
 from dotenv import load_dotenv
@@ -96,45 +96,6 @@ LOGGING_CONFIG = {
 
 
 logger = logging.getLogger("bot")
-
-# ---------------------------
-# Database Connectors
-# ---------------------------
-
-def create_pg_conn():
-    """
-    Blocking (synchronous) Postgres connection for scripts, migrations, etc.
-    """
-    if not all([PGHOST, PGUSER, PGPASSWORD, PGDATABASE]):
-        raise RuntimeError("Postgres credentials missing in .env")
-    return psycopg2.connect(
-    host=PGHOST,
-    port=PGPORT,
-    sslmode="require",
-    dbname=PGDATABASE,
-    user=PGUSER,
-    password=PGPASSWORD
-)
-
-async def create_async_pg_conn():
-    """
-    Asynchronous Postgres connection for bot runtime.
-    """
-    if not all([PGHOST, PGUSER, PGPASSWORD, PGDATABASE]):
-        raise RuntimeError("Postgres credentials missing in .env")
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    return await asyncpg.connect(
-     host=PGHOST,
-    port=PGPORT,
-    database=PGDATABASE,
-    user=PGUSER,
-    password=PGPASSWORD,
-    ssl=ssl_context
-)
-
-
 
 # ---------------------------
 # Error Handling
