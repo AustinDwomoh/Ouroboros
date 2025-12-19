@@ -6,7 +6,7 @@ from discord import app_commands, ui
 from discord.ext import commands
 from settings import ErrorHandler
 from dbmanager import Games
-
+from constants import gameType
 
 # ============================================================================ #
 #                        UI ELEMENTS FOR GAME SELECTION                        #
@@ -101,7 +101,7 @@ class EvenOddView(ui.View):
                     interaction.guild.id,
                     interaction.user.id,
                     self.player_score,
-                    "sporty",
+                    gameType.sporty,
                 )
 
     @ui.button(label="Even", style=discord.ButtonStyle.success)
@@ -166,7 +166,7 @@ class RedBlackView(ui.View):
                     interaction.guild.id,
                     interaction.user.id,
                     self.player_score,
-                    "sporty",
+                    gameType.sporty,
                 )
 
     @ui.button(label="Red", style=discord.ButtonStyle.red)

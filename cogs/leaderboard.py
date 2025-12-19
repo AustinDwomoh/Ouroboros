@@ -7,8 +7,8 @@ from discord.ext import commands
 from cogs.leveling import LeaderboardPaginationView  
 from settings import ErrorHandler
 from io import BytesIO
-from dbmanager.Games import get_leaderboard, get_player_scores
-from settings import create_async_pg_conn
+from dbmanager import Games
+from constants import gameType
 
 
 # ============================================================================ #
@@ -33,16 +33,17 @@ class Leaderboard(commands.Cog):
         
         try:
             if game_type:
+                game_type = gameType(game_type)
                 # Fetch specific game type scores
-                rows = await get_player_scores(interaction.guild.id, game_type)
+                rows = await Games.get_player_scores(interaction.guild.id, game_type)
                 if not rows:
-                    await interaction.followup.send(f"No leaderboard available for {game_type}.")
+                    await interaction.followup.send(f"No leaderboard available for {game_type.value}.")
                     return
                 # Convert to tuple format (player_id, score)
                 rows = [(row['player_id'], row['player_score']) for row in rows]
             else:
                 # Fetch overall leaderboard
-                rows = await get_leaderboard(interaction.guild.id)
+                rows = await Games.get_leaderboard(interaction.guild.id)
                 if not rows:
                     await interaction.followup.send("No leaderboard available.")
                     return
@@ -102,11 +103,11 @@ class Leaderboard(commands.Cog):
         """Autocomplete for game types."""
         try:
             current = current.strip() if current else ""
-            game_types = ["pvp", "sporty", "pvb", "efootball"]
+            game_types = [gt for gt in gameType]
             filtered_choices = [
-                app_commands.Choice(name=game, value=game)
+                app_commands.Choice(name=game.value, value=game)
                 for game in game_types
-                if current.lower() in game.lower()
+                if current.lower() in game.value.lower()
             ]
             if filtered_choices:
                 await interaction.response.autocomplete(filtered_choices)

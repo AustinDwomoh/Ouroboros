@@ -8,7 +8,7 @@ from discord import ui
 from settings import ErrorHandler,ALLOWED_ID
 from datetime import datetime, timedelta
 from dbmanager import Games, ServerStatManager
-
+from constants import gameType
 errorHandler = ErrorHandler()
 
 # ============================================================================ #
@@ -702,8 +702,8 @@ class DailyTournament(commands.Cog):
                 save_tournament_data(guild_id, tournament_data)
 
                 if guild_id:
-                    Games.save_game_result(guild_id, winner_id, 3, "efootball")
-                    Games.save_game_result(guild_id, loser_id, 0, "efootball")
+                    Games.save_game_result(guild_id, winner_id, 3, gameType.efootball)
+                    Games.save_game_result(guild_id, loser_id, 0, gameType.efootball)
                 break
 
     async def remove_role(self, player):
@@ -873,7 +873,7 @@ class DailyTournament(commands.Cog):
                 )
             )
         Games.save_game_result(
-            fixtures_channel.guild.id, final_winner_id, 10, "efootball"
+            fixtures_channel.guild.id, final_winner_id, 10, gameType.efootball
         )
         # Remove champion role from previous champion if exists
         for member in fixtures_channel.guild.members:

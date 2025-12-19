@@ -6,6 +6,7 @@ from discord import app_commands, ui
 from discord.ext import commands
 from settings import ErrorHandler
 from dbmanager import Games 
+from constants import gameType
 
 
 # ============================================================================ #
@@ -22,8 +23,7 @@ class OpponentAcceptView(ui.View):
 
     @ui.button(label="Accept", style=discord.ButtonStyle.success)
     async def accept_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+        self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user == self.opponent:
             await interaction.response.send_message(
                 f"{self.opponent.mention} has accepted the challenge!", ephemeral=False
@@ -68,28 +68,21 @@ class RPSView(ui.View):
         self,
         player1,
         player2,
-        total_rounds,
-        current_round,
-        player1_score,
-        player2_score,
+        
     ):
         """The Game veiw
 
-        Args:
+        Params:
             player1 (interaction object(user)): the user object for player one
             player2 (interaction object(user)): the user object for player one
-            total_rounds (int): the total rounds to be played
-            current_round (int): keeps track of the round the game is currently on
-            player1_score (int): player score
-            player2_score (int): player score
         """
         super().__init__(timeout=30)
         self.player1 = player1
         self.player2 = player2
-        self.total_rounds = total_rounds
-        self.current_round = current_round
-        self.player1_score = player1_score
-        self.player2_score = player2_score
+        self.total_rounds = 5
+        self.current_round = 1
+        self.player1_score = 0
+        self.player2_score = 0
         self.player_choices = {
             player1.id: None,
             player2.id: None,
@@ -187,10 +180,10 @@ class RPSView(ui.View):
                 self.player1_score = self.player1_score * 2
                 self.player2_score = self.player2_score * 2
                 await Games.save_game_result(
-                    interaction.guild.id, self.player1.id, self.player1_score, "pvp"
+                    interaction.guild.id, self.player1.id, self.player1_score, gameType.pvp
                 )
                 await Games.save_game_result(
-                    interaction.guild.id, self.player2.id, self.player2_score, "pvp"
+                    interaction.guild.id, self.player2.id, self.player2_score, gameType.pvp
                 )
                 self.stop()
 

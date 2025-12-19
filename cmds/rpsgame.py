@@ -6,7 +6,7 @@ from discord import app_commands, ui
 from discord.ext import commands
 from settings import ErrorHandler
 from dbmanager import Games  # for database connection
-
+from constants import gameType
 
 # ============================================================================ #
 #                                  UI ELEMENT & GAME LOGIC                     #
@@ -110,7 +110,7 @@ class RPSView(ui.View):
                 if not isinstance(interaction.channel, discord.DMChannel):
                     #if it is a dm we dont store it
                     await Games.save_game_result(
-                        interaction.guild.id, interaction.user.id, self.player_score, "pvb"
+                        interaction.guild.id, interaction.user.id, self.player_score, gameType.pvb
                     )
         except Exception as e:
             errorHandler = ErrorHandler()
@@ -149,7 +149,7 @@ class RPS(commands.Cog):
 
     # ================================ ACTIVATION ================================ #
     @app_commands.command(name="rps", description="Rock Paper Game vs Ouroboros")
-    @app_commands.dm_only()
+    #@app_commands.dm_only()
     async def rps(self, interaction: discord.Interaction):
         """Start the Rock, Paper, Scissors game against the bot."""
         # Start
