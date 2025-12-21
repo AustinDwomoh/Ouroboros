@@ -8,179 +8,125 @@ from settings import ErrorHandler
 from dbmanager import Games
 from constants import gameType
 
+GAME_RULES = {
+    "even_odd": {
+        "choices": ["even", "odd"],
+        "resolver": lambda: "even" if random.randint(1, 10) % 2 == 0 else "odd",
+    },
+    "red_black": {
+        "choices": ["red", "black"],
+        "resolver": lambda: random.choice(["red", "black"]),
+    }
+}
+
 # ============================================================================ #
 #                        UI ELEMENTS FOR GAME SELECTION                        #
 # ============================================================================ #
 # View for selecting the game
+class GameButton(ui.Button):
+    def __init__(self, choice, view_reference):
+        label = choice.capitalize()
+        style = discord.ButtonStyle.green if choice in ["even", "red"] else discord.ButtonStyle.red
+
+        super().__init__(label=label, style=style)
+        self.choice = choice
+        self.view_reference = view_reference
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.view_reference.play_round(interaction, self.choice)
+
 class GameSelectionView(ui.View):
-    def __init__(self, player, bot):
+    def __init__(self, player, bot, guild_id):
         super().__init__(timeout=30)
         self.player = player
         self.bot = bot
-    
-    async def on_timeout(self):
-        await self.player.send("You took too long to select a game!")
+        self.guild_id = guild_id
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    async def interaction_check(self, interaction):
         return interaction.user == self.player
 
     @ui.button(label="Even or Odd", style=discord.ButtonStyle.success)
-    async def even_odd_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def even_odd(self, interaction, button):
         await interaction.response.edit_message(
-            content="Starting Even or Odd game...", view=None
+            content="Starting Even/Odd...check your DMs!",
+            view=None
         )
-        await interaction.channel.send(
-            "Game starts now! Click a button to make your choice.",
-            view=EvenOddView(self.player, self.bot),
+        await self.player.send(
+            "Lets Begin!",
+            view=GameView(self.player, self.bot, "even_odd", self.guild_id)
         )
-        self.stop()
 
-    @ui.button(label="Red or Black", style=discord.ButtonStyle.red)
-    async def red_black_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    @ui.button(label="Red or Black", style=discord.ButtonStyle.danger)
+    async def red_black(self, interaction, button):
         await interaction.response.edit_message(
-            content="Starting Red or Black game...", view=None
+            content="Starting Red/Black...check your DMs!",
+            view=None
         )
-        await interaction.channel.send(
-            "Game starts now! Click a button to make your choice.",
-            view=RedBlackView(self.player, self.bot),
+        await self.player.send(
+            "Lets Begin!",
+            view=GameView(self.player, self.bot, "red_black", self.guild_id)
         )
-        self.stop()
 
 
-# ============================================================================ #
-#                         UI ELEMENT FOR EVEN ODD GAME                         #
-# ============================================================================ #
-class EvenOddView(ui.View):
-    def __init__(self, player, bot):
+class GameView(ui.View):
+    def __init__(self, player, bot, game_key, guild_id):
         super().__init__(timeout=30)
         self.player = player
         self.bot = bot
-        self.total_rounds = 5  # Fixed number of rounds
-        self.current_round = 1
-        self.player_score = 0
-
-    async def on_timeout(self):
-        await self.player.send("Don't bother me if you ain't ready!")
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user == self.player
-
-    async def handle_round(self, interaction: discord.Interaction, player_choice):
-        await interaction.response.defer()
-        number = random.randint(1, 10)
-        result = "even" if number % 2 == 0 else "odd"
-
-        if player_choice == result:
-            self.player_score += 1
-            response = f"Round {self.current_round}: You chose {player_choice} and the number was {number}. You win!"
-        else:
-            response = f"Round {self.current_round}: You chose {player_choice} and the number was {number}. You lose!"
-
-        self.current_round += 1
-
-        # Update the message with scores
-        if self.current_round <= self.total_rounds:
-            await interaction.edit_original_response(
-                content=f"{response}\n\nCurrent Score: {self.player_score}\nRound {self.current_round}/{self.total_rounds}: Click a button to make your choice.",
-                view=self,
-            )
-        else:
-            await interaction.edit_original_response(
-                content=f"{response}\n\nGame over! Your final score: {self.player_score}.",
-                view=None,
-            )
-            # Save results
-            self.stop()
-            self.player_score = self.player_score * 2
-            if not isinstance(interaction.channel, discord.DMChannel):
-                await Games.save_game_result(
-                    interaction.guild.id,
-                    interaction.user.id,
-                    self.player_score,
-                    gameType.sporty,
-                )
-
-    @ui.button(label="Even", style=discord.ButtonStyle.success)
-    async def even_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        await self.handle_round(interaction, "even")
-
-    @ui.button(label="Odd", style=discord.ButtonStyle.danger)
-    async def odd_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        await self.handle_round(interaction, "odd")
-
-
-# ============================================================================ #
-#                         UI ELEMENT FOR RED BLACK GAME                        #
-# ============================================================================ #
-class RedBlackView(ui.View):
-    def __init__(self, player, bot):
-        super().__init__(timeout=30)
-        self.player = player
-        self.bot = bot
+        self.guild_id = guild_id
         self.total_rounds = 5
         self.current_round = 1
         self.player_score = 0
 
-    async def on_timeout(self):
-        await self.player.send("Don't bother me if you ain't ready!")
+        self.game_key = game_key
+        self.game_config = GAME_RULES[game_key]
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # Dynamically create buttons for the game
+        for choice in self.game_config["choices"]:
+            self.add_item(GameButton(choice, self))
+
+    async def on_timeout(self):
+        await self.player.send("You took too long. Game cancelled.")
+
+    async def interaction_check(self, interaction: discord.Interaction):
         return interaction.user == self.player
 
-    async def handle_round(self, interaction: discord.Interaction, player_choice):
+    async def play_round(self, interaction, player_choice):
         await interaction.response.defer()
-        result = random.choice(["red", "black"])
+
+        resolver = self.game_config["resolver"]
+        result = resolver()
 
         if player_choice == result:
             self.player_score += 1
-            response = f"Round {self.current_round}: You chose {player_choice} and the result was {result}. You win!"
+            msg = f"Round {self.current_round}: You chose {player_choice}, result was **{result}**. You win!"
         else:
-            response = f"Round {self.current_round}: You chose {player_choice} and the result was {result}. You lose!"
+            msg = f"Round {self.current_round}: You chose {player_choice}, result was **{result}**. You lose!"
 
         self.current_round += 1
 
-        # Update the message with scores
         if self.current_round <= self.total_rounds:
             await interaction.edit_original_response(
-                content=f"{response}\n\nCurrent Score: {self.player_score}\nRound {self.current_round}/{self.total_rounds}: Click a button to make your choice.",
-                view=self,
+                content=f"{msg}\n\nCurrent Score: **{self.player_score}**\nRound {self.current_round}/{self.total_rounds}",
+                view=self
             )
         else:
             await interaction.edit_original_response(
-                content=f"{response}\n\nGame over! Your final score: {self.player_score}.",
-                view=None,
+                content=f"{msg}\n\nGame Over! Final Score: **{self.player_score}**",
+                view=None
             )
-            # Save results
             self.stop()
-            self.player_score = self.player_score * 2
-            if not isinstance(interaction.channel, discord.DMChannel):
-                await Games.save_game_result(
-                    interaction.guild.id,
+
+            final_score = self.player_score * 2
+
+            #since the games will be initated via DM we need to save the game result here
+            await Games.save_game_result(
+                    self.guild_id,
                     interaction.user.id,
-                    self.player_score,
-                    gameType.sporty,
+                    final_score,
+                    gameType.sporty
                 )
-
-    @ui.button(label="Red", style=discord.ButtonStyle.red)
-    async def red_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        await self.handle_round(interaction, "red")
-
-    @ui.button(label="Black", style=discord.ButtonStyle.secondary)
-    async def black_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        await self.handle_round(interaction, "black")
-
+            
 
 # ============================================================================ #
 #                           ACTIVATION SCRIPT AND COG                          #
@@ -190,12 +136,13 @@ class Sporty(commands.Cog):
         self.client = client
 
     @app_commands.command(name="sporty", description="Test Your luck")
+    @app_commands.guild_only()
     async def sporty(self, interaction: discord.Interaction):
         """Start the game selection menu."""
         try:
             await interaction.response.send_message(
             "Select a game to play!",
-            view=GameSelectionView(interaction.user, self.client),
+            view=GameSelectionView(interaction.user, self.client,interaction.guild_id),ephemeral=True
         )
         except Exception as e:
             errorHandler = ErrorHandler()

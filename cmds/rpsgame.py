@@ -155,7 +155,7 @@ class RPS(commands.Cog):
         # Start
         await interaction.response.send_message(
             "Game starts now! Click a button to make your choice.",
-            view=RPSView(interaction.user, self.client),
+            view=RPSView(interaction.user, self.client),ephemeral=True
         )
 
 

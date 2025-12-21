@@ -4,7 +4,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from cogs.leveling import LeaderboardPaginationView  
+from views.LeaderboardPage import LeaderboardPaginationView  
 from settings import ErrorHandler
 from io import BytesIO
 from dbmanager import Games
@@ -48,7 +48,7 @@ class Leaderboard(commands.Cog):
                     await interaction.followup.send("No leaderboard available.")
                     return
                 # Convert to tuple format (player_id, total_score)
-                rows = [(row['player_id'], row['total_score']) for row in rows]
+                rows = [(row['user_id'], row['total_score']) for row in rows]
             
             # Build leaderboard data with member info
             leaderboard_data = []
@@ -64,7 +64,7 @@ class Leaderboard(commands.Cog):
 
             # Create pagination view
             pagination_view = LeaderboardPaginationView(
-                data=leaderboard_data, sep=5, timeout=None
+                data=leaderboard_data, sep=5, timeout=None,text="Score" 
             )
             
             # Generate the first page's image
@@ -105,7 +105,7 @@ class Leaderboard(commands.Cog):
             current = current.strip() if current else ""
             game_types = [gt for gt in gameType]
             filtered_choices = [
-                app_commands.Choice(name=game.value, value=game)
+                app_commands.Choice(name=game.value, value=game.value)
                 for game in game_types
                 if current.lower() in game.value.lower()
             ]
@@ -121,22 +121,6 @@ class Leaderboard(commands.Cog):
             self.error_handler.handle(e, context="leaderboard_autocomplete")
 
     # ================================ RANK SCRIPT =============================== #
-    async def fetch_player_score(self, guild_id: int, game_type: str, player_id: int):
-        """Fetch the player score from a specific game type."""
-        try:
-            conn = await create_async_pg_conn()
-            try:
-                row = await conn.fetchrow("""
-                    SELECT player_score
-                    FROM game_scores
-                    WHERE guild_id = $1 AND game_type = $2 AND player_id = $3
-                """, guild_id, game_type, player_id)
-                return row['player_score'] if row else 0
-            finally:
-                await conn.close()
-        except Exception as e:
-            self.error_handler.handle(e, context=f"fetch_player_score_{game_type}")
-            return 0
 
     @app_commands.guild_only()
     @app_commands.command(name="rank", description="Rank with score in mini games")
@@ -153,27 +137,22 @@ class Leaderboard(commands.Cog):
         
         try:
             # Fetch scores for each game type
-            pvp_score = await self.fetch_player_score(guild_id, "pvp", member.id)
-            pvb_score = await self.fetch_player_score(guild_id, "pvb", member.id)
-            sporty_score = await self.fetch_player_score(guild_id, "sporty", member.id)
-            efootball_score = await self.fetch_player_score(guild_id, "efootball", member.id)
             
+            scores = await Games.get_player_scores(guild_id, None, member.id)
             # Fetch overall leaderboard to determine rank
-            leaderboard = await get_leaderboard(guild_id)
+            rank = await Games.get_rank(guild_id, member.id)   
+            player_scores = {g.value: 0 for g in gameType}
+            for row in scores:  # scores is list of {game_type, player_score}
+                player_scores[row["game_type"]] = row["player_score"]
+
+            pvp_text = f"PvP: {player_scores.get(gameType.pvp.value, 0)}pts"
+            pvb_text = f"PvB: {player_scores.get(gameType.pvb.value, 0)}pts"
+            sporty_text = f"Sporty: {player_scores.get(gameType.sporty.value, 0)}pts"
+            efootball_text = f"Efootball: {player_scores.get(gameType.efootball.value, 0)}pts"
+           
             
-            rank = 'None'
-            if leaderboard:
-                for index, row in enumerate(leaderboard, start=1):
-                    if row['player_id'] == member.id:
-                        rank = index
-                        break
             
             # Create rank display
-            pvp_text = f"PvP: {pvp_score}pts"
-            pvb_text = f"PvB: {pvb_score}pts"
-            sporty_text = f"Sporty: {sporty_score}pts"
-            efootball_text = f"Efootball: {efootball_score}pts"
-        
             embed = discord.Embed(
                 title=f"🏆Rank #{rank}",
                 description=(

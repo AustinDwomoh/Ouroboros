@@ -1,3 +1,4 @@
+from typing import Optional
 from constants import gameType
 from settings import  ErrorHandler
 from rimiru import Rimiru
@@ -39,15 +40,13 @@ async def get_player_scores(guild_id: int, game_type: gameType = None,user_id: i
     try:
         rows = []
         if game_type:
-            rows = await conn.call_function("get_player_game_scores", [guild_id, game_type,user_id])
+            rows = await conn.call_function("get_player_game_scores", [guild_id, game_type.value,user_id])
         else:
             rows = await conn.call_function("get_player_scores", [user_id,guild_id])
         return [dict(r) for r in rows]
     except Exception as e:
         error_handler.handle(e, context="get_player_scores")
         return []
-    finally:
-        await conn.close()
 
 
 async def get_leaderboard(guild_id: int,game_type: gameType = None):
@@ -63,7 +62,7 @@ async def get_leaderboard(guild_id: int,game_type: gameType = None):
     try:
         rows = []
         if game_type:
-            rows = await conn.call_function("get_game_leaderboard", [guild_id, game_type])
+            rows = await conn.call_function("get_game_leaderboard", [guild_id, game_type.value])
         else:
             rows = await conn.call_function("get_leaderboard", [guild_id])
         return [dict(r) for r in rows]
@@ -71,3 +70,26 @@ async def get_leaderboard(guild_id: int,game_type: gameType = None):
         error_handler.handle(e, context="get_leaderboard")
         return []
    
+
+
+async def get_rank(guild_id: int, player_id: int,game_type: gameType = None) -> Optional[int]:
+    """
+    Returns the rank of a player in the overall leaderboard for a guild.
+    
+    :param guild_id: The guild ID
+    :type guild_id: int
+    :param player_id: The player ID
+    :type player_id: int
+    :return: The rank of the player or None if not found
+    :rtype: Optional[int]
+    """
+    conn = await Rimiru.shion()
+    try:
+        if game_type:
+            rank = await conn.call_function("get_player_rank", [guild_id, player_id, game_type.value])
+        else:
+            rank = await conn.call_function("get_player_rank", [guild_id, player_id])
+        return rank
+    except Exception as e:
+        error_handler.handle(e, context="get_rank")
+        return None
