@@ -49,14 +49,14 @@ class LeaderboardPaginationView(discord.ui.View):
             font = ImageFont.truetype(FONT_DIR/"OpenSans-Bold.ttf", font_size)
         except:
             font = ImageFont.load_default()
-        
-        for i, (rank, username, level, xp, avatar_url) in enumerate(data):
+        #level/score and xp/points
+        for i, (rank, username, level, xp, avatar) in enumerate(data):
             top = margin + i * (row_height + margin)
             left = margin
 
             # Download avatar
-            response = requests.get(avatar_url)
-            avatar_img = Image.open(BytesIO(response.content)).convert("RGBA")
+           
+            avatar_img = Image.open(BytesIO(avatar)).convert("RGBA")
             avatar_img = avatar_img.resize((avatar_size, avatar_size))
             avatar_img = self.circular_crop(avatar_img)
             img.paste(avatar_img, (left, top), avatar_img)

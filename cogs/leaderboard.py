@@ -1,4 +1,11 @@
 # ============================================================================ #
+#                                     NOTES                                    #
+# ============================================================================ #
+# This cog handles the leaderboard and rank commands for mini games.
+# It fetches data from the database and displays it in an embed with pagination.
+#Its been tested and both the leaderboard and rank commands are working as intended.
+
+# ============================================================================ #
 #                                    IMPORT                                    #
 # ============================================================================ #
 import discord
@@ -32,31 +39,26 @@ class Leaderboard(commands.Cog):
         await interaction.response.defer()
         
         try:
+            rows = None
             if game_type:
-                game_type = gameType(game_type)
+                game_type = gameType(game_type) #since its a string we convert it
                 # Fetch specific game type scores
-                rows = await Games.get_player_scores(interaction.guild.id, game_type)
-                if not rows:
-                    await interaction.followup.send(f"No leaderboard available for {game_type.value}.")
-                    return
-                # Convert to tuple format (player_id, score)
-                rows = [(row['player_id'], row['player_score']) for row in rows]
+                rows = await Games.get_leaderboard(interaction.guild.id, game_type)
             else:
                 # Fetch overall leaderboard
                 rows = await Games.get_leaderboard(interaction.guild.id)
-                if not rows:
-                    await interaction.followup.send("No leaderboard available.")
+            # Process rows into a list of (user_id, total_score)
+            rows = [(row['user_id'], row['total_score']) for row in rows]
+            if not rows:
+                    await interaction.followup.send(f"No leaderboard available for {game_type.value}.")
                     return
-                # Convert to tuple format (player_id, total_score)
-                rows = [(row['user_id'], row['total_score']) for row in rows]
-            
             # Build leaderboard data with member info
             leaderboard_data = []
             for idx, (player_id, score) in enumerate(rows, start=1):
                 member = interaction.guild.get_member(player_id)
                 if member:
-                    avatar_url = member.display_avatar.url
-                    leaderboard_data.append((idx, member.display_name, score, 0, avatar_url))
+                    avatar = await member.display_avatar.read()
+                    leaderboard_data.append((idx, member.display_name, score, 0, avatar))  # rank, username, score, placeholder, avatar bytes
             
             if not leaderboard_data:
                 await interaction.followup.send("No active players found on the leaderboard.")
@@ -141,9 +143,13 @@ class Leaderboard(commands.Cog):
             scores = await Games.get_player_scores(guild_id, None, member.id)
             # Fetch overall leaderboard to determine rank
             rank = await Games.get_rank(guild_id, member.id)   
+            if rank is None:
+                await interaction.followup.send(f"{member.name} has no rank in this server.")
+                return
+      
             player_scores = {g.value: 0 for g in gameType}
             for row in scores:  # scores is list of {game_type, player_score}
-                player_scores[row["game_type"]] = row["player_score"]
+                player_scores[row["game_type"]] = row["score"]
 
             pvp_text = f"PvP: {player_scores.get(gameType.pvp.value, 0)}pts"
             pvb_text = f"PvB: {player_scores.get(gameType.pvb.value, 0)}pts"

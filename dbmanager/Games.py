@@ -1,11 +1,19 @@
 from typing import Optional
-from constants import gameType
+from constants import FetchType, gameType
 from settings import  ErrorHandler
 from rimiru import Rimiru
 error_handler = ErrorHandler()
-""" Hit a pause need to determine how the leaderboards works and also the game scores table
-    also there meeds to be a better name for them take the leveling board for example
- """
+# ============================================================================ #
+#                                     NOTES                                    #
+# ============================================================================ #
+# This module provides asynchronous database operations for managing game scores
+# and leaderboards using the Rimiru DB access layer.
+#the functions include saving game results, fetching player scores, leaderboards, and player ranks.
+# It uses stored procedures/functions in the database for efficient data handling
+# All functions handle exceptions and log errors using ErrorHandler.
+#Tested and working as intended.
+# ============================================================================ #
+
 # -------------------------------------------------------------
 # Update / Save Scores
 # -------------------------------------------------------------
@@ -85,11 +93,12 @@ async def get_rank(guild_id: int, player_id: int,game_type: gameType = None) -> 
     """
     conn = await Rimiru.shion()
     try:
+        fetch = FetchType.FETCHVAL.value
         if game_type:
-            rank = await conn.call_function("get_player_rank", [guild_id, player_id, game_type.value])
+            rank = await conn.call_function("get_player_rank", [guild_id, player_id, game_type.value],fetch)
         else:
-            rank = await conn.call_function("get_player_rank", [guild_id, player_id])
-        return rank
+            rank = await conn.call_function("get_player_rank", [guild_id, player_id],fetch)
+        return rank if rank else None
     except Exception as e:
         error_handler.handle(e, context="get_rank")
         return None

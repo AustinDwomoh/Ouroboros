@@ -1,6 +1,16 @@
 from dataclasses import dataclass
 from typing import Optional,List,Dict
 
+# ============================================================================ #
+#                                     NOTES                                    #
+# ============================================================================ #
+# This module defines data models for users, servers, and media entities.
+# The models include user scores, server details, and media information.
+# These models facilitate structured data handling within the application.
+# TODO: test models and ensure they meet application needs. Also consider expanding
+# with additional fields or methods as necessary.
+# ============================================================================ #
+
 @dataclass(frozen=True)
 class User:
     id: int

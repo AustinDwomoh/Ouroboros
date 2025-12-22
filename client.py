@@ -2,6 +2,7 @@ from time import time
 
 import asyncpg, discord, logging, ssl
 from discord.ext import commands
+from rimiru import Rimiru
 from settings import *
 
 # Logging setup
@@ -24,7 +25,7 @@ class Client(commands.Bot):
         self._seen_users: dict[int, float] = {}
 
     async def setup_hook(self):
-        await self.init_db_pool()
+        self.db = await Rimiru.shion() 
         await self.load_commands()
         await self.load_cogs()
         logger.info("Loaded commands and cogs")
@@ -40,23 +41,7 @@ class Client(commands.Bot):
                 logger.error(f"Failed to sync slash commands: {e}")
                 await self.close()
 
-    async def init_db_pool(self):
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-
-        self.db_pool = await asyncpg.create_pool(
-            host=PGHOST,
-            port=PGPORT,
-            database=PGDATABASE,
-            user=PGUSER,
-            password=PGPASSWORD,
-            ssl=ssl_context,
-            min_size=2,
-            max_size=10,
-        )
-
-        logger.info("Database pool initialized")
+       
 
     # -------------------------------------------------
     # DB Utilities
@@ -68,19 +53,9 @@ class Client(commands.Bot):
         last_seen = self._seen_users.get(uid)
         if last_seen and now - last_seen < CACHE_TTL:
             return
-
-        async with self.db_pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO users (discord_id, username)
-                VALUES ($1, $2)
-                ON CONFLICT (discord_id)
-                DO UPDATE SET
-                    username = EXCLUDED.username,
-                    updated_at = NOW();
-                """,
-                uid,
-                interaction.user.name,
+        
+        await self.db.upsert(
+                "users", {"discord_id": uid, "username": interaction.user.name}, conflict_column="discord_id"
             )
 
         self._seen_users[uid] = now

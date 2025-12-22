@@ -3,8 +3,9 @@ Look am anime lover, I legit have a rimuru wallpaper in my room ok?  Don't judge
 """
 import asyncpg
 import ssl
-from settings import PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
 
+from settings import PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+from constants import FetchType
 class Rimiru:
     """
     Asynchronous DB access layer for Ouroboros.
@@ -15,7 +16,8 @@ class Rimiru:
     configured via class factory `Rimiru.shion()`
 
     """
-
+    _instance = None          
+    _pool: asyncpg.Pool = None 
     def __init__(self, pool: asyncpg.Pool):
         self.pool = pool
 
@@ -24,14 +26,14 @@ class Rimiru:
     # ----------------------------------------------------
     @classmethod
     async def shion(cls):
-        """
-        Factory method to create an async Rimiru instance with a connection pool.
-        """
+        if cls._instance is not None:
+            return cls._instance
+
         ssl_ctx = ssl.create_default_context()
         ssl_ctx.check_hostname = False
         ssl_ctx.verify_mode = ssl.CERT_NONE
 
-        pool = await asyncpg.create_pool(
+        cls._pool = await asyncpg.create_pool(
             host=PGHOST,
             port=PGPORT,
             database=PGDATABASE,
@@ -41,7 +43,9 @@ class Rimiru:
             min_size=2,
             max_size=10,
         )
-        return cls(pool)
+
+        cls._instance = cls(cls._pool)
+        return cls._instance
 
     # ----------------------------------------------------
     # TRANSACTION HELPER
@@ -58,97 +62,113 @@ class Rimiru:
     # ----------------------------------------------------
     #  CRUD
     # ----------------------------------------------------
-    async def create(self, table:str, data:dict) -> asyncpg.Record:
+    async def select(self, table: str, columns: list = None, filters: dict = None, order_by: str = None, limit: int = None):
         """
-        Create a new record in the specified table.
-    
-        :param table: Name of the table
-        :type table: str
-        :param data: Data to insert as a dictionary. Keys are column names. values are the corresponding values.
-        :type data: dict
-        :return: The created record
-        :rtype: Record
-        """
-        cols = ", ".join(data.keys())
-        placeholders = ", ".join(f"${i+1}" for i in range(len(data)))
-        sql = f"INSERT INTO {table} ({cols}) VALUES ({placeholders}) RETURNING *;"
-
-        async with self.pool.acquire() as conn:
-            return await conn.fetchrow(sql, *data.values())
-
-    async def read(self, table:str, conditions:dict=None):
-        """
-        Read records from the specified table with optional conditions.
-    
-        :param table: Name of the table
-        :type table: str
-        :param conditions: Conditions as a dictionary. Keys are column names, values are the corresponding values to filter by. Defaults to None.
-        :type conditions: dict, optional
-        """
-        if conditions:
-            where = " AND ".join(
-                f"{k} = ${i+1}" for i, k in enumerate(conditions.keys())
-            )
-            sql = f"SELECT * FROM {table} WHERE {where};"
-            params = list(conditions.values())
-        else:
-            sql = f"SELECT * FROM {table};"
-            params = []
-
-        async with self.pool.acquire() as conn:
-            return await conn.fetch(sql, *params)
-
-    async def update(self, table:str, data:dict, conditions:dict):
-        """
-        Update records in the specified table based on conditions.
-        :param table: Name of the table
-        :param data: Data to update as a dictionary. Keys are column names, values are the corresponding values.
-        :param conditions: Conditions as a dictionary. Keys are column names, values are the corresponding values to filter by
-        """
-        set_clause = ", ".join(f"{k} = ${i+1}" for i, k in enumerate(data.keys()))
-
-        where_clause = " AND ".join(
-            f"{k} = ${len(data) + i + 1}" for i, k in enumerate(conditions.keys())
-        )
-
-        sql = (
-            f"UPDATE {table} SET {set_clause} "
-            f"WHERE {where_clause} RETURNING *;"
-        )
-
-        params = list(data.values()) + list(conditions.values())
-
-        async with self.pool.acquire() as conn:
-            return await conn.fetch(sql, *params)
-
-    async def delete(self, table:str, conditions:dict):
-        """
-        Delete records from the specified table based on conditions.
+        Select records with optional filtering
         
-        :param self: Description
-        :param table: Name of the table
-        :param conditions: Conditions as a dictionary. Keys are column names, values are the corresponding values to filter by.
+        :param table: Table name
+        :param columns: List of columns to select (default: all)
+        :param filters: Dictionary of column=value filters
+        :param order_by: Column to order by (e.g., "created_at DESC")
+        :param limit: Maximum number of records to return
         """
-        where_clause = " AND ".join(
-            f"{k} = ${i+1}" for i, k in enumerate(conditions.keys())
-        )
-        sql = f"DELETE FROM {table} WHERE {where_clause} RETURNING *;"
+        cols = ", ".join(columns) if columns else "*"
+        sql = f"SELECT {cols} FROM {table}"
+        params = []
+        param_count = 1
+        
+        if filters:
+            where_clauses = []
+            for key, value in filters.items():
+                where_clauses.append(f"{key} = ${param_count}")
+                params.append(value)
+                param_count += 1
+            sql += f" WHERE {' AND '.join(where_clauses)}"
+        
+        if order_by:
+            sql += f" ORDER BY {order_by}"
+        
+        if limit:
+            sql += f" LIMIT {limit}"
+        
+        sql += ";"
+        
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(sql, *params)
+            return  [dict(r) for r in rows][0]
 
-        params = list(conditions.values())
+
+   
+    # -------------------------
+    # UPSERT (INSERT or UPDATE)
+    # -------------------------
+    async def upsert(self, table: str, data: dict, conflict_column: str ):
+        """Insert or update a record based on conflict column
+            To use this method, provide the following
+            its important you know the unique constraint of the table you are upserting to.  The conflict_column parameter should be set to that unique constraint column.
+            
+            parameters:
+                :param table: Table name
+                :param data: Dictionary of column-value pairs
+                :param conflict_column: Column name to check for conflicts
+        """
+        columns = list(data.keys())
+        values = list(data.values())
+        
+        placeholders = ", ".join(f"${i+1}" for i in range(len(values)))
+        cols = ", ".join(columns)
+        update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in columns if k != conflict_column)
+        
+        sql = f"""
+            INSERT INTO {table} ({cols}) 
+            VALUES ({placeholders})
+            ON CONFLICT ({conflict_column}) 
+            DO UPDATE SET {update_cols}
+            RETURNING *;
+        """
+        
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow(sql, *values)
+
+    # -------------------------
+    # DELETE
+    # -------------------------
+    async def delete(self, table: str, filters: dict):
+        """Delete records matching filters"""
+        where_clause = " AND ".join(f"{k} = ${i+1}" for i, k in enumerate(filters.keys()))
+        sql = f"DELETE FROM {table} WHERE {where_clause} RETURNING *;"
+        params = list(filters.values())
 
         async with self.pool.acquire() as conn:
             return await conn.fetch(sql, *params)
-
     # ----------------------------------------------------
     # ASYNC FUNCTION CALLS
     # ----------------------------------------------------
-    async def call_function(self, fn:str, params=None):
+    
+
+    
+    async def call_function(self, fn: str, params=None, fetch_type=None):
+        #TODO: test if the dict lamba works here
+        """
+        fetch_type can be:
+        - FetchType.FETCH: returns list of Record objects
+        - FetchType.FETCHVAL: returns single scalar value
+        - FetchType.FETCHROW: returns single Record object
+        """
         params = params or []
+        fetch_type = fetch_type or FetchType.FETCH.value  # Default to FETCH
+        
         placeholders = ", ".join(f"${i+1}" for i in range(len(params)))
         sql = f"SELECT * FROM {fn}({placeholders});"
 
         async with self.pool.acquire() as conn:
-            return await conn.fetch(sql, *params)
+            if fetch_type == FetchType.FETCHVAL.value:
+                return await conn.fetchval(sql, *params)
+            elif fetch_type == FetchType.FETCHROW.value:
+                return await conn.fetchrow(sql, *params)
+            else:  # FetchType.FETCH
+                return await conn.fetch(sql, *params)
+
 
  
        
