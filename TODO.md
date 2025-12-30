@@ -10,14 +10,13 @@
 - [x] **leaderboard.py** - Working
 - [*] **Games.py**
 - [x] **welcome.py**
-
-
+- [x] **serverstat.py**
+- [x] **channelmanagement.py**  this works but make a site it connects to
 ## 🔧 In Progress / Needs Work
-- [ ] **channelmanagement.py** 
+
 - [ ] **finance.py**
 - [ ] **leveling.py**
 - [ ] **movies.py**
-- [ ] **serverstat.py**
 - [ ] **tournament.py**
 - [ ] **FinTech.py**
 - [ ] **LevelinManager.py**

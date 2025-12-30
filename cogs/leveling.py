@@ -1,12 +1,10 @@
-import discord, requests
+import discord
 from discord import app_commands
 from discord.ext import commands
-#from dbmanager import LevelinManager
+from dbmanager import LevelinManager
 from settings import ErrorHandler
 from views.LeaderboardPage import LeaderboardPaginationView
 from io import BytesIO
-
-
 
 class Levelling(commands.Cog):
     def __init__(self, client):
@@ -20,12 +18,12 @@ class Levelling(commands.Cog):
             guild_id = message.guild.id
             user_id = message.author.id
             # Fetch the user's XP and level, or initialize them
-            user_data = LevelinManager.get_user_level(guild_id, user_id)
+            user_data = await LevelinManager.get_user_level(guild_id, user_id)
             if user_data:
                 xp, level = user_data
             else:
                 xp, level = 0, 1
-                LevelinManager.insert_or_update_user(guild_id, user_id, xp, level)
+                await LevelinManager.insert_or_update_user(guild_id, user_id, xp, level)
             # Add XP and check for level up
             xp += 5  # Customize the XP per message
 
@@ -48,16 +46,16 @@ class Levelling(commands.Cog):
                 embed.set_thumbnail(url=str(message.author.display_avatar.url))
                 
                 await message.channel.send(embed=embed)
-            LevelinManager.insert_or_update_user(guild_id, user_id, xp, level)
+            await LevelinManager.insert_or_update_user(guild_id, user_id, xp, level)
         except Exception as e:
             await ErrorHandler().handle(e, context="Levelling Cog on_message")
 
     @app_commands.command(name="level_self", description="Check your level")
     @app_commands.guild_only()
-    async def level_self(self, interaction: discord.Interaction):
+    async def level_self(self, interaction: discord.Interaction) -> None:
         try:
             await interaction.response.defer()
-            user_data = LevelinManager.get_user_level(
+            user_data = await LevelinManager.get_user_level(
                 interaction.guild.id, interaction.user.id
             )
             if not user_data:
@@ -66,7 +64,7 @@ class Levelling(commands.Cog):
                 )
                 return
             xp, level = user_data
-            rank = LevelinManager.get_rank(interaction.guild.id, interaction.user.id)  # Get the user's rank
+            rank = await LevelinManager.get_rank(interaction.guild.id, interaction.user.id)  # Get the user's rank
             
             embed = discord.Embed(
                 title="🎉 Current Lvl!",
@@ -82,16 +80,20 @@ class Levelling(commands.Cog):
         
 
     @app_commands.command(name="level_server", description="Check the server leaderboard.")
+    @app_commands.describe(limit="Number of top users to display (max 50)")
     @app_commands.guild_only()
-    async def level_server(self, interaction: discord.Interaction):
+    async def level_server(self, interaction: discord.Interaction, limit: int = 50) -> None:
         try:
             await interaction.response.defer()
-
+            limit = min(limit, 50)  # Cap the limit to 50
             # Fetch leaderboard data
-            top_users = LevelinManager.fetch_top_users(interaction.guild.id)
+            top_users = await LevelinManager.fetch_top_users(interaction.guild.id, limit)
 
             table_data = []
-            for idx, (user_id, level, xp) in enumerate(top_users,start=1):
+            for idx, data in enumerate(top_users,start=1):
+                user_id = data.get("user_id")
+                level = data.get("level")
+                xp = data.get("xp")
                 member = interaction.guild.get_member(user_id)
                 if member:
                     avatar_url = member.display_avatar.url

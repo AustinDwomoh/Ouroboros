@@ -95,7 +95,7 @@ class Rimiru:
         
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(sql, *params)
-            return  [dict(r) for r in rows][0]
+            return  [dict(r) for r in rows][0] if len(rows)==1 else [dict(r) for r in rows]
 
 
    

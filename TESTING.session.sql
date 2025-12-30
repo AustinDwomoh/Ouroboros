@@ -1,0 +1,1 @@
+"CREATE TABLE levels (guild_id bigint, user_id bigint, xp bigint, level integer);"
