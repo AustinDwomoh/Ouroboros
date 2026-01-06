@@ -41,7 +41,7 @@ class Leaderboard(commands.Cog):
         try:
             rows = None
             if game_type:
-                game_type = gameType(game_type) #since its a string we convert it
+                game_type = gameType.find_game_type(game_type)  # since its a string we convert it
                 # Fetch specific game type scores
                 rows = await Games.get_leaderboard(interaction.guild.id, game_type)
             else:
@@ -105,7 +105,7 @@ class Leaderboard(commands.Cog):
         """Autocomplete for game types."""
         try:
             current = current.strip() if current else ""
-            game_types = [gt for gt in gameType]
+            game_types = gameType.get_game_types()
             filtered_choices = [
                 app_commands.Choice(name=game.value, value=game.value)
                 for game in game_types
@@ -151,10 +151,10 @@ class Leaderboard(commands.Cog):
             for row in scores:  # scores is list of {game_type, player_score}
                 player_scores[row["game_type"]] = row["score"]
 
-            pvp_text = f"PvP: {player_scores.get(gameType.pvp.value, 0)}pts"
-            pvb_text = f"PvB: {player_scores.get(gameType.pvb.value, 0)}pts"
-            sporty_text = f"Sporty: {player_scores.get(gameType.sporty.value, 0)}pts"
-            efootball_text = f"Efootball: {player_scores.get(gameType.efootball.value, 0)}pts"
+            pvp_text = f"PvP: {player_scores.get(gameType.PVP.value, 0)}pts"
+            pvb_text = f"PvB: {player_scores.get(gameType.PVB.value, 0)}pts"
+            sporty_text = f"Sporty: {player_scores.get(gameType.SPORTY.value, 0)}pts"
+            efootball_text = f"Efootball: {player_scores.get(gameType.EFOOTBALL.value, 0)}pts"
            
             
             

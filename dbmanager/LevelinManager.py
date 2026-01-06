@@ -10,7 +10,7 @@ async def get_user_level(guild_id: int, user_id: int)-> tuple[int, int] | None:
     """Return (xp, level) for a user in a guild from the centralized `levels` table."""
     conn = await Rimiru.shion() 
     try:
-        row = await conn.select(table="levels", columns=["xp", "level"], filters={"guild_id": guild_id, "user_id": user_id})
+        row = await conn.selectOne(table="levels", columns=["xp", "level"], filters={"guild_id": guild_id, "user_id": user_id})
         print(row)
         if row:
             return row.get('xp'), row.get('level')
@@ -50,7 +50,7 @@ async def get_rank(guild_id: int, user_id: int) -> int | None:
     """Return a user's rank in the guild (1 = highest XP)."""
     conn = await Rimiru.shion()
     try:
-        rank = await conn.call_function("get_user_lvl_rank",[guild_id, user_id],fetch_type=FetchType.FETCHVAL.value)
+        rank = await conn.call_function("get_user_lvl_rank",params=[guild_id, user_id],fetch_type=FetchType.FETCHVAL.value)
         print(rank)
         return rank
     except Exception as e:

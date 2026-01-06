@@ -120,12 +120,8 @@ class GameView(ui.View):
             final_score = self.player_score * 2
 
             #since the games will be initated via DM we need to save the game result here
-            await Games.save_game_result(
-                    self.guild_id,
-                    interaction.user.id,
-                    final_score,
-                    gameType.sporty
-                )
+            await Games.save_game_result(self.guild_id,interaction.user.id,final_score,gameType.SPORTY)
+                
             
 
 # ============================================================================ #

@@ -96,9 +96,9 @@ class Levelling(commands.Cog):
                 xp = data.get("xp")
                 member = interaction.guild.get_member(user_id)
                 if member:
-                    avatar_url = member.display_avatar.url
+                    avatar = await member.display_avatar.read()
                     table_data.append(
-                        (idx,member.display_name, level, xp, avatar_url)
+                        (idx,member.display_name, level, xp, avatar)
                     )
 
             # Create pagination view

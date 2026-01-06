@@ -26,7 +26,7 @@ async def save_game_result(guild_id: int, player_id: int, player_score: int, gam
     conn = await Rimiru.shion()
     try:
         game_type = game_type.value
-        await conn.call_function("save_game_result", [guild_id, player_id, game_type, player_score or 0])
+        await conn.call_function("save_game_result", params=[guild_id, player_id, game_type, player_score or 0])
     except Exception as e:
         error_handler.handle(e, context="save_game_result")
    
@@ -48,9 +48,9 @@ async def get_player_scores(guild_id: int, game_type: gameType = None,user_id: i
     try:
         rows = []
         if game_type:
-            rows = await conn.call_function("get_player_game_scores", [guild_id, game_type.value,user_id])
+            rows = await conn.call_function("get_player_game_scores", params=[guild_id, game_type.value,user_id])
         else:
-            rows = await conn.call_function("get_player_scores", [user_id,guild_id])
+            rows = await conn.call_function("get_player_scores", params=[user_id,guild_id])
         return [dict(r) for r in rows]
     except Exception as e:
         error_handler.handle(e, context="get_player_scores")
@@ -70,9 +70,9 @@ async def get_leaderboard(guild_id: int,game_type: gameType = None):
     try:
         rows = []
         if game_type:
-            rows = await conn.call_function("get_game_leaderboard", [guild_id, game_type.value])
+            rows = await conn.call_function("get_game_leaderboard", params=[guild_id, game_type.value])
         else:
-            rows = await conn.call_function("get_leaderboard", [guild_id])
+            rows = await conn.call_function("get_leaderboard", params=[guild_id])
         return [dict(r) for r in rows]
     except Exception as e:
         error_handler.handle(e, context="get_leaderboard")
@@ -95,9 +95,9 @@ async def get_rank(guild_id: int, player_id: int,game_type: gameType = None) -> 
     try:
         fetch = FetchType.FETCHVAL.value
         if game_type:
-            rank = await conn.call_function("get_player_rank", [guild_id, player_id, game_type.value],fetch)
+            rank = await conn.call_function("get_player_rank", params=[guild_id, player_id, game_type.value], fetch_type=fetch)
         else:
-            rank = await conn.call_function("get_player_rank", [guild_id, player_id],fetch)
+            rank = await conn.call_function("get_player_rank", params=[guild_id, player_id], fetch_type=fetch)
         return rank if rank else None
     except Exception as e:
         error_handler.handle(e, context="get_rank")

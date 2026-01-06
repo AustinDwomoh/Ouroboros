@@ -117,7 +117,7 @@ class ErrorHandler:
         """
         self.webhook_url = DISCORD_WEBHOOK_URL
         self.log_base_dir = LOG_BASE_DIR
-        self.notify = True  # TODO: Set to False for local testing, True for production
+        self.notify = False if BOT_MODE == "testing" else True  # TODO: Set to False for local testing, True for production
         
         # Create log directory
         os.makedirs(self.log_base_dir, exist_ok=True)

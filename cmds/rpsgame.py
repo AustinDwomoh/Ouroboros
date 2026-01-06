@@ -110,7 +110,7 @@ class RPSView(ui.View):
                 if not isinstance(interaction.channel, discord.DMChannel):
                     #if it is a dm we dont store it
                     await Games.save_game_result(
-                        interaction.guild.id, interaction.user.id, self.player_score, gameType.pvb
+                        interaction.guild.id, interaction.user.id, self.player_score, gameType.PVB
                     )
         except Exception as e:
             errorHandler = ErrorHandler()

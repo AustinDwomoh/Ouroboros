@@ -9,19 +9,25 @@
 - [x] **embed.py** - Working
 - [x] **leaderboard.py** - Working
 - [*] **Games.py**
+- [x] **LevelinManager.py**
 - [x] **welcome.py**
 - [x] **serverstat.py**
 - [x] **channelmanagement.py**  this works but make a site it connects to
+- [x] **leveling.py**
+- [x] **ServerStatManager.py**
+- [x] **tournament.py**
+
 ## 🔧 In Progress / Needs Work
 
-- [ ] **finance.py**
-- [ ] **leveling.py**
+
 - [ ] **movies.py**
-- [ ] **tournament.py**
-- [ ] **FinTech.py**
-- [ ] **LevelinManager.py**
-- [ ] **ServerStatManager.py**
 - [ ] **movies folder**
+
+
+
+## Ideas to redesign
+- [ ] **finance.py**
+- [ ] **FinTech.py**
 
 ## Abandoned ideas
 - [x] **notification.py**
