@@ -1,6 +1,7 @@
 """
 Look am anime lover, I legit have a rimuru wallpaper in my room ok?  Don't judge me.
 """
+import json
 import asyncpg
 import ssl
 
@@ -135,7 +136,10 @@ class Rimiru:
                 :param conflict_column: Column name to check for conflicts
         """
         columns = list(data.keys())
-        values = list(data.values())
+        values = [
+        json.dumps(v) if isinstance(v, dict) else v 
+        for v in data.values()]
+    
         
         placeholders = ", ".join(f"${i+1}" for i in range(len(values)))
         cols = ", ".join(columns)

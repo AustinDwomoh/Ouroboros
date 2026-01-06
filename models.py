@@ -298,7 +298,7 @@ class Movie(Media):
     def to_media_dict(self) -> dict:
         """Convert to dict for DB insertion (for media table)"""
         return {
-            "media_type": "movie",
+            "media_type": "movies",
             "title": self.title,
             "tmdb_id": self.tmdb_id,
             "overview": self.overview,
@@ -399,7 +399,7 @@ class UserMedia:
     def to_embed_dict(self) -> dict:
         """Convert to dictionary optimized for Discord embeds"""
         data = {
-            "title": f"{self.media_type.emoji} {self.title}",
+            "title": f"{self.media_type.name} {self.title}",
             "thumbnail": self.poster_url,
             "color": self.color,
             "fields": []

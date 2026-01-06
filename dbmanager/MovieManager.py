@@ -194,9 +194,12 @@ async def cache_media(media_type: str,tmdb_id: str):
 
         media_data = await get_media_details(media_type.value, tmdb_id)
         row = await conn.upsert("media", data=media_data.to_media_dict(), conflict_column="tmdb_id")
+        print(row)
         insert_data = media_data.to_db_dict()
         insert_data["id"] = row["id"]
-        await conn.upsert(f"{table}", data=insert_data, conflict_column="id")
+        print(insert_data)
+        await conn.upsert(f"{table}", data=insert_data, conflict_column="media_id")
+        
         print("Cached media:", media_data.title)
         return media_data
     except Exception as e:

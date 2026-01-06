@@ -118,7 +118,7 @@ class MediaSelectionView(discord.ui.View):
                     label=label,
                     value=str(media['id']),
                     description=desc,
-                    emoji="🎬" if media_type == "movie" else "📺"
+                    emoji="🎬" if media_type == "movie" else "📺" #cant use images here
                 )
             )
         
@@ -132,12 +132,8 @@ class MediaSelectionView(discord.ui.View):
     
     async def select_callback(self, interaction: discord.Interaction):
         """Handle when user selects a media option."""
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ Not for you!", ephemeral=True)
-            return
-        
-        selected_id = interaction.values[0]
-        selected_title = None
+        selected_id = interaction.data['values'][0]
+        selected_title = None   
         
         # Find selected media
         for item in self.children:
@@ -256,6 +252,7 @@ class Movies(commands.Cog):
         title="The movie title to search for",
         watchlist="Add to watchlist instead of marking as watched (default: False)"
     )
+    @app_commands.dm_only()
     async def add_movie(self, interaction: discord.Interaction, title: str,watchlist: bool = False):
         """Add a movie with automatic conflict resolution."""
         await interaction.response.defer(ephemeral=True)
@@ -310,6 +307,7 @@ class Movies(commands.Cog):
         episode="Current episode number (optional)",
         watchlist="Add to watchlist instead of marking progress (default: False)"
     )
+    @app_commands.dm_only()
     async def add_series(
         self, 
         interaction: discord.Interaction, 
@@ -384,6 +382,7 @@ class Movies(commands.Cog):
 
     @app_commands.command(name="watchlist", description="View your watchlist for movies or series")
     @app_commands.describe(media_type="Type of media (movie or series)")
+    @app_commands.dm_only()
     async def view_watchlist(
         self,
         interaction: discord.Interaction,
@@ -428,6 +427,7 @@ class Movies(commands.Cog):
             await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
 
     @app_commands.command(name="incomplete", description="Check what media you haven't finished watching")
+    @app_commands.dm_only()
     async def check_incomplete(self, interaction: discord.Interaction):
         """Check user's incomplete media."""
         await interaction.response.defer(ephemeral=True)
@@ -479,6 +479,7 @@ class Movies(commands.Cog):
 
     @app_commands.command(name="delete_media", description="Remove a media entry from your list")
     @app_commands.describe(title="The title of the media to delete")
+    @app_commands.dm_only()
     async def delete_media(
         self,
         interaction: discord.Interaction,
@@ -519,6 +520,7 @@ class Movies(commands.Cog):
 
     @app_commands.command(name="search_anime", description="Search for anime on HiAnime")
     @app_commands.describe(query="Anime title to search for")
+    @app_commands.dm_only()
     async def search_anime(
         self,
         interaction: discord.Interaction,
