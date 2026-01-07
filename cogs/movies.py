@@ -167,7 +167,7 @@ class MediaSelectionView(discord.ui.View):
                     watchlist=self.watchlist
                 )
             else:  # series/tv
-                media_data = await MovieManager.add_or_update_series(
+                media_data = await MovieManager.add_or_update_user_series(
                     self.user_id, 
                     self.original_query,
                     season=self.season,
@@ -258,21 +258,29 @@ class Movies(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            # Search for media options
-            media_options = await MovieManager.search_media_multiple("movie", title)
+            # Search for media options 
+            if self.movie_title_cache.get(title):
+                media_options = [{
+                    'id': self.movie_title_cache[title]["id"],
+                    'title': title,
+                    'tmdb_id': self.movie_title_cache[title]["tmdb_id"]
+                }]
+            else:
+                media_options = await MovieManager.search_media_multiple("movie", title)
     
             
             if not media_options:
                 await interaction.followup.send(f" No movies found for: `{title}`",ephemeral=True)
                 return
-            
-            # If only one result with high similarity, auto-add
-            if len(media_options) == 1:
+            if len(media_options) > 1:
+                embed = create_selection_embed(media_options, "movie", title)
+                view = MediaSelectionView(media_options, "movie", interaction.user.id, title, watchlist=watchlist)
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+                return
+            else:
                 media = media_options[0]
-                
-                # Save directly
-                media_data = await MovieManager.add_or_update_user_movie(interaction.user.id, title,tmdb_id=media['id'],watchlist=watchlist)
-                
+                media_data = await MovieManager.add_or_update_user_movie(interaction.user.id, title,tmdb_id=media['tmdb_id'],watchlist=watchlist)
+        
                 if media_data:
                     status_text = "added to watchlist" if watchlist else "marked as watched"
                     embed = discord.Embed(
@@ -290,11 +298,6 @@ class Movies(commands.Cog):
                     await interaction.followup.send("Failed to save movie", ephemeral=True)
                 return
             
-            # Multiple results - show selection
-            embed = create_selection_embed(media_options, "movie", title)
-            view = MediaSelectionView(media_options, "movie", interaction.user.id, title, watchlist=watchlist)
-            
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
             
         except Exception as e:
             errorHandler.handle(e, context=f"add_movie({title})")
@@ -320,24 +323,44 @@ class Movies(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            media_options = await MovieManager.search_media_multiple("tv", title, limit=10)
+            if self.movie_title_cache.get(title):
+                media_options = [{
+                    'id': self.movie_title_cache[title]["id"],
+                    'title': title,
+                    'tmdb_id': self.movie_title_cache[title]["tmdb_id"]
+                
+                }]
+            else:
+                media_options = await MovieManager.search_media_multiple("tv", title)
             
             if not media_options:
                 await interaction.followup.send( f"No series found for: `{title}`", ephemeral=True)
                 return
             
             # Auto-add if single high-confidence result
-            if len(media_options) == 1 or (
-                len(media_options) > 1 and media_options[0]['similarity_score'] > 0.9
-                ):
-                media = media_options[0]
-                
-                media_data = await MovieManager.add_or_update_series(
+            if len(media_options) > 1 :
+            # Multiple results - show selection
+                embed = create_selection_embed(media_options, "series", title)
+                view = MediaSelectionView(
+                    media_options, 
+                    "tv", 
                     interaction.user.id, 
                     title,
                     season=season,
                     episode=episode,
-                    tmdb_id=media['id'],
+                    watchlist=watchlist
+                )
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+                return
+            else:
+                media = media_options[0]
+                    
+                media_data = await MovieManager.add_or_update_user_series(
+                    interaction.user.id, 
+                    title,
+                    season=season,
+                    episode=episode,
+                    tmdb_id=media['tmdb_id'],
                     watchlist=watchlist
                 )
                 
@@ -358,19 +381,6 @@ class Movies(commands.Cog):
                     await interaction.followup.send("Failed to save series", ephemeral=True)
                 return
             
-            # Multiple results - show selection
-            embed = create_selection_embed(media_options, "series", title)
-            view = MediaSelectionView(
-                media_options, 
-                "tv", 
-                interaction.user.id, 
-                title,
-                season=season,
-                episode=episode,
-                watchlist=watchlist
-            )
-            
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
             
         except Exception as e:
             errorHandler.handle(e, context=f"add_series({title})")
@@ -558,7 +568,40 @@ class Movies(commands.Cog):
             await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
 
         
-   
+    @app_commands.command(name="search_media", description="Search for movies or series")
+    @app_commands.describe(title="Media title to search for", media_type="Type of media: movie or series")
+    @app_commands.dm_only()
+    async def search_media(
+        self,
+        interaction: discord.Interaction,
+        title: str,
+        media_type: str
+        ):
+        """Search for movies or series."""
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            media_type_obj = MediaType.find_media_type(media_type)
+            results = await MovieManager.search_media(media_type_obj.value, self.movie_title_cache.get(title))
+            
+            if not results:
+                await interaction.followup.send(
+                    f"No {media_type} found for: `{title}`",
+                    ephemeral=True
+                )
+                return
+            
+            # Use paginator for results
+            view = MediaSearchPaginator(results, interaction.user)
+            await interaction.followup.send(
+                embed=view.get_embed(),
+                view=view,
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            errorHandler.handle(e, context=f"search_media({title}, {media_type})")
+            await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
     # ============================================================================ #
     #                                AUTOCOMPLETE                                  #
     # ============================================================================ #
@@ -592,6 +635,7 @@ class Movies(commands.Cog):
         """Autocomplete for media titles."""
         try:
             self.movie_title_cache = await MovieManager.fetch_media_names()
+    
             filtered = [
                 app_commands.Choice(name=title, value=title)
                 for title in self.movie_title_cache.keys()

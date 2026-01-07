@@ -163,6 +163,7 @@ class Series(Media):
         """Build Series from database row"""
         last_episode = Episode.from_dict(data.get("last_episode_to_air"))
         next_episode = Episode.from_dict(data.get("next_episode_to_air"))
+        print("Building Series from DB:", data)
         
         return cls(
             id=data["id"],
@@ -277,6 +278,7 @@ class Movie(Media):
     
     @classmethod
     def from_db(cls, data: dict) -> "Movie":
+        print("Building Movie from DB:", data)
         return cls(
             id=data["id"],
             title=data["title"],

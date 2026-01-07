@@ -26,11 +26,13 @@ async def add_or_update_user_movie(user_id: int, title: str, tmdb_id:int=None,wa
     try:
         # 1. Look up or insert movie into movies table
         media_data = await get_cached_media(MediaType.MOVIE.value, title)
+        print("Cached media data:", media_data)
         if media_data is None:
             media_data = await cache_media(MediaType.MOVIE.value, tmdb_id) 
         if media_data is None:
             raise ValueError("Failed to fetch or cache movie data.")
         # 2. Insert or update user_media record
+        print(media_data)
         row = await conn.upsert("user_media", data={
             "user_id": user_id,
             "media_id": media_data.id,
@@ -41,17 +43,16 @@ async def add_or_update_user_movie(user_id: int, title: str, tmdb_id:int=None,wa
             #so we can give feedback to the user with the title/poster etc
             return media_data
     except Exception as e:
-        error_handler.handle(e, context=f"add_or_update_movie({title})")
-    
+        error_handler.handle(e, context=f"add_or_update_user_movie({title})")
 
-
-async def add_or_update_series(user_id: int, title: str, season=None, episode=None, tmdb_id:int=None, watchlist: bool=False ):
+async def add_or_update_user_series(user_id: int, title: str, season=None, episode=None, tmdb_id:int=None, watchlist: bool=False ):
     """Insert or update a movie watch record for a user."""
    
     conn = await Rimiru.shion()
     try:
         # 1. Look up or insert movie into movies table
         media_data = await get_cached_media(MediaType.SERIES.value, title)
+        print("Cached media data:", media_data)
         if media_data is None:
             media_data = await cache_media(MediaType.SERIES.value, tmdb_id) 
         if media_data is None:
@@ -97,12 +98,12 @@ async def add_to_watchlist(user_id: int, title: str, media_type:str,tmdb_id:int=
 async def fetch_media_names():
     """Fetch all distinct media titles a user has interacted with."""
     conn = await Rimiru.shion()
-    try:
-        rows = await conn.select("media", columns=["title","id"], order_by="title ASC")
-        return [{r['title']: r["id"]} for r in rows]
+    try:  
+        rows = await conn.select("media", columns=["title","id","tmdb_id"], order_by="title ASC")
+        return {r['title']: {"id": r["id"], "tmdb_id": r["tmdb_id"]} for r in rows}
     except Exception as e:
         error_handler.handle(e, context="fetch_media_names")
-        return []
+        return {}
 
 async def get_watchlist(user_id: int, media_type: str):
     """Fetch a user's watchlist entries for a given media type.
@@ -113,7 +114,6 @@ async def get_watchlist(user_id: int, media_type: str):
         
         rows = await conn.call_function(
             fn="get_user_watchlist", params=[user_id, media_type], fetch_type=FetchType.FETCH)
-        #TODO:make sure this returns list of dicts
         return dict(rows)
     except Exception as e:
         error_handler.handle(e, context=f"get_watchlist({user_id}, {media_type})")
@@ -129,6 +129,28 @@ async def delete_user_media(user_id: int, media_id: int):
         error_handler.handle(e, context=f"delete_user_media({user_id}, {media_id})")
         return False
     
+async def fetch_user_medias(user_id: int,media_type: str):
+    """Fetch all media entries a user has interacted with."""
+    conn = await Rimiru.shion()
+    try:
+        rows = await conn.call_function(
+            fn="get_user_media", params=[user_id, media_type], fetch_type=FetchType.FETCH)
+        return [UserMedia.from_db(dict(r)) for r in rows]
+    except Exception as e:
+        error_handler.handle(e, context=f"fetch_user_medias({user_id}, {media_type})")
+        return None
+
+async def fetch_user_media(user_id:int, media_id:int, title:str):
+    """Fetch a specific media entry for a user by title and type."""
+    conn = await Rimiru.shion()
+    try:
+        rows = await conn.call_function(fn="get_user_media_by_title", params=[user_id, media_id, title], fetch_type=FetchType.FETCH)
+        if rows:
+            return UserMedia.from_db(dict(rows[0]))
+        return None
+    except Exception as e:
+        error_handler.handle(e, context=f"fetch_user_media({user_id}, {media_id}, {title})")
+        return None
 
 async def check_user_completion(user_id: int):
     """Check if a user has completed all media in their watchlist."""
@@ -136,7 +158,7 @@ async def check_user_completion(user_id: int):
     try:
         rows = await conn.call_function(
             fn="get_user_incomplete_media", params=[user_id], fetch_type=FetchType.FETCH)
-        return [ UserMedia.from_db(dict(r)) for r in rows]
+        return [UserMedia.from_db(dict(r)) for r in rows]
 
     except Exception as e:
         error_handler.handle(e, context=f"check_user_completion({user_id})")
@@ -161,6 +183,7 @@ async def get_cached_media(media_type: str, title: str):
     conn = await Rimiru.shion()
     try:
         table = MediaType.find_media_type(media_type).table_name
+        print(f"Looking for cached media: {media_type} - {title}, table: {table}")
         if not table:
             return None
         if table == "movies":
@@ -168,9 +191,11 @@ async def get_cached_media(media_type: str, title: str):
         else:
             fn = "get_series_by_title"
         row = await conn.call_function(fn=fn, params=[title], fetch_type=FetchType.FETCHROW)
-        if row:
-            return Series.from_db(row) if media_type == "tv" else Movie.from_db(row)
-        return None
+        print(row)
+        if not row:
+            return None
+        row = row[0]
+        return Series.from_db(row) if media_type == "tv" else Movie.from_db(row)
     except Exception as e:
         error_handler.handle(e, context="get_cached_media")
         return None
@@ -198,7 +223,7 @@ async def cache_media(media_type: str,tmdb_id: str):
         insert_data = media_data.to_db_dict()
         insert_data["id"] = row["id"]
         print(insert_data)
-        await conn.upsert(f"{table}", data=insert_data, conflict_column="media_id")
+        await conn.upsert(f"{table}", data=insert_data, conflict_column="id")
         
         print("Cached media:", media_data.title)
         return media_data
@@ -602,7 +627,6 @@ async def get_movies_needing_update():
         error_handler.handle(e, context="get_movies_needing_update")
         return []
 
-
 async def series_background_updater():
     """Background task to periodically update series data."""
     print("[UPDATER] Series background updater started")
@@ -637,7 +661,6 @@ async def series_background_updater():
             error_handler.handle(e, context="series_background_updater")
             # Wait 5 minutes before retrying after error
             await asyncio.sleep(300)
-
 
 async def movie_background_updater():
     """Background task to periodically update movie data (less frequent than series)."""
@@ -675,7 +698,6 @@ async def movie_background_updater():
             error_handler.handle(e, context="movie_background_updater")
             # Wait 5 minutes before retrying after error
             await asyncio.sleep(300)
-
 
 async def start_background_updaters():
     """Start all background updater tasks."""
