@@ -26,16 +26,17 @@ async def add_or_update_user_movie(user_id: int, title: str, tmdb_id:int=None,wa
     try:
         # 1. Look up or insert movie into movies table
         media_data = await get_cached_media(MediaType.MOVIE.value, title)
+        db_id = media_data.id if media_data else None
         print("Cached media data:", media_data)
         if media_data is None:
-            media_data = await cache_media(MediaType.MOVIE.value, tmdb_id) 
+            media_data, db_id = await cache_media(MediaType.MOVIE.value, tmdb_id) 
         if media_data is None:
             raise ValueError("Failed to fetch or cache movie data.")
         # 2. Insert or update user_media record
         print(media_data)
         row = await conn.upsert("user_media", data={
             "user_id": user_id,
-            "media_id": media_data.id,
+            "media_id": db_id,
             "status": "watchlist" if watchlist else "watched"
             }, conflict_column="user_id, media_id")
         if row:
@@ -51,16 +52,19 @@ async def add_or_update_user_series(user_id: int, title: str, season=None, episo
     conn = await Rimiru.shion()
     try:
         # 1. Look up or insert movie into movies table
+        
         media_data = await get_cached_media(MediaType.SERIES.value, title)
+        db_id = media_data.id if media_data else None
         print("Cached media data:", media_data)
         if media_data is None:
-            media_data = await cache_media(MediaType.SERIES.value, tmdb_id) 
+            media_data,id = await cache_media(MediaType.SERIES.value, tmdb_id)
+            db_id = id
         if media_data is None:
             raise ValueError("Failed to fetch or cache movie data.")
         # 2. Insert or update user_media record
         row = await conn.upsert("user_media", data={
             "user_id": user_id,
-            "media_id": media_data.id,
+            "media_id": db_id,
             "progress": {"season": season, "episode": episode} if season and episode else None,
             "status": "watching" 
             }, conflict_column="user_id, media_id")
@@ -191,7 +195,7 @@ async def get_cached_media(media_type: str, title: str):
         else:
             fn = "get_series_by_title"
         row = await conn.call_function(fn=fn, params=[title], fetch_type=FetchType.FETCHROW)
-        print(row)
+
         if not row:
             return None
         row = row[0]
@@ -222,11 +226,10 @@ async def cache_media(media_type: str,tmdb_id: str):
         print(row)
         insert_data = media_data.to_db_dict()
         insert_data["id"] = row["id"]
-        print(insert_data)
         await conn.upsert(f"{table}", data=insert_data, conflict_column="id")
         
         print("Cached media:", media_data.title)
-        return media_data
+        return media_data, row["id"]
     except Exception as e:
         error_handler.handle(e, context="cache_media")
 

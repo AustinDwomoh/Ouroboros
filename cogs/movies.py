@@ -278,8 +278,13 @@ class Movies(commands.Cog):
                 await interaction.followup.send(embed=embed, view=view, ephemeral=True)
                 return
             else:
+                print("Single media option found:", media_options)
                 media = media_options[0]
-                media_data = await MovieManager.add_or_update_user_movie(interaction.user.id, title,tmdb_id=media['tmdb_id'],watchlist=watchlist)
+                print("Media selected:", media)
+                if len(media) == 3: #since there are times the api will return only one page and an accrute one so tmdb_id will be there but as id
+                    media_data = await MovieManager.add_or_update_user_movie(interaction.user.id, title, tmdb_id=media['tmdb_id'], watchlist=watchlist)
+                else:
+                    media_data = await MovieManager.add_or_update_user_movie(interaction.user.id, title,tmdb_id=media['id'],watchlist=watchlist)
         
                 if media_data:
                     status_text = "added to watchlist" if watchlist else "marked as watched"
@@ -293,7 +298,7 @@ class Movies(commands.Cog):
                     if media.get('overview'):
                         embed.add_field(name="Overview", value=media['overview'][:200], inline=False)
                     
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    await interaction.followup.send(embed=embed)
                 else:
                     await interaction.followup.send("Failed to save movie", ephemeral=True)
                 return
@@ -301,7 +306,7 @@ class Movies(commands.Cog):
             
         except Exception as e:
             errorHandler.handle(e, context=f"add_movie({title})")
-            await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
+            await interaction.followup.send(f" Error: Saving movie failed.", ephemeral=True)
 
     @app_commands.command(name="add_series", description="Add a TV series to your watch list")
     @app_commands.describe(
@@ -353,16 +358,14 @@ class Movies(commands.Cog):
                 await interaction.followup.send(embed=embed, view=view, ephemeral=True)
                 return
             else:
+                print("Single media option found:", media_options)
                 media = media_options[0]
-                    
-                media_data = await MovieManager.add_or_update_user_series(
-                    interaction.user.id, 
-                    title,
-                    season=season,
-                    episode=episode,
-                    tmdb_id=media['tmdb_id'],
-                    watchlist=watchlist
-                )
+                if len(media) == 3: #since there are times the api will return only one page and an accrute one so tmdb_id will be there but as id
+                    media_data = await MovieManager.add_or_update_user_series( interaction.user.id,  title, season=season, episode=episode, tmdb_id=media['tmdb_id'], watchlist=watchlist
+                    )
+                else:
+                    media_data = await MovieManager.add_or_update_user_series( interaction.user.id,  title, season=season, episode=episode,tmdb_id=media['id'], watchlist=watchlist
+                    )
                 
                 if media_data:
                     status_text = "added to watchlist" if watchlist else "progress updated"
