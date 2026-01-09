@@ -130,21 +130,21 @@ class Rimiru:
             To use this method, provide the following
             its important you know the unique constraint of the table you are upserting to.  The conflict_column parameter should be set to that unique constraint column.
             
-            parameters:
-                :param table: Table name
-                :param data: Dictionary of column-value pairs
-                :param conflict_column: Column name to check for conflicts
-        """
+                parameters:
+                    :param table: Table name
+                    :param data: Dictionary of column-value pairs
+                    :param conflict_column: Column name to check for conflicts
+            """
         columns = list(data.keys())
         values = [
-        json.dumps(v) if isinstance(v, dict) else v 
-        for v in data.values()]
-    
-        
+            json.dumps(v) if isinstance(v, (dict, list)) else v
+            for v in data.values()
+        ]
+
         placeholders = ", ".join(f"${i+1}" for i in range(len(values)))
         cols = ", ".join(columns)
         update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in columns if k != conflict_column)
-        
+
         sql = f"""
             INSERT INTO {table} ({cols}) 
             VALUES ({placeholders})
@@ -152,12 +152,13 @@ class Rimiru:
             DO UPDATE SET {update_cols}
             RETURNING *;
         """
-        
-        async with self.pool.acquire() as conn:
-            return await conn.fetchrow(sql, *values)
 
-    # -------------------------
-    # DELETE
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(sql, *values) 
+            return dict(row) if row else None
+
+        # -------------------------
+        # DELETE
     # -------------------------
     async def delete(self, table: str, filters: dict):
         """Delete records matching filters"""

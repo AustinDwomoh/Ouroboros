@@ -5,9 +5,8 @@
 
 import aiohttp
 from difflib import SequenceMatcher
-from bs4 import BeautifulSoup
 import discord
-from settings import MOVIE_BASE_URL, MOVIE_API_KEY, HIANIME_BASE_URL, ErrorHandler
+from settings import MOVIE_BASE_URL, MOVIE_API_KEY, ErrorHandler
 from rimiru import Rimiru
 from models import Series, Movie,UserMedia
 from constants import FetchType, MediaType
@@ -66,7 +65,7 @@ async def add_or_update_user_series(user_id: int, title: str, season=None, episo
             "user_id": user_id,
             "media_id": db_id,
             "progress": {"season": season, "episode": episode} if season and episode else None,
-            "status": "watching" 
+            "status": "watchlist" if watchlist else "watching"
             }, conflict_column="user_id, media_id")
         if row:
             #the idea is if it actually inserted or updated we return the media data
@@ -109,18 +108,18 @@ async def fetch_media_names():
         error_handler.handle(e, context="fetch_media_names")
         return {}
 
-async def get_watchlist(user_id: int, media_type: str):
-    """Fetch a user's watchlist entries for a given media type.
+async def get_watchlist(user_id: int,):
+    """Fetch a user's watchlist entries.
     returns list of dicts with media details.
     """
     conn = await Rimiru.shion()
     try:
         
         rows = await conn.call_function(
-            fn="get_user_watchlist", params=[user_id, media_type], fetch_type=FetchType.FETCH)
-        return dict(rows)
+            fn="get_user_watchlist", params=[user_id], fetch_type=FetchType.FETCH)
+        return [dict(row) for row in rows]
     except Exception as e:
-        error_handler.handle(e, context=f"get_watchlist({user_id}, {media_type})")
+        error_handler.handle(e, context=f"get_watchlist({user_id})")
         return []
 
 async def delete_user_media(user_id: int, media_id: int):
@@ -133,27 +132,19 @@ async def delete_user_media(user_id: int, media_id: int):
         error_handler.handle(e, context=f"delete_user_media({user_id}, {media_id})")
         return False
     
-async def fetch_user_medias(user_id: int,media_type: str):
-    """Fetch all media entries a user has interacted with."""
-    conn = await Rimiru.shion()
-    try:
-        rows = await conn.call_function(
-            fn="get_user_media", params=[user_id, media_type], fetch_type=FetchType.FETCH)
-        return [UserMedia.from_db(dict(r)) for r in rows]
-    except Exception as e:
-        error_handler.handle(e, context=f"fetch_user_medias({user_id}, {media_type})")
-        return None
+# ============================================================================ #
 
-async def fetch_user_media(user_id:int, media_id:int, title:str):
+async def fetch_user_media(user_id:int, media_id:int):
     """Fetch a specific media entry for a user by title and type."""
     conn = await Rimiru.shion()
     try:
-        rows = await conn.call_function(fn="get_user_media_by_title", params=[user_id, media_id, title], fetch_type=FetchType.FETCH)
+        rows = await conn.call_function(fn="get_user_media_by_id", params=[user_id, media_id], fetch_type=FetchType.FETCH)
+
         if rows:
             return UserMedia.from_db(dict(rows[0]))
         return None
     except Exception as e:
-        error_handler.handle(e, context=f"fetch_user_media({user_id}, {media_id}, {title})")
+        error_handler.handle(e, context=f"fetch_user_media({user_id}, {media_id})")
         return None
 
 async def check_user_completion(user_id: int):
@@ -226,6 +217,7 @@ async def cache_media(media_type: str,tmdb_id: str):
         print(row)
         insert_data = media_data.to_db_dict()
         insert_data["id"] = row["id"]
+        print("Insert data for specific table:", insert_data)
         await conn.upsert(f"{table}", data=insert_data, conflict_column="id")
         
         print("Cached media:", media_data.title)
@@ -302,37 +294,10 @@ async def get_media_details(media_type: str, media_id: str = None):
     if data.get("status_code") == 34:
         return {}
     
- 
+    if not data.get("title") and not data.get("name"):
+        return {}
 
     return Series.from_api(data) if media_type == "tv" else Movie.from_api(data)
-
-# ============================================================
-# ANIME SEARCH (unchanged)
-# ============================================================
-async def search_hianime(keyword: str):
-    """Scrape Hianime search results."""
-    url = f"{HIANIME_BASE_URL}/search?keyword={keyword}"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as r:
-            if r.status != 200:
-                return {"error": "Failed to fetch data"}
-            html = await r.text()
-
-    soup = BeautifulSoup(html, "html.parser")
-    results = []
-    for item in soup.select(".film_list-wrap .flw-item"):
-        title_tag = item.select_one(".dynamic-name")
-        link_tag = item.select_one("a")
-        img_tag = item.select_one("img")
-        if title_tag and link_tag and img_tag:
-            results.append(
-                {
-                    "title": title_tag.text.strip(),
-                    "link": HIANIME_BASE_URL + link_tag["href"],
-                    "thumbnail": img_tag.get("data-src") or img_tag.get("src"),
-                }
-            )
-    return results
 
 
 
@@ -344,7 +309,6 @@ async def search_hianime(keyword: str):
 import asyncio
 from datetime import datetime, timezone
 from typing import List
-from main import client
 from asyncio import Semaphore
 
 async def send_reminder_to_user(client, user_id: int, reminders: List[Series], semaphore: Semaphore):
@@ -387,7 +351,7 @@ async def send_reminder_to_user(client, user_id: int, reminders: List[Series], s
             error_handler.handle(e, context=f"send_reminder_to_{user_id}")
 
 
-async def send_incomplete_reminder_to_user(client, user_id: int, incomplete: list, semaphore: Semaphore):
+async def send_incomplete_reminder_to_user(client, user_id: int, incomplete: list[UserMedia], semaphore: Semaphore):
     """Send incomplete media reminders to a single user"""
     async with semaphore:
         try:
@@ -409,7 +373,6 @@ async def send_incomplete_reminder_to_user(client, user_id: int, incomplete: lis
             # Send individual embed for each media
             for media in incomplete:
                 embed_data = media.to_embed_dict() 
-                
                 embed = discord.Embed(
                     title=embed_data["title"],          
                     description=embed_data["description"],
@@ -426,7 +389,7 @@ async def send_incomplete_reminder_to_user(client, user_id: int, incomplete: lis
                         inline=field.get("inline", False)
                     )
 
-                await user.send(embed=embed)  # FIXED: Actually send it!
+                await user.send(embed=embed)  
                 await asyncio.sleep(0.5)
             
             # Send footer message
@@ -444,7 +407,7 @@ async def send_incomplete_reminder_to_user(client, user_id: int, incomplete: lis
             error_handler.handle(e, context=f"send_incomplete_reminder_{user_id}")
 
 
-async def send_upcoming_episode_reminders():
+async def send_upcoming_episode_reminders(client):
     """Send reminders to users about upcoming episodes - PARALLEL VERSION"""
     conn = await Rimiru.shion()
     
@@ -499,7 +462,7 @@ async def send_upcoming_episode_reminders():
     except Exception as e:
         error_handler.handle(e, context="send_upcoming_episode_reminders")
 
-async def send_incomplete_media_reminders():
+async def send_incomplete_media_reminders(client):
     """Send reminders about incomplete media - PARALLEL VERSION"""
     conn = await Rimiru.shion()
 
@@ -702,12 +665,12 @@ async def movie_background_updater():
             # Wait 5 minutes before retrying after error
             await asyncio.sleep(300)
 
-async def start_background_updaters():
+async def start_background_updaters(client):
     """Start all background updater tasks."""
     tasks = [
         asyncio.create_task(series_background_updater()),
         asyncio.create_task(movie_background_updater()),
-        asyncio.create_task(send_incomplete_media_reminders()),
-        asyncio.create_task(send_upcoming_episode_reminders())
+        asyncio.create_task(send_incomplete_media_reminders(client)),
+        asyncio.create_task(send_upcoming_episode_reminders(client))
     ]
     await asyncio.gather(*tasks)

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
+import json
 import random
-from typing import Optional,List,Dict
+from typing import Any, Optional,List,Dict
 from constants import Status, WatchStatus, MediaType
 from datetime import datetime, date
 
@@ -129,7 +130,7 @@ class Series(Media):
     last_episode_to_air: Optional[Episode] = None
     next_episode_to_air: Optional[Episode] = None
     in_production: Optional[bool] = None
-    seasons: Optional[list[dict]] = None
+    seasons: Optional[dict] = None
 
     @classmethod
     def from_api(cls, data: dict) -> "Series":
@@ -322,157 +323,190 @@ class Movie(Media):
     
 
 
+
 @dataclass
 class UserMedia:
     """
-    Represents media that a user hasn't completed.
-    Designed to map directly from get_user_incomplete_media SQL function.
+    Represents a user's relationship with a media item.
+    Aligned with:
+    - get_user_incomplete_media
+    - get_user_media_by_id
     """
+
     # Core identifiers
     id: int
     media_type: MediaType
     title: str
     tmdb_id: int
-    
+
     # Display info
     overview: Optional[str] = None
     poster_path: Optional[str] = None
-    
+
     # Status info
-    status: Optional[str] = None  # Media status (Ended, Airing, etc)
-    user_status: str = ""
-    
-    # Progress tracking
-    total_episodes: Optional[int] = None
-    watched_episodes: int = 0
-    remaining_episodes: int = 0
-    completion_percentage: float = 0.0
-    
-    # Date tracking
-    last_watched_date: Optional[datetime] = None
-    next_episode_info: Optional[dict] = None
-    
+    media_status: Optional[str] = None   # Airing, Ended, etc
+    user_status: str = ""                # watching, watchlist, watched
+
+    # Progress (authoritative, raw)
+    progress: Optional[Dict[str, Any]] = None
+
+    # Dates
+    last_updated: Optional[datetime] = None
+
+    # Series-only
+    next_episode_info: Optional[Dict[str, Any]] = None
+
+    # -----------------------
+    # Type helpers
+    # -----------------------
+
     @property
     def is_movie(self) -> bool:
-        """Check if this is a movie"""
         return self.media_type == MediaType.MOVIE
-    
+
     @property
     def is_series(self) -> bool:
-        """Check if this is a series"""
-        return self.media_type in [MediaType.SERIES, MediaType.TV]
-    
+        return self.media_type == MediaType.SERIES
+
+    @property
+    def is_completed(self) -> bool:
+        """
+        Movies: completed if watched
+        Series: only completed if explicitly marked watched
+        (no fake math)
+        """
+        return self.user_status.strip() == "watched"
+
+    # -----------------------
+    # Display helpers
+    # -----------------------
+
     @property
     def poster_url(self) -> Optional[str]:
-        """Get full poster URL"""
         if self.poster_path:
             return f"https://image.tmdb.org/t/p/w500{self.poster_path}"
         return None
-    
+
     @property
     def next_episode_text(self) -> Optional[str]:
-        """Get formatted next episode text"""
         if not self.next_episode_info:
             return None
-        
+
         season = self.next_episode_info.get("season_number", "?")
         episode = self.next_episode_info.get("episode_number", "?")
         air_date = self.next_episode_info.get("air_date", "Unknown")
-        name = self.next_episode_info.get("name", "")
-        
-        base = f"S{season}E{episode}"
+        name = self.next_episode_info.get("name")
+
+        label = f"S{season}E{episode}"
         if name:
-            base += f" - {name}"
-        base += f"\nAirs: {air_date}"
-        
-        return base
+            label += f" — {name}"
+
+        return f"{label}\nAirs: {air_date}"
+
     @property
-    def color(self):
-        """Discord color for embeds"""
-        colors = {
-            "watching": 0x3498db,    # Blue
-            "watchlist": 0xf39c12,   # Orange
-            "watched": 0x2ecc71,     # Green
-        }
-        return colors.get(self.user_status, 0x95a5a6)  # Grey default
-    
-    def to_embed_dict(self) -> dict:
-        """Convert to dictionary optimized for Discord embeds"""
+    def progress_text(self) -> Optional[str]:
+        """
+        Human-readable progress from JSONB.
+        Assumes {season, episode} unless expanded later.
+        """
+        if not self.progress:
+            return None
+
+        season = self.progress.get("season")
+        episode = self.progress.get("episode")
+
+        if season and episode:
+            return f"S{season}E{episode}"
+
+        return None
+
+    @property
+    def color(self) -> int:
+        return {
+            "watching": 0x3498db,
+            "watchlist": 0xf39c12,
+            "watched": 0x2ecc71,
+        }.get(self.user_status.strip(), 0x95a5a6)
+
+    # -----------------------
+    # Discord embed
+    # -----------------------
+
+    def to_embed_dict(self) -> Dict[str, Any]:
         data = {
-            "title": f"{self.media_type.name} {self.title}",
+            "title": f"{self.media_type.table_name.title()} • {self.title}",
             "thumbnail": self.poster_url,
             "color": self.color,
             "fields": []
         }
-        
+
         if self.is_series:
-            # Series-specific fields
-            data["description"] = f"**Progress:** {self.watched_episodes}/{self.total_episodes or '?'} episodes"
-            
-            data["fields"].extend([
-                {
-                    "name": " Remaining",
-                    "value": f"{self.remaining_episodes} episodes",
-                    "inline": True
-                },
-                {
-                    "name": " Completion",
-                    "value": f"{self.completion_percentage}%",
-                    "inline": True
-                },
-                {
-                    "name": " Status",
-                    "value": self.status or "Unknown",
-                    "inline": True
-                }
-            ])
-            
+            if self.progress_text:
+                data["description"] = f"**Progress:** {self.progress_text}"
+            else:
+                data["description"] = "**Progress:** Not started"
+
             if self.next_episode_text:
                 data["fields"].append({
-                    "name": " Next Episode",
+                    "name": "Next Episode",
                     "value": self.next_episode_text,
                     "inline": False
                 })
+
         else:
-            # Movie-specific fields
-            data["description"] = "Not watched yet"
-            
-            if self.status:
-                data["fields"].append({
-                    "name": " Status",
-                    "value": self.status,
-                    "inline": True
-                })
-        
+            data["description"] = "✓ Watched" if self.is_completed else "Not watched yet"
+
+        if self.media_status:
+            data["fields"].append({
+                "name": "Status",
+                "value": self.media_status,
+                "inline": True
+            })
+
         if self.overview:
-            overview = self.overview[:200] + "..." if len(self.overview) > 200 else self.overview
+            trimmed = self.overview[:200] + "..." if len(self.overview) > 200 else self.overview
             data["fields"].append({
                 "name": " Overview",
-                "value": overview,
+                "value": trimmed,
                 "inline": False
             })
-        
+
+        if self.last_updated:
+            data["fields"].append({
+                "name": " Last Activity",
+                "value": self.last_updated.strftime("%b %d, %Y"),
+                "inline": True
+            })
+
         return data
-    
+
+    # -----------------------
+    # Factory
+    # -----------------------
+
     @classmethod
-    def from_db(cls, row: dict) -> "UserMedia":
-        """Create from database row (from get_user_incomplete_media function)"""
+    def from_db(cls, row: Dict[str, Any]) -> "UserMedia":
+        print(type(row["next_episode_info"]), row["next_episode_info"])
+        next_episode = None
+        progress = None
+        if isinstance(row.get("next_episode_info"), str):
+            next_episode = json.loads(row["next_episode_info"]) if row["next_episode_info"] else None
+        if isinstance(row.get("progress"), str):
+            progress = json.loads(row["progress"]) if row["progress"] else None
         return cls(
             id=row["id"],
-            media_type=MediaType(row["media_type"]),
+            media_type=MediaType.find_media_type(row["media_type"]),
             title=row["title"],
             tmdb_id=row["tmdb_id"],
             overview=row.get("overview"),
             poster_path=row.get("poster_path"),
-            status=row.get("status"),
-            user_status=row.get("user_status"),
-            total_episodes=row.get("total_episodes"),
-            watched_episodes=row.get("watched_episodes", 0),
-            remaining_episodes=row.get("remaining_episodes", 0),
-            completion_percentage=float(row.get("completion_percentage", 0.0)),
-            last_watched_date=row.get("last_watched_date"),
-            next_episode_info=row.get("next_episode_info")
+            media_status=row.get("media_status") or row.get("status"),
+            user_status=row.get("user_status", ""),
+            progress=progress,
+            last_updated=row.get("last_updated"),
+            next_episode_info=next_episode,
         )
+
 
 
 @dataclass
