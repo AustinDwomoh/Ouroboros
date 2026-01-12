@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Set
 import discord
 from discord.ext import commands
 import asyncio
-
+from settings import ErrorHandler
 class DataMigrationManager:
     """Handles data migration from old Ouroboros database to new version"""
     
@@ -389,9 +389,11 @@ class NotificationManager:
                 failed_count += 1
                 print(f"  ✗ Failed to notify user {user_id}: {e}")
         
-        print(f"\n✓ Notification complete!")
-        print(f"  • Successful: {success_count}")
-        print(f"  • Failed: {failed_count}")
+            
+
+        msg = f"\n✓ Notification complete!\n" +f"  • Successful: {success_count}" + f"  • Failed: {failed_count}"
+        ErrorHandler().handle(msg,"Update state")
+        
 
 
 def main():
