@@ -29,7 +29,7 @@ DISCORD_TOKEN = os.getenv("TEST_DISCORD_TOKEN") if IS_TESTING else os.getenv("DI
 CLIENT_ID = os.getenv("TEST_CLIENT_ID") if IS_TESTING else os.getenv("CLIENT_ID")
 PUBLIC_KEY = os.getenv("TEST_PUBLIC_KEY") if IS_TESTING else os.getenv("PUBLIC_KEY")
 CREATOR_ID = os.getenv("CREATOR")
-ALLOWED_ID = [CREATOR_ID] if CREATOR_ID else []
+ALLOWED_ID = [int(CREATOR_ID)] if CREATOR_ID else []
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 # ---------------------------
 # External APIs

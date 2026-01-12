@@ -5,6 +5,7 @@ from discord.ext import commands
 from rimiru import Rimiru
 from settings import *
 from dbmanager import MovieManager
+from gather_data import NotificationManager
 
 # Logging setup
 logging.basicConfig(level=logging.DEBUG)
@@ -42,11 +43,29 @@ class Client(commands.Bot):
                 logger.error(f"Failed to sync slash commands: {e}")
                 await self.close()
 
-       
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        """This meant to b used for updates to users"""
+        if message.author.bot:
+            return  # Ignore messages from bots
+        print("Message received:", message.content)
+        state = (message.author.id in ALLOWED_ID) and (message.content.strip() == "$GodOfLies")
+        print("State:", state)
+        print("Author ID:", message.author.id," Allowed IDs:", ALLOWED_ID)
+        
 
-    # -------------------------------------------------
-    # DB Utilities
-    # -------------------------------------------------
+        if state:
+            await message.channel.send("Ready to serve, Master.")
+            await NotificationManager.notify_users(self)
+            await message.add_reaction("✅")
+            return  # stop ONLY this message # Ignore messages from users not in ALLOWED_ID
+       
+        await self.process_commands(message)
+     
+        # -------------------------------------------------
+        # DB Utilities
+        # -------------------------------------------------
+   
     async def ensure_user(self, interaction: discord.Interaction):
         uid = interaction.user.id
         now = time()

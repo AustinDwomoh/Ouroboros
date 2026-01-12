@@ -16,8 +16,8 @@ class Break(commands.Cog):
     # ============================================================================ #
     #                               ACTIVATION SCRIPT                              #
     # ============================================================================ #
-    @app_commands.command(name="break", description="Take a break and get a motivational quote!")
-    @app_commands.guild_only()
+    #@app_commands.command(name="break", description="Take a break and get a motivational quote!")
+    #@app_commands.guild_only()
     async def break_command(self, interaction: discord.Interaction):
         """
         

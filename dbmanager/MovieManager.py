@@ -524,15 +524,17 @@ async def update_series_details(series_id: int, tmdb_id: int):
             return False
         
         # Update media table
-        await conn.update("media", 
-                         data=media_data.to_media_dict(), 
-                         filters={"id": series_id})
+        insert_data = media_data.to_media_dict()
+        await conn.upsert("media", 
+                         data=insert_data, 
+                         conflict_column="tmdb_id")
         
         # Update series_details table
         update_data = media_data.to_db_dict()
-        await conn.update("series", 
+        update_data["id"] = series_id
+        await conn.upsert("series", 
                          data=update_data, 
-                         filters={"id": series_id})
+                         conflict_column="id")
         
         return True
     except Exception as e:
@@ -550,15 +552,16 @@ async def update_movie_details(movie_id: int, tmdb_id: int):
             return False
         
         # Update media table
-        await conn.update("media", 
+        await conn.upsert("media", 
                          data=media_data.to_media_dict(), 
-                         filters={"id": movie_id})
-        
+                         conflict_column="tmdb_id")
+
         # Update movies_details table
         update_data = media_data.to_db_dict()
-        await conn.update("movies", 
+        update_data["id"] = movie_id
+        await conn.upsert("movies", 
                          data=update_data, 
-                         filters={"id": movie_id})
+                         conflict_column="id")
         
         return True
     except Exception as e:
