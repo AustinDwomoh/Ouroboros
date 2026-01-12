@@ -44,24 +44,24 @@ class Client(commands.Bot):
 		
         logger.info("Ouroboros Is Ready")
     
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        """This meant to b used for updates to users"""
-        if message.author.bot:
-            return  # Ignore messages from bots
-        print("Message received:", message.content)
-        state = (message.author.id in ALLOWED_ID) and (message.content.strip() == "$GodOfLies")
-        print("State:", state)
-        print("Author ID:", message.author.id," Allowed IDs:", ALLOWED_ID)
-        
-
-        if state:
-            await message.channel.send("Ready to serve, Master.")
-            await NotificationManager.notify_users(self)
-            await message.add_reaction("✅")
-            return  # stop ONLY this message # Ignore messages from users not in ALLOWED_ID
-       
-        await self.process_commands(message)
+   # @commands.Cog.listener()
+   # async def on_message(self, message):
+   #     """This meant to b used for updates to users"""
+   #     if message.author.bot:
+   #         return  # Ignore messages from bots
+   #     print("Message received:", message.content)
+   #     state = (message.author.id in ALLOWED_ID) and (message.content.strip() == "$GodOfLies")
+   #     print("State:", state)
+   #     print("Author ID:", message.author.id," Allowed IDs:", ALLOWED_ID)
+   #     
+#
+   #     if state:
+   #         await message.channel.send("Ready to serve, Master.")
+   #         await NotificationManager.notify_users(self)
+   #         await message.add_reaction("✅")
+   #         return  # stop ONLY this message # Ignore messages from users not in ALLOWED_ID
+   #    
+   #     await self.process_commands(message)
      
         # -------------------------------------------------
         # DB Utilities
