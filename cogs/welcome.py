@@ -1,10 +1,9 @@
-from PIL import Image, ImageDraw, ImageFont
 from settings import *  # for Dir
-import discord,requests,os,random
+import discord,random
 from discord import app_commands
 from discord.ext import commands
 from dbmanager import ServerStatManager
-
+from constants import channelType
 errorHandler = ErrorHandler()
 img_dir = IMGS_DIR
 
@@ -31,8 +30,8 @@ class WelcomeGoodbyeCog(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member):
         try:
-            channels = ServerStatManager.get_greetings_channel_ids(member.guild.id)
-            channel_id = channels.get("welcome")
+            channels = await ServerStatManager.get_greetings_channel_ids(member.guild.id)
+            channel_id = channels.get(channelType.WELCOME.value)
 
             if channel_id:
                 channel = member.guild.get_channel(channel_id)
@@ -44,8 +43,8 @@ class WelcomeGoodbyeCog(commands.Cog):
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         try:
-            channels = ServerStatManager.get_greetings_channel_ids(member.guild.id)
-            channel_id = channels.get("goodbye")
+            channels = await ServerStatManager.get_greetings_channel_ids(member.guild.id)
+            channel_id = channels.get(channelType.GOODBYE.value)
 
             if channel_id:
                 channel = member.guild.get_channel(channel_id)
@@ -116,7 +115,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        ServerStatManager.set_channel_id(interaction.guild.id, "welcome", channel.id)
+        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.WELCOME.value, channel.id)
         await interaction.response.send_message(
             f"Welcome channel set to {channel.mention}", ephemeral=True
         )
@@ -146,7 +145,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        ServerStatManager.set_channel_id(interaction.guild.id, "goodbye", channel.id)
+        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.GOODBYE.value, channel.id)
         await interaction.response.send_message(
             f"Goodbye channel set to {channel.mention}", ephemeral=True
         )

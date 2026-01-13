@@ -1,19 +1,21 @@
 # ============================================================================ #
+#                                     NOTES                                    #
+# ============================================================================ #
+# This cog handles the leaderboard and rank commands for mini games.
+# It fetches data from the database and displays it in an embed with pagination.
+#Its been tested and both the leaderboard and rank commands are working as intended.
+
+# ============================================================================ #
 #                                    IMPORT                                    #
 # ============================================================================ #
-import discord,sqlite3
-from discord import  app_commands
+import discord
+from discord import app_commands
 from discord.ext import commands
-from dbmanager import Games
-from cogs.leveling import LeaderboardPaginationView  
-from discord.ext import commands
+from views.LeaderboardPage import LeaderboardPaginationView  
 from settings import ErrorHandler
 from io import BytesIO
-
-
-# ============================================================================ #
-#                                LEADERBOARD UI                                #
-# ============================================================================ #
+from dbmanager import Games
+from constants import gameType
 
 
 # ============================================================================ #
@@ -22,6 +24,7 @@ from io import BytesIO
 class Leaderboard(commands.Cog):
     def __init__(self, client):
         self.client = client
+        self.error_handler = ErrorHandler()
 
     # ============================ Leaderboard COMMAND =========================== #
     @app_commands.command(name="leaderboard", description="Mini Game Rankings")
@@ -30,71 +33,83 @@ class Leaderboard(commands.Cog):
     )
     @app_commands.guild_only()
     async def leaderboard(
-        self, interaction: discord.Interaction, game_type: str = None):
+        self, interaction: discord.Interaction, game_type: str = None
+    ):
         """Show the leaderboard for the current guild with pagination or a specific game type."""
         await interaction.response.defer()
-        with Games.create_connection() as conn:
-            c = conn.cursor()
-            try:
-                if game_type:
-                    table_name = f"{game_type}_scores_{interaction.guild.id}"
-                    c.execute(
-                        f"SELECT player_id, player_score FROM {table_name} ORDER BY player_score DESC"
-                    )
-                else:
-                    table_name = f"leaderboard_{interaction.guild.id}"
-                    c.execute(
-                        f"SELECT player_id, total_score FROM {table_name} ORDER BY total_score DESC"
-                    )
-                rows = c.fetchall()
-            except sqlite3.OperationalError as e:
-                await interaction.followup.send("No Leaderboard available.")
+        
+        try:
+            rows = None
+            if game_type:
+                game_type = gameType.find_game_type(game_type)  # since its a string we convert it
+                # Fetch specific game type scores
+                rows = await Games.get_leaderboard(interaction.guild.id, game_type)
+            else:
+                # Fetch overall leaderboard
+                rows = await Games.get_leaderboard(interaction.guild.id)
+            # Process rows into a list of (user_id, total_score)
+            rows = [(row['user_id'], row['total_score']) for row in rows]
+            if not rows:
+                    await interaction.followup.send(f"No leaderboard available for {game_type.value}.")
+                    return
+            # Build leaderboard data with member info
+            leaderboard_data = []
+            for idx, (player_id, score) in enumerate(rows, start=1):
+                member = interaction.guild.get_member(player_id)
+                if member:
+                    avatar = await member.display_avatar.read()
+                    leaderboard_data.append((idx, member.display_name, score, 0, avatar))  # rank, username, score, placeholder, avatar bytes
+            
+            if not leaderboard_data:
+                await interaction.followup.send("No active players found on the leaderboard.")
                 return
-        leaderboard_data = []
-        for idx, (player_id, score) in enumerate(rows, start=1):
-            member = interaction.guild.get_member(player_id)
-            if member:
-                avatar_url = member.display_avatar.url
-                leaderboard_data.append((idx,member.display_name, score, 0,avatar_url))
 
-        pagination_view = LeaderboardPaginationView(
-            data=leaderboard_data, sep=5, timeout=None
-        )
-        # Generate the first page's image
-        page_data = pagination_view.get_current_page_data()
-        img = pagination_view.generate_leaderboard_image(page_data)
-        buffer = BytesIO()
-        img.save(buffer, format="PNG")
-        buffer.seek(0)
+            # Create pagination view
+            pagination_view = LeaderboardPaginationView(
+                data=leaderboard_data, sep=5, timeout=None,text="Score" 
+            )
+            
+            # Generate the first page's image
+            page_data = pagination_view.get_current_page_data()
+            img = pagination_view.generate_leaderboard_image(page_data)
+            buffer = BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
 
-        # Prepare discord file
-        discord_file = discord.File(buffer, filename="leaderboard.png")
+            # Prepare discord file
+            discord_file = discord.File(buffer, filename="leaderboard.png")
 
-        # Create embed
-        embed = discord.Embed(
-            title=f"🏆 Leaderboard Page {pagination_view.current_page}/{pagination_view.get_total_pages()}",
-            color=discord.Color.gold()
-        )
-        embed.set_image(url="attachment://leaderboard.png")
-        embed.set_footer(text="Use the buttons below to navigate pages.")
+            # Create embed
+            embed = discord.Embed(
+                title=f"🏆 Leaderboard Page {pagination_view.current_page}/{pagination_view.get_total_pages()}",
+                color=discord.Color.gold()
+            )
+            embed.set_image(url="attachment://leaderboard.png")
+            embed.set_footer(text="Use the buttons below to navigate pages.")
 
-        # Send initial message and store it
-        pagination_view.message = await interaction.followup.send(
-            embed=embed,
-            file=discord_file,
-            view=pagination_view
-        )
+            # Send initial message and store it
+            pagination_view.message = await interaction.followup.send(
+                embed=embed,
+                file=discord_file,
+                view=pagination_view
+            )
+            
+        except Exception as e:
+            self.error_handler.handle(e, context="leaderboard_command")
+            await interaction.followup.send("An error occurred while fetching the leaderboard.")
 
     @leaderboard.autocomplete("game_type")
-    async def game_type_autocomplete(self, interaction: discord.Interaction, current: str):
-        # List of possible game types/
+    async def game_type_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ):
+        """Autocomplete for game types."""
         try:
             current = current.strip() if current else ""
-            game_types = ["pvp", "sporty", "pvb", "efootball"]
+            game_types = gameType.get_game_types()
             filtered_choices = [
-                app_commands.Choice(name=game, value=game)
+                app_commands.Choice(name=game.value, value=game.value)
                 for game in game_types
-                if current.lower() in game.lower()
+                if current.lower() in game.value.lower()
             ]
             if filtered_choices:
                 await interaction.response.autocomplete(filtered_choices)
@@ -102,79 +117,68 @@ class Leaderboard(commands.Cog):
                 await interaction.response.autocomplete(
                     [app_commands.Choice(name="No matches found", value="none")]
                 )
-        except discord.errors.NotFound as e:
-           pass
+        except discord.errors.NotFound:
+            pass
         except Exception as e:
-            ErrorHandler().handle(e,context="leaderboard_autocomplete")
+            self.error_handler.handle(e, context="leaderboard_autocomplete")
 
     # ================================ RANK SCRIPT =============================== #
-    async def fetch_player_score(self, cursor, table_name, player_id):
-        """Fetch the player score from a specific table."""
-        try:
-            cursor.execute(
-                f"SELECT player_score FROM {table_name} WHERE player_id = :player_id",
-                {"player_id": player_id},
-            )
-            score_row = cursor.fetchone()
-            return score_row[0] if score_row else 0
-        except Games.sqlite3.OperationalError as e:
-            return 0
 
     @app_commands.guild_only()
     @app_commands.command(name="rank", description="Rank with score in mini games")
     async def rank(
-        self, interaction: discord.Interaction, member: discord.Member = None):
+        self, interaction: discord.Interaction, member: discord.Member = None
+    ):
         """Show the rank of a member in the current guild."""
-
         await interaction.response.defer()
+        
         if member is None:
             member = interaction.user
-        guild_id = interaction.guild.id
-        pvp_table_name = f"pvp_scores_{guild_id}"
-        pvb_table_name = f"pvb_scores_{guild_id}"
-        sporty_table_name = f"sporty_scores_{guild_id}"
-        efootball_table_name = f"efootball_scores_{guild_id}"
-        leaderboard_table_name = f"leaderboard_{interaction.guild.id}"
-
-        with Games.create_connection() as conn:
-            c = conn.cursor()
-            pvp_score = await self.fetch_player_score(c, pvp_table_name, member.id)
-            pvb_score = await self.fetch_player_score(c, pvb_table_name, member.id)
-            sporty_score = await self.fetch_player_score(
-                c, sporty_table_name, member.id
-            )
-            efootball_score = await self.fetch_player_score(
-                c, efootball_table_name, member.id
-            )
-            try:
-                c.execute(
-                    f"SELECT player_id, total_score FROM {leaderboard_table_name} ORDER BY total_score DESC"
-                )
-                rows = c.fetchall()
-                player_position = None
-                for index, row in enumerate(rows, start=1):
-                    if row[0] == member.id:
-                        player_position = index
-                        break
-                rank = player_position
-            except Games.sqlite3.OperationalError as e:
-                rank = 'None'
-            # banner making code
-            pvp_text = f"PvP: {pvp_score}pts"
-            pvb_text = f"PvB: {pvb_score}pts"
-            sporty_text = f"Sporty: {sporty_score}pts"
-            efootball_text = f"Efootball: {efootball_score}pts"
         
+        guild_id = interaction.guild.id
+        
+        try:
+            # Fetch scores for each game type
+            
+            scores = await Games.get_player_scores(guild_id, None, member.id)
+            # Fetch overall leaderboard to determine rank
+            rank = await Games.get_rank(guild_id, member.id)   
+            if rank is None:
+                await interaction.followup.send(f"{member.name} has no rank in this server.")
+                return
+      
+            player_scores = {g.value: 0 for g in gameType}
+            for row in scores:  # scores is list of {game_type, player_score}
+                player_scores[row["game_type"]] = row["score"]
+
+            pvp_text = f"PvP: {player_scores.get(gameType.PVP.value, 0)}pts"
+            pvb_text = f"PvB: {player_scores.get(gameType.PVB.value, 0)}pts"
+            sporty_text = f"Sporty: {player_scores.get(gameType.SPORTY.value, 0)}pts"
+            efootball_text = f"Efootball: {player_scores.get(gameType.EFOOTBALL.value, 0)}pts"
+           
+            
+            
+            # Create rank display
             embed = discord.Embed(
-                title=f"🏆Rank #{rank} ",
+                title=f"🏆Rank #{rank}",
                 description=(
-                    f"Congratulations **{interaction.user.name}**!\n You are **Rank #{rank}**.\n\n With \n {pvp_text}  \n {pvb_text} \n {sporty_text} \n {efootball_text}"
+                    f"Congratulations **{member.name}**!\n"
+                    f"You are **Rank #{rank}**.\n\n"
+                    f"With:\n"
+                    f"{pvp_text}\n"
+                    f"{pvb_text}\n"
+                    f"{sporty_text}\n"
+                    f"{efootball_text}"
                 ),
-                color=discord.Color.purple()  # pick your color
-                )
-            embed.set_thumbnail(url=str(interaction.user.display_avatar.url))
+                color=discord.Color.purple()
+            )
+            embed.set_thumbnail(url=str(member.display_avatar.url))
             await interaction.followup.send(embed=embed)
             
+        except Exception as e:
+            self.error_handler.handle(e, context="rank_command")
+            await interaction.followup.send("An error occurred while fetching rank information.")
+
 
 # ============================================================================ #
 #                                     SETUP                                    #

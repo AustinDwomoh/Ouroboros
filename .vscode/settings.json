@@ -1,7 +1,35 @@
 {
     "cSpell.words": [
         "dbmanager",
+        "efootball",
+        "fintech",
         "HIANIME",
+        "sconn",
+        "serverstats",
         "TMBD"
+    ],
+    "sqltools.connections": [
+        {
+            "pgOptions": {
+                "ssl": {
+                    "rejectUnauthorized": true
+                }
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "postgres.austindwomoh.xyz",
+            "port": 5433,
+            "sshOptions": {
+                "port": 22,
+                "host": "159.223.100.23",
+                "username": "root",
+                "password": "@Inphinithy17"
+            },
+            "driver": "PostgreSQL",
+            "name": "Ouroboros",
+            "database": "ouroboros",
+            "username": "root",
+            "password": "@Inphinithy17"
+        }
     ]
 }

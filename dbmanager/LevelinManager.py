@@ -1,71 +1,58 @@
-import sqlite3
+from settings import  ErrorHandler
+from rimiru import Rimiru
+from constants import FetchType
+error_handler = ErrorHandler()
+
+# -------------------------------------------------------------
+# BASIC LEVEL OPERATIONS
+# -------------------------------------------------------------
+async def get_user_level(guild_id: int, user_id: int)-> tuple[int, int] | None:
+    """Return (xp, level) for a user in a guild from the centralized `levels` table."""
+    conn = await Rimiru.shion() 
+    try:
+        row = await conn.selectOne(table="levels", columns=["xp", "level"], filters={"guild_id": guild_id, "user_id": user_id})
+        print(row)
+        if row:
+            return row.get('xp'), row.get('level')
+    except Exception as e:
+        error_handler.handle(e, context="get_user_level")
+        return None
+
+async def insert_or_update_user(guild_id: int, user_id: int, xp: int, level: int) -> None:
+    """Insert or update XP and level for a user in a guild."""
+    conn = await Rimiru.shion()
+    try:
+        await conn.upsert(table="levels", data={"guild_id": guild_id, "user_id": user_id, "xp": xp, "level": level}, conflict_column="user_id,guild_id")
+    except Exception as e:
+        error_handler.handle(e, context="insert_or_update_user")
 
 
-def create_connection(db_path="data/leveling.db"):
-    return sqlite3.connect(db_path)
-
-
-def create_guild_table(guild_id):
+# -------------------------------------------------------------
+# LEADERBOARD / RANKING
+# -------------------------------------------------------------
+async def fetch_top_users(guild_id: int, limit: int = 10) -> list[tuple[int, int, int]]:
+    """Return top N users in a guild by level and XP."""
+    conn = await Rimiru.shion()
+    try:
+        rows = await conn.select(
+            table="levels",
+            columns=["user_id", "level", "xp"],
+            filters={"guild_id": guild_id},
+            order_by=f"level DESC, xp DESC",
+            limit=limit
+        )
+        return rows
+    except Exception as e:
+        error_handler.handle(e, context="fetch_top_users")
+        return []
     
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"""
-        CREATE TABLE IF NOT EXISTS levels_{guild_id} (
-            user_id INTEGER NOT NULL,
-            xp INTEGER DEFAULT 0,
-            level INTEGER DEFAULT 1,
-            PRIMARY KEY (user_id)
-        )
-        """
-        )
-        conn.commit()
-
-
-def get_user_level(guild_id, user_id):
-    create_guild_table(guild_id)
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT xp, level FROM levels_{guild_id} WHERE user_id = ?", (user_id,)
-        )
-        return cursor.fetchone()
-
-
-def insert_or_update_user(guild_id, user_id, xp, level):
-    
-    create_guild_table(guild_id)
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"INSERT INTO levels_{guild_id} (user_id, xp, level) VALUES (?, ?, ?) "
-            "ON CONFLICT(user_id) DO UPDATE SET xp = ?, level = ?",
-            (user_id, xp, level, xp, level),
-        )
-        conn.commit()
-
-
-def fetch_top_users(guild_id, limit=10):
-    
-    create_guild_table(guild_id)
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"SELECT user_id, level, xp FROM levels_{guild_id} ORDER BY level DESC, xp DESC LIMIT ?",
-            (limit,),
-        )
-        return cursor.fetchall()
-
-
-def get_rank(guild_id, user_id):
-    create_guild_table(guild_id)
-    user_data = get_user_level(guild_id, user_id)
-    if user_data is None:
-        return None  # User not found
-
-    xp = user_data[0]
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT COUNT(*) FROM levels_{guild_id} WHERE xp > ?", (xp,))
-        rank = cursor.fetchone()[0] + 1  # +1 because rank is 1-indexed
+async def get_rank(guild_id: int, user_id: int) -> int | None:
+    """Return a user's rank in the guild (1 = highest XP)."""
+    conn = await Rimiru.shion()
+    try:
+        rank = await conn.call_function("get_user_lvl_rank",params=[guild_id, user_id],fetch_type=FetchType.FETCHVAL.value)
+        print(rank)
         return rank
+    except Exception as e:
+        error_handler.handle(e, context="get_rank")
+        return None

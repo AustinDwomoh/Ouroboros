@@ -1,25 +1,35 @@
 import os, pathlib, discord,traceback,requests,json
+import os,logging,pathlib,traceback,discord
 from threading import Thread
 from datetime import datetime
 from dotenv import load_dotenv
+import aiohttp
+import asyncio
 
+
+# ---------------------------
+# Environment Loading
+# ---------------------------
 load_dotenv()
+BASE_DIR = pathlib.Path(__file__).parent
+LOG_BASE_DIR = BASE_DIR / "errors"
 
+BOT_MODE = os.getenv("BOT_MODE", "production").strip().lower()
+IS_PRODUCTION = BOT_MODE == "production"
+IS_TESTING = BOT_MODE == "testing"
 
-state = os.getenv("BOT_MODE", "production").strip().lower()
-# Accessing environment variables
-if state == "testing":
-    DISCORD_TOKEN = os.getenv("TEST_DISCORD_TOKEN")
-    CLIENT_ID = os.getenv("TEST_CLIENT_ID")
-    PUBLIC_KEY = os.getenv("TEST_PUBLIC_KEY")
-else:
-    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-    CLIENT_ID = os.getenv("CLIENT_ID")
-    PUBLIC_KEY = os.getenv("PUBLIC_KEY")
-
-
+# ---------------------------
+# Discord Credentials
+# ---------------------------
+DISCORD_TOKEN = os.getenv("TEST_DISCORD_TOKEN") if IS_TESTING else os.getenv("DISCORD_TOKEN")
+CLIENT_ID = os.getenv("TEST_CLIENT_ID") if IS_TESTING else os.getenv("CLIENT_ID")
+PUBLIC_KEY = os.getenv("TEST_PUBLIC_KEY") if IS_TESTING else os.getenv("PUBLIC_KEY")
 CREATOR_ID = os.getenv("CREATOR")
-ALLOWED_ID = [CREATOR_ID]
+ALLOWED_ID = [int(CREATOR_ID)] if CREATOR_ID else []
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+# ---------------------------
+# External APIs
+# ---------------------------
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 BEARER_TOKEN = os.getenv("BEARER_TOKEN")
 X_API_KEY = os.getenv("X_API_KEY")
@@ -31,89 +41,122 @@ MOVIE_API_KEY = os.getenv("MOVIE_API_KEY")
 H_BASE_URL = os.getenv("HIANIME_BASE_URL")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
+# ---------------------------
+# Database Config
+# ---------------------------
+PGHOST = os.getenv("PGHOST")
+PGPORT = int(os.getenv("PGPORT", "5432"))
+PGUSER = os.getenv("PGUSER")
+PGPASSWORD = os.getenv("PGPASSWORD")
+PGDATABASE = os.getenv("PGDATABASE")
+SQLITE_DATA_DIR = os.getenv("SQLITE_DATA_DIR", "data")
 
-BASE_DIR = pathlib.Path(__file__).parent
-
+# ---------------------------
+# Paths
+# ---------------------------
 CMDS_DIR = BASE_DIR / "cmds"
 COGS_DIR = BASE_DIR / "cogs"
 IMGS_DIR = BASE_DIR / "imgs"
 FONT_DIR = BASE_DIR / "fonts"
-# Load logging configuration from file
+LOGS_DIR = BASE_DIR / "logs"
+os.makedirs(LOGS_DIR, exist_ok=True)
+os.makedirs(LOG_BASE_DIR, exist_ok=True)
+
+# ---------------------------
+# Logging
+# ---------------------------
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "%(asctime)s - %(levelname)-10s -%(module)-15s:%(message)s"
-        },
-        "standard": {"format": "%(asctime)s - %(levelname)-10s - %(message)s"},
+        "standard": {"format": "%(asctime)s - %(levelname)-8s - %(message)s"},
+        "verbose": {"format": "%(asctime)s - %(levelname)-8s - %(module)s: %(message)s"},
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",
             "class": "logging.StreamHandler",
-            "formatter": "standard",
-        },
-        "console2": {
-            "level": "WARNING",
-            "class": "logging.StreamHandler",
+            "level": "DEBUG" if IS_TESTING else "INFO",
             "formatter": "standard",
         },
         "file": {
-            "level": "INFO",
             "class": "logging.FileHandler",
-            "filename": "logs/infos.log",
-            "mode": "w",
+            "filename": LOGS_DIR / "bot.log",
+            "mode": "a",
             "formatter": "verbose",
         },
     },
     "loggers": {
-        "bot": {"handlers": ["console"], "level": "INFO", "propagate": False},
-        "discord": {
-            "handlers": ["console2", "file"],
-            "level": "INFO",
-            "propagate": False,
-        },
+        "discord": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+        "bot": {"handlers": ["console", "file"], "level": "DEBUG" if IS_TESTING else "INFO"},
     },
 }
 
-LOG_BASE_DIR =BASE_DIR / "errors"
+
+logger = logging.getLogger("bot")
+
+# ---------------------------
+# Error Handling
+# ---------------------------
 
 class ErrorHandler:
     """
-    Handles exceptions by logging error details to timestamped daily files.
-    Optionally sends asynchronous Discord webhook notifications.
-    Also provides a Discord embed for user-friendly error feedback.
+    Handles exception logging with Discord webhook notifications.
+    Creates timestamped error logs in /errors/YYYY-MM-DD/.
+    Sends rich embeds to Discord webhook for production errors.
     """
 
     def __init__(self):
-        self.notify = True #if state == "production" else False
-        os.makedirs(LOG_BASE_DIR, exist_ok=True)
-
-    def handle(self, error, context=""):
         """
-        Logs error details and notifies via Discord if enabled.
+        Initialize the error handler.
+        
+        Args:
+            log_base_dir: Base directory for error logs
+        """
+        self.webhook_url = DISCORD_WEBHOOK_URL
+        self.log_base_dir = LOG_BASE_DIR
+        self.notify = False if BOT_MODE == "testing" else True  # TODO: Set to False for local testing, True for production
+        
+        # Create log directory
+        os.makedirs(self.log_base_dir, exist_ok=True)
+        
+        # Warn if webhook is not configured
+        if self.notify and not self.webhook_url:
+            print("[WARNING] DISCORD_ERROR_WEBHOOK_URL not set. Error notifications disabled.")
+            self.notify = False
+
+    def handle(self, error: Exception, context: str = ""):
+        """
+        Handle an exception by logging and optionally notifying via Discord webhook.
+        
+        Args:
+            error: The exception that occurred
+            context: Additional context about where/why the error occurred
         """
         now = datetime.now()
-        day_folder = now.strftime("%Y-%m-%d")
-        time_stamp = now.strftime("%H-%M-%S")
+        folder = self.log_base_dir / now.strftime("%Y-%m-%d")
+        folder.mkdir(exist_ok=True)
+        
+        # Create error log file
+        filename = f"error_{now.strftime('%H-%M-%S')}.txt"
+        path = folder / filename
 
-        folder_path = os.path.join(LOG_BASE_DIR, day_folder)
-        os.makedirs(folder_path, exist_ok=True)
-        file_path = os.path.join(folder_path, f"error_{time_stamp}.txt")
-
-        error_message = (
+        # Format error message
+        error_traceback = traceback.format_exc()
+        msg = (
             f"Timestamp: {now}\n"
             f"Context: {context}\n"
             f"Exception: {str(error)}\n\n"
-            f"Traceback:\n{traceback.format_exc()}\n"
+            f"Traceback:\n{error_traceback}\n"
         )
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(error_message)
+        # Write to file
+        path.write_text(msg, encoding="utf-8")
+        
+        # Log to console
+        print(f"[ERROR] {context}: {error}")
 
         if self.notify:
-            Thread(target=self.send_discord_alert, args=(error, context, file_path)).start()
+            Thread(target=self.send_discord_alert, args=(error, context, path)).start()
 
     def send_discord_alert(self, error, context, file_path):
         """
@@ -168,18 +211,46 @@ class ErrorHandler:
             with open(fallback_path, "a", encoding="utf-8") as f:
                 f.write(f"{datetime.now()} - Failed to send Discord alert: {str(e)}\n")
 
-    def help_embed(self):
+    def _run_async_notify(self, error: Exception, context: str, traceback_text: str, log_path, timestamp: datetime):
+        """Run async Discord notification in new event loop."""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(
+                self._send_discord_webhook(error, context, traceback_text, log_path, timestamp)
+            )
+        except Exception as e:
+            self._log_notification_failure(e)
+        finally:
+            loop.close()
+
+    async def _send_discord_webhook(self, error: Exception, context: str, traceback_text: str, log_path, timestamp: datetime):
         """
         Returns a Discord embed for user-facing error display.
         """
         embed = discord.Embed(
-            title="Error Handling",
-            description="An error occurred. Please contact the admin if it persists:\n**Inphinithy**",
-            color=0xFF0000
+            title="⚠️ An Error Occurred",
+            description="Something went wrong while processing your request. The error has been logged and the development team has been notified.",
+            color=discord.Color.red(),
         )
+        
         embed.add_field(
-            name="Contact",
-            value="[Send a DM](https://discord.com/users/755872891601551511)",
-            inline=False
+            name="🔄 What to do next",
+            value=(
+                "• Try your command again\n"
+                "• Check if your input was correct\n"
+                "• Contact support if the issue persists"
+            ),
+            inline=False,
         )
+        
+        embed.add_field(
+            name="📞 Need Help?",
+            value="[Contact Inphinithy](https://discord.com/users/755872891601551511)",
+            inline=False,
+        )
+        
+        embed.set_footer(text="Error handlers are monitoring this issue")
+        embed.timestamp = datetime.now()
+        
         return embed

@@ -1,259 +1,180 @@
-import sqlite3
 from settings import ErrorHandler
+from rimiru import Rimiru
+from constants import Roles,channelType
 
-errorHandler = ErrorHandler()
+error_handler = ErrorHandler()
 
-def create_connection(db_path="data/serverstats.db"):
-    return sqlite3.connect(db_path)
-
-def setup_database():
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS serverstats (
-                guild_id INTEGER PRIMARY KEY,
-                welcome_channel_id INTEGER,
-                goodbye_channel_id INTEGER,
-                chat_channel_id INTEGER,
-                signup_channel_id INTEGER,
-                fixtures_channel_id INTEGER,
-                guidelines_channel_id INTEGER,
-                tourstate TEXT DEFAULT 'off',
-                state TEXT DEFAULT 'off',
-                player_role TEXT DEFAULT 'Tour Player',
-                tour_manager_role TEXT DEFAULT 'Tour manager',
-                winner_role TEXT DEFAULT '🥇Champ'
-           
-            )
-        """
-        )
-
-        """ cursor.execute(f"PRAGMA table_info(serverstats)")
-        columns = [row[1] for row in cursor.fetchall()]  # Get column names
-
-        if "player_role" not in columns:
-            cursor.execute(
-                "ALTER TABLE serverstats ADD COLUMN player_role TEXT DEFAULT 'Tour Player'"
-            )
-
-        if "tour_manager_role" not in columns:
-            cursor.execute(
-                "ALTER TABLE serverstats ADD COLUMN tour_manager_role TEXT DEFAULT 'Tour manager'"
-            )
-
-        if "winner_role" not in columns:
-            cursor.execute(
-                "ALTER TABLE serverstats ADD COLUMN winner_role TEXT DEFAULT '🥇Champ'"
-            ) """#not needed for now
-        conn.commit()
-
-def get_server_state(guild_id):
-    setup_database()
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT state FROM serverstats WHERE guild_id = ?
-        """,
-            (guild_id,),
-        )
-        result = cursor.fetchone()
-        return result[0] if result else "off"
-
-def get_role(guild_id, role):
-    setup_database()
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"""
-            SELECT {role} FROM serverstats WHERE guild_id = ?
-        """,
-            (guild_id,),
-        )
-        result = cursor.fetchone()
-        return result[0] if result else "No_role"
-
-def set_role(guild_id, role_column, role_value):
-        """
-        Sets or updates a role in the serverstats table.
-
-        :param guild_id: The Discord guild ID.
-        :param role_column: The column name (player_role, tour_manager_role, or winner_role).
-        :param role_value: The role name or ID to be stored.
-        """
-        try:
-            setup_database()
-            with create_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                f"""
-                INSERT INTO serverstats (guild_id, {role_column})
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET {role_column} = excluded.{role_column}
-            """,
-                (guild_id, role_value),
-            )
-            conn.commit()
-
-        except Exception as e:
-            errorHandler.handle(e,f"Error setting role for guild {guild_id}: {e}")
-
-def get_server_tourstate(guild_id):
-    setup_database()
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-        """
-        SELECT tourstate FROM serverstats WHERE guild_id = ?
-    """,
-        (guild_id,),
-    )
-    result = cursor.fetchone()
-    return result[0] if result else "off"
-
-def set_server_state(guild_id, state):
-    try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO serverstats (guild_id, state)
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET state = ?
-            """,
-                (guild_id, state, state),
-            )
-            conn.commit()
+# -------------------------------------------------------------
+# STATE GETTERS / SETTERS
+# -------------------------------------------------------------
+async def get_server_state(guild_id: int):
+    """Return 'on' or 'off' state for a guild."""
+    conn = await Rimiru.shion()
+    try:       
+        val = await conn.select("servers", columns=["state"], filters={"guild_id": guild_id})
+        return val[0]['state'] or "off"
     except Exception as e:
-        errorHandler.handle(e,f"Error setting server state for guild {guild_id}: {e}")
-     
-
-def set_server_tourstate( guild_id, state):
+        error_handler.handle(e, context="get_server_state")
+        return "off"
+  
+async def set_server_state(guild_id: int, state: str):
+    """Insert or update global on/off state for a guild."""
+    conn = await Rimiru.shion()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-            """
-            INSERT INTO serverstats (guild_id, tourstate)
-            VALUES (?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET tourstate = ?
-        """,
-            (guild_id, state, state),
-        )
-        conn.commit()
+        await conn.upsert("servers", {"guild_id": guild_id, "state": state}, conflict_column="guild_id")
     except Exception as e:
-        errorHandler.handle(e,f"Error setting server state for guild {guild_id}: {e}")
+        error_handler.handle(e, context="set_server_state")
+   
 
-
-def set_channel_id( guild_id, channel_type, channel_id):
-    if channel_type not in (
-        "welcome",
-        "goodbye",
-        "chat",
-        "signup",
-        "fixtures",
-        "guidelines",
-    ):
-        raise ValueError("Invalid channel type. Must be 'welcome' or 'goodbye'.")
-
-    column = f"{channel_type}_channel_id"
+async def get_server_tourstate(guild_id: int):
+    """Return 'on' or 'off' tournament state for a guild."""
+    conn = await Rimiru.shion()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-            f"""
-            INSERT INTO serverstats (guild_id, {column})
-            VALUES (?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET {column} = ?
-        """,
-            (guild_id, channel_id, channel_id),
-        )
-        conn.commit()
+        val = await conn.selectOne("servers", columns=["tourstate"], filters={"guild_id": guild_id})
+        return val.get("tourstate") if val else "off"
     except Exception as e:
-        errorHandler.handle(e,f"Error setting {channel_type} channel for guild {guild_id}: {e}")
+        error_handler.handle(e, context="get_server_tourstate")
+        return "off"
+ 
 
 
-def get_greetings_channel_ids( guild_id):
+async def set_server_tourstate(guild_id: int, state: str):
+    """Insert or update tournament on/off state for a guild."""
+    conn = await Rimiru.shion()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-            """
-            SELECT welcome_channel_id, goodbye_channel_id FROM serverstats WHERE guild_id = ?
-        """,
-            (guild_id,),
-        )
-        result = cursor.fetchone()
-        return (
-            {"welcome": result[0], "goodbye": result[1]}
-            if result
-            else {"welcome": None, "goodbye": None}
-        )
+        await conn.upsert("servers", {"guild_id": guild_id, "tourstate": state}, conflict_column="guild_id")
     except Exception as e:
-        errorHandler.handle(e,f"Error fetching channel IDs for guild {guild_id}: {e}")
-    
-        return {"welcome": None, "goodbye": None}
+        error_handler.handle(e, context="set_server_tourstate")
 
-def get_tour_channel_ids( guild_id):
+
+
+# -------------------------------------------------------------
+# ROLE MANAGEMENT
+# -------------------------------------------------------------
+async def get_role(guild_id: int, role: Roles) -> str:
+    """Return a specific role (player_role, tour_manager_role, or winner_role)."""
+    if role not in Roles.get_roles():
+        raise ValueError("Invalid role column")
+    conn = await Rimiru.shion()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-            """
-            SELECT chat_channel_id, signup_channel_id, fixtures_channel_id, guidelines_channel_id 
-            FROM serverstats WHERE guild_id = ?
-        """,
-            (guild_id,),
-        )
-        result = cursor.fetchone()
+        val = await conn.selectOne("servers", columns=[role.value], filters={"guild_id": guild_id})
+        return val.get(role.value) if val else Roles.NONE.value
+    except Exception as e:
+        error_handler.handle(e, context=f"get_role:{role.value}")
+        return Roles.NONE.value
 
-        if result:
+
+
+async def set_role(guild_id: int, role: Roles, role_value: str):
+    """Insert or update a guild's stored role."""
+    if role not in Roles.get_roles():
+        raise ValueError("Invalid role column")
+    conn = await Rimiru.shion()
+    try:
+        return await conn.upsert("servers", {"guild_id": guild_id, role.value: role_value}, conflict_column="guild_id")
+    except Exception as e:
+        error_handler.handle(e, context=f"set_role:{role.value}")
+
+
+
+# -------------------------------------------------------------
+# CHANNEL MANAGEMENT
+# -------------------------------------------------------------
+async def set_channel_id(guild_id: int, channel: channelType, channel_id: int):
+    """Set or update a specific channel ID in the serverstats table."""
+    if channel not in channelType.get_channel_types():
+        raise ValueError(f"Invalid channel type: {channel}")
+    column = f"{channel.value}_channel_id"
+    conn = await Rimiru.shion()
+    try:
+        await conn.upsert("servers", {"guild_id": guild_id, column: channel_id}, conflict_column="guild_id")
+
+    except Exception as e:
+        error_handler.handle(e, context=f"set_channel_id:{channel.value}")
+ 
+
+
+async def get_greetings_channel_ids(guild_id: int):
+    """Return welcome and goodbye channel IDs for a guild."""
+    conn = await Rimiru.shion()
+    try:
+        row = await conn.select('servers', 
+        columns=["welcome_channel_id", "goodbye_channel_id"], filters={"guild_id": guild_id})
+        if not row:
             return {
-                "chat": result[0],
-                "signup": result[1],
-                "fixtures": result[2],
-                "guidelines": result[3],
-            }
-        else:
-            errorHandler.handle(e,f"No tour channel IDs found for guild {guild_id}")
-            return {
-                "chat": None,
-                "signup": None,
-                "fixtures": None,
-                "guidelines": None,
-            }
+                channelType.WELCOME.value: None, 
+                channelType.GOODBYE.value: None}
+       
 
+        return {
+            channelType.WELCOME.value: row["welcome_channel_id"], 
+            channelType.GOODBYE.value: row["goodbye_channel_id"]
+            }
     except Exception as e:
-        errorHandler.handle(e,f"Error fetching tour channel IDs for guild {guild_id}: {e}")
-        return {"chat": None, "signup": None, "fixtures": None, "guidelines": None}
+        error_handler.handle(e, context="get_greetings_channel_ids")
+        return {channelType.WELCOME.value: None, 
+                channelType.GOODBYE.value: None}
 
-def get_all_server_states():
-    """Retrieve the on/off state for all guilds."""
+
+
+async def get_tour_channel_ids(guild_id: int):
+    """Return all tournament-related channel IDs."""
+    conn = await Rimiru.shion()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT guild_id, state FROM serverstats")
-        return dict(cursor.fetchall())
+        row = await conn.selectOne('servers', columns=["chat_channel_id", "signup_channel_id", "fixtures_channel_id"], filters={"guild_id": guild_id})
+        if not row:
+            return {
+                    channelType.CHAT.value: None, 
+                    channelType.SIGNUP.value: None, 
+                    channelType.FIXTURES.value: None, 
+                    }
+        row = dict(row)
+        return {
+            channelType.CHAT.value: row["chat_channel_id"],
+            channelType.SIGNUP.value: row["signup_channel_id"],
+            channelType.FIXTURES.value: row["fixtures_channel_id"],
+        }
     except Exception as e:
-        errorHandler.handle(e,f"Error retrieving all server states: {e}")
+        error_handler.handle(e, context="get_tour_channel_ids")
+        return {
+            channelType.CHAT.value: None, 
+            channelType.SIGNUP.value: None, 
+            channelType.FIXTURES.value: None, 
+        }
+
+async def get_tournament_servers():
+    """Return a list of guild IDs with tournament state 'on'."""
+    conn = await Rimiru.shion()
+    try:
+        rows = await conn.select('servers', columns=["guild_id","signup_channel_id","chat_channel_id","fixtures_channel_id"], filters={"tourstate": "on"})
+        return {r["guild_id"]: {channelType.SIGNUP: r["signup_channel_id"], channelType.CHAT: r["chat_channel_id"], channelType.FIXTURES: r["fixtures_channel_id"]} for r in rows}
+    except Exception as e:
+        error_handler.handle(e, context="get_tournament_servers")
+        return []
+
+# -------------------------------------------------------------
+# GLOBAL OVERVIEW
+# -------------------------------------------------------------
+async def get_all_server_states():
+    """Return mapping of all guilds and their active states."""
+    conn = await Rimiru.shion()
+    try:
+        rows = await conn.select('servers', columns=["guild_id", "state"])
+        return {r["guild_id"]: r["state"] for r in rows}
+    except Exception as e:
+        error_handler.handle(e, context="get_all_server_states")
         return {}
 
-def get_all_server_tourstates(self):
-    """Retrieve the on/off tourstate for all guilds."""
+
+
+async def get_all_server_tourstates():
+    """Return mapping of all guilds and their tournament states."""
+    conn = await Rimiru.shion()
     try:
-        setup_database()
-        with create_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT guild_id, tourstate FROM serverstats")
-        return dict(cursor.fetchall())
+        rows = await conn.select('servers', columns=["guild_id", "tourstate"])
+        return {r["guild_id"]: r["tourstate"] for r in rows}
     except Exception as e:
-        errorHandler.handle(e,f"Error retrieving all server tour states: {e}")
+        error_handler.handle(e, context="get_all_server_tourstates")
         return {}
+
 

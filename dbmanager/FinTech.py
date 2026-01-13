@@ -1,175 +1,161 @@
-import sqlite3
-from datetime import datetime, timedelta
-from settings import ErrorHandler
+# from datetime import datetime, timedelta
+# from settings import ErrorHandler
 
-def create_connection(db_path="data/finance.db"):
-    return sqlite3.connect(db_path)
+# error_handler = ErrorHandler()
 
-def create_money_table(user_id=None):
-    table_name = f'"{user_id}_fintech"'
-    with create_connection() as conn:
-        cursor = conn.cursor()
-        if user_id:
-            cursor.execute(
-            f"""
-                    CREATE TABLE IF NOT EXISTS {table_name} (  
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT NOT NULL,
-                        category TEXT,
-                        amount REAL NOT NULL,
-                        total_paid REAL,
-                        status TEXT NOT NULL,
-                        frequency TEXT NOT NULL,
-                        due_date TEXT NOT NULL,
-                        last_paid_date TEXT
-                    )"""
-                    )
-            
-        cursor.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS user_payments (  
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER  NOT NULL
-                )"""
-                    )
-            
-        conn.commit()
 
-def calculate_next_due_date(due_date: str, frequency: str) -> str:
-    """Calculates the next due date based on frequency and last paid date"""
-    try:
-        date_obj = datetime.strptime(due_date, "%Y-%m-%d")
-        if frequency == "Monthly":
-            next_due = date_obj + timedelta(days=30)
-        elif frequency == "Bi-Weekly":
-            next_due = date_obj + timedelta(days=14)
-        elif frequency == "Weekly":
-            next_due = date_obj + timedelta(days=7)
-        else:
-            return due_date  # One-time payments stay the same
+# # -------------------------------------------------------------
+# # UTILITIES
+# # -------------------------------------------------------------
+# def calculate_next_due_date(due_date: str, frequency: str) -> str:
+#     """Calculate the next due date from a given due date + frequency."""
+#     try:
+#         date_obj = datetime.strptime(due_date, "%Y-%m-%d")
+#         freq = frequency.lower()
+#         if freq == "monthly":
+#             next_due = date_obj + timedelta(days=30)
+#         elif freq in ("bi-weekly", "biweekly"):
+#             next_due = date_obj + timedelta(days=14)
+#         elif freq == "weekly":
+#             next_due = date_obj + timedelta(days=7)
+#         elif freq == "daily":
+#             next_due = date_obj + timedelta(days=1)
+#         else:
+#             return due_date  # one-time or yearly stays same
+#         return next_due.strftime("%Y-%m-%d")
+#     except Exception:
+#         return due_date
 
-        return next_due.strftime("%Y-%m-%d")
-    except ValueError:
-        return due_date  # Return as-is if date format is incorrect
 
-def update_user_ids(user_id):
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute("SELECT * FROM user_payments WHERE user_id = ?", (user_id,))
-        existing = c.fetchone()
-        if not existing:
-            c.execute(
-                f""" INSERT INTO user_payments (user_id) VALUES (?) """, (user_id,)
-            )
+# # -------------------------------------------------------------
+# # CRUD / FINTECH OPERATIONS
+# # -------------------------------------------------------------
+# async def fintech_list(user_id: int):
+#     """Fetch all fintech payments for a given user."""
+#     conn = await create_async_pg_conn()
+#     await ensure_user(user_id)
+#     try:
+#         rows = await conn.fetch("""
+#             SELECT id, name, category, amount, total_paid,
+#                    status, frequency, due_date, last_paid_date
+#             FROM fintech_payments
+#             WHERE user_id = $1
+#             ORDER BY due_date ASC NULLS LAST
+#         """, user_id)
+#         return [dict(r) for r in rows]
+#     except Exception as e:
+#         error_handler.handle(e, context=f"fintech_list({user_id})")
+#         return []
+#     finally:
+#         await conn.close()
 
-def fintech_list(user_id):
-    """Retrieves all series from the user's database."""
-    table_name = f'"{user_id}_fintech"'
-    create_money_table(user_id)
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(f"SELECT * FROM {table_name}")
-        return c.fetchall()
 
-def update_table(user_id, name, category, amount, due_date, status, frequency="One-Time"):
-    table_name = f'"{user_id}_fintech"'
-    create_money_table(user_id)
-    update_user_ids(user_id)
-    
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(f"SELECT * FROM {table_name} WHERE name = ?", (name,))
-        existing = c.fetchone()
-        if existing:
-            frequency = existing[6]
-            existing_due_date = existing[7]
-            total_paid = existing[4]
-            new_due_date = calculate_next_due_date(
-                existing_due_date, frequency 
-            )
-            last_paid_date = datetime.today().strftime("%Y-%m-%d")
+# async def update_payment(user_id: int, name: str, category: str,
+#                          amount: float, due_date: str,
+#                          status: str, frequency="once"):
+#     """
+#     Insert or update a user's fintech payment record.
+#     """
+#     conn = await create_async_pg_conn()
+#     await ensure_user(user_id)
+#     try:
+#         row = await conn.fetchrow("""
+#             SELECT id, total_paid, frequency, due_date
+#             FROM fintech_payments
+#             WHERE user_id = $1 AND name ILIKE $2
+#         """, user_id, name)
 
-            # Update existing record
-            c.execute(
-                f"""
-                    UPDATE {table_name}
-                    SET category = COALESCE(?, category),
-                        total_paid = COALESCE(total_paid, 0) + ?,
-                        due_date = COALESCE(?, due_date),
-                        last_paid_date = COALESCE(?, last_paid_date),
-                        status = COALESCE(?, status)
-                    WHERE name = ?
-                """,
-                (category, amount, new_due_date, last_paid_date, status, name),
-            )
-            conn.commit()
-            
-            return new_due_date, (0 if total_paid is None else total_paid) + amount
-        else:
-            c.execute(
-                f"""
-                INSERT INTO {table_name} 
-                (name, category, amount, due_date, frequency,status)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """,
-                (name, category, amount, due_date, frequency, status),
-            )
-        conn.commit()
-        return due_date,amount
+#         if row:
+#             # existing payment — update totals/dates
+#             total_paid = row["total_paid"] or 0
+#             existing_due = row["due_date"] or due_date
+#             freq = (row["frequency"] or frequency).lower()
+#             new_due = calculate_next_due_date(existing_due, freq)
+#             last_paid = datetime.now().strftime("%Y-%m-%d")
 
-def update_payment_status(user_id, payment_name, status):
-    table_name = f'"{user_id}_fintech"'
-    with create_connection() as conn:
-        c = conn.cursor()
-        c.execute(
-            f"""
-            UPDATE {table_name} 
-            SET status = ? 
-            WHERE name = ?
-        """,
-            (status, payment_name),
-        )
-        conn.commit()
+#             await conn.execute("""
+#                 UPDATE fintech_payments
+#                 SET category = COALESCE($1, category),
+#                     total_paid = $2,
+#                     due_date = $3,
+#                     last_paid_date = $4,
+#                     status = $5,
+#                     frequency = $6,
+#                     updated_at = now()
+#                 WHERE id = $7
+#             """, category, total_paid + amount, new_due, last_paid,
+#                  status, freq, row["id"])
+#             return {"updated_due": new_due, "new_total": total_paid + amount}
+#         else:
+#             # new payment
+#             await conn.execute("""
+#                 INSERT INTO fintech_payments
+#                     (user_id, name, category, amount, due_date,
+#                      frequency, status, total_paid)
+#                 VALUES ($1,$2,$3,$4,$5,$6,$7,0)
+#             """, user_id, name, category, amount, due_date,
+#                  frequency.lower(), status)
+#             return {"inserted": True, "due_date": due_date}
+#     except Exception as e:
+#         error_handler.handle(e, context="update_payment")
+#         return {}
+#     finally:
+#         await conn.close()
 
-def check_due_dates():
-    try:
-        today = datetime.today().strftime("%Y-%m-%d")
-        upcoming_date = (datetime.today() + timedelta(days=7)).strftime("%Y-%m-%d")
-        reminders = []
-        create_money_table()
-        with create_connection() as conn:
-            c = conn.cursor()
-            c.execute("SELECT DISTINCT user_id FROM user_payments")
-            user_ids = [row[0] for row in c.fetchall()]
-            for user_id in user_ids:
-                table_name = f'"{user_id}_fintech"'
-                c.execute(
-                    f"""
-                SELECT name, category, amount, due_date, status
-                FROM {table_name} 
-                WHERE status != 'paid' AND status = 'active'
-                AND due_date IS NOT NULL 
-                AND due_date BETWEEN ? AND ? 
-                ORDER BY due_date ASC
-                """,
-                    (today, upcoming_date),
-                )
 
-                user_reminders = c.fetchall()
-                
-                for name, category, amount, due_date, status in user_reminders:
-                    reminders.append(
-                        {
-                            "user_id": user_id,
-                            "name": name,
-                            "category": category,
-                            "amount": amount,
-                            "due_date": due_date,
-                            "status": status,
-                        }
-                    )
-        return reminders
-    except Exception as e:
-        ErrorHandler().handle(e, context="Error in check_due_dates function")
-        return []
+# async def update_payment_status(user_id: int, name: str, status: str):
+#     """Change payment status (pending → paid, overdue → paid, etc.)."""
+#     conn = await create_async_pg_conn()
+#     await ensure_user(user_id)
+#     try:
+#         await conn.execute("""
+#             UPDATE fintech_payments
+#             SET status = $1, updated_at = now()
+#             WHERE user_id = $2 AND name ILIKE $3
+#         """, status, user_id, name)
+#         return True
+#     except Exception as e:
+#         error_handler.handle(e, context="update_payment_status")
+#         return False
+#     finally:
+#         await conn.close()
 
+
+# # -------------------------------------------------------------
+# # DUE-DATE REMINDERS
+# # -------------------------------------------------------------
+# async def check_due_dates():
+#     """
+#     Find upcoming payments within 7 days that are active and not yet paid.
+#     """
+#     conn = await create_async_pg_conn()
+#     reminders = []
+#     try:
+#         today = datetime.now().date()
+#         week_ahead = today + timedelta(days=7)
+
+#         rows = await conn.fetch("""
+#             SELECT user_id, name, category, amount,
+#                    due_date, status, frequency
+#             FROM fintech_payments
+#             WHERE status IN ('pending','active')
+#               AND due_date BETWEEN $1 AND $2
+#             ORDER BY due_date ASC
+#         """, today, week_ahead)
+
+#         for r in rows:
+#             reminders.append({
+#                 "user_id": r["user_id"],
+#                 "name": r["name"],
+#                 "category": r["category"],
+#                 "amount": float(r["amount"]),
+#                 "due_date": r["due_date"].strftime("%Y-%m-%d") if r["due_date"] else None,
+#                 "status": r["status"],
+#                 "frequency": r["frequency"]
+#             })
+#         return reminders
+#     except Exception as e:
+#         error_handler.handle(e, context="check_due_dates")
+#         return []
+#     finally:
+#         await conn.close()

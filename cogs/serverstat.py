@@ -19,7 +19,7 @@ class ServerStat(commands.Cog):
     @tasks.loop(minutes=20)
     async def update_stats(self):
         for guild in self.client.guilds:
-            state = ServerStatManager.get_server_state(guild.id)
+            state = await ServerStatManager.get_server_state(guild.id)
 
             if state == "on":
                 member_count = guild.member_count
@@ -78,7 +78,7 @@ class ServerStat(commands.Cog):
     async def on_ready(self):
         # Check the state of each guild when bot is ready
         for guild in self.client.guilds:
-            state = ServerStatManager.get_server_state(guild.id)
+            state = await ServerStatManager.get_server_state(guild.id)
             if state:
                 print(f"Data found for guild {guild.name}: State = {state}")
             else:
@@ -109,7 +109,7 @@ class ServerStat(commands.Cog):
             await interaction.response.defer()
             guild_id = interaction.guild.id
             state = "on" if state == "on" else "off"  # Ensures only "on" or "off" is stored
-            ServerStatManager.set_server_state(guild_id, state)  # Use DatabaseManager to set server state
+            await ServerStatManager.set_server_state(guild_id, state)  # Use DatabaseManager to set server state
 
             await interaction.followup.send(f"Server_stat set to '{state}' for {interaction.guild.name}")
             await self.update_stats()
@@ -131,7 +131,7 @@ class ServerStat(commands.Cog):
         """
         Triggered when the bot is added to a guild.
         """
-        inphinithy = await self.client.fetch_user(755872891601551511)
+        inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
         await inphinithy.send(f"Joined new guild: {guild.name} ({guild.id})")
 
     @commands.Cog.listener()
@@ -139,9 +139,9 @@ class ServerStat(commands.Cog):
         """
         Triggered when the bot is removed from a guild.
         """
-        inphinithy = await self.client.fetch_user(755872891601551511)
+        inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
         await inphinithy.send(f"Left guild: {guild.name} ({guild.id})")
-        ServerStatManager.set_server_state(guild.id, "off")
+        await ServerStatManager.set_server_state(guild.id, "off")
 
 
 async def setup(client):
