@@ -109,6 +109,8 @@ class Episode:
     @classmethod
     def from_dict(cls, data: Optional[dict]) -> Optional["Episode"]:
         """Build Episode from dict (from DB or API)"""
+        #print("Building Episode from dict:", type(data))
+        data = json.loads(data) if isinstance(data, str) else data
         if not data:
             return None
         return cls(
@@ -162,6 +164,7 @@ class Series(Media):
     @classmethod
     def from_db(cls, data: dict) -> "Series":
         """Build Series from database row"""
+       # print("Building Series from DB:", data)
         last_episode = Episode.from_dict(data.get("last_episode_to_air"))
         next_episode = Episode.from_dict(data.get("next_episode_to_air"))
         return cls(
@@ -353,6 +356,8 @@ class UserMedia:
     # Dates
     last_updated: Optional[datetime] = None
 
+    last_episode_info: Optional[Dict[str, Any]] = None
+
     # Series-only
     next_episode_info: Optional[Dict[str, Any]] = None
 
@@ -402,7 +407,21 @@ class UserMedia:
             label += f" — {name}"
 
         return f"{label}\nAirs: {air_date}"
+    @property
+    def last_episode_text(self) -> Optional[str]:
+        if not self.last_episode_info:
+            return None
 
+        season = self.last_episode_info.get("season_number", "?")
+        episode = self.last_episode_info.get("episode_number", "?")
+        air_date = self.last_episode_info.get("air_date", "Unknown")
+        name = self.last_episode_info.get("name")
+
+        label = f"S{season}E{episode}"
+        if name:
+            label += f" — {name}"
+
+        return f"{label}\nAired: {air_date}"
     @property
     def progress_text(self) -> Optional[str]:
         """
@@ -452,6 +471,17 @@ class UserMedia:
                     "value": self.next_episode_text,
                     "inline": False
                 })
+            else:
+                data["fields"].append({
+                    "name": "Next Episode",
+                    "value": "No upcoming episodes scheduled",
+                    "inline": False
+                })
+                data["fields"].append({
+                    "name": "Latest Release",
+                    "value": self.last_episode_text if self.last_episode_info else "No episodes aired yet",
+                    "inline": False
+                })
 
         else:
             data["description"] = "✓ Watched" if self.is_completed else "Not watched yet"
@@ -486,13 +516,19 @@ class UserMedia:
 
     @classmethod
     def from_db(cls, row: Dict[str, Any]) -> "UserMedia":
-        print(type(row["next_episode_info"]), row["next_episode_info"])
+       # print(type(row["next_episode_info"]), row["next_episode_info"])
         next_episode = None
         progress = None
+        last_episode = None
         if isinstance(row.get("next_episode_info"), str):
             next_episode = json.loads(row["next_episode_info"]) if row["next_episode_info"] else None
-        if isinstance(row.get("progress"), str):
-            progress = json.loads(row["progress"]) if row["progress"] else None
+        if isinstance(row.get("user_progress"), str):
+            progress = json.loads(row["user_progress"]) if row["user_progress"] else None
+        if isinstance(row.get("last_episode_info"), str):
+            last_episode = json.loads(row["last_episode_info"]) if row["last_episode_info"] else None
+        print("Parsed next_episode_info:", next_episode)
+        print("Parsed user_progress:", progress)
+        print("Parsed last_episode_info:", last_episode)
         return cls(
             id=row["id"],
             media_type=MediaType.find_media_type(row["media_type"]),
@@ -503,6 +539,7 @@ class UserMedia:
             media_status=row.get("media_status") or row.get("status"),
             user_status=row.get("user_status", ""),
             progress=progress,
+            last_episode_info=last_episode,
             last_updated=row.get("last_updated"),
             next_episode_info=next_episode,
         )

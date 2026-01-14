@@ -77,6 +77,7 @@ class MediaType(Enum):
     @classmethod
     def find_media_type(cls, type_str: str):
         mapping = {
+            "movies": cls.MOVIE,
             "movie": cls.MOVIE,
             "tv": cls.SERIES,
             "series": cls.SERIES

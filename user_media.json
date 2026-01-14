@@ -1,0 +1,888 @@
+[
+    {
+        "title": "a whisker away",
+        "type": "movie"
+    },
+    {
+        "title": "the boy and the herion",
+        "type": "movie"
+    },
+    {
+        "title": "kraven the hunter",
+        "type": "movie"
+    },
+    {
+        "title": "red notice",
+        "type": "movie"
+    },
+    {
+        "title": "crazy stupid love",
+        "type": "movie"
+    },
+    {
+        "title": "spellbound",
+        "type": "movie"
+    },
+    {
+        "title": "furiosa mad max saga",
+        "type": "movie"
+    },
+    {
+        "title": "batman ninja vs yakuza league",
+        "type": "movie"
+    },
+    {
+        "title": "moana 2",
+        "type": "movie"
+    },
+    {
+        "title": "watchmen 1",
+        "type": "movie"
+    },
+    {
+        "title": "watchmen 2",
+        "type": "movie"
+    },
+    {
+        "title": "sinners",
+        "type": "movie"
+    },
+    {
+        "title": "kpop demon hunters",
+        "type": "movie"
+    },
+    {
+        "title": "happy gilmore 2",
+        "type": "movie"
+    },
+    {
+        "title": "superman",
+        "type": "movie"
+    },
+    {
+        "title": "the fantastic 4: first steps",
+        "type": "movie"
+    },
+    {
+        "title": "saga of tanya the evil: the movie",
+        "type": "movie"
+    },
+    {
+        "title": "coraline",
+        "type": "movie"
+    },
+    {
+        "title": "megan 2.0",
+        "type": "movie"
+    },
+    {
+        "title": "weapons",
+        "type": "movie"
+    },
+    {
+        "title": "now you see me: now you don't",
+        "type": "movie"
+    },
+    {
+        "title": "wake up dead man: a knives out mystery",
+        "type": "movie"
+    },
+    {
+        "title": "dan da dan",
+        "season": 1,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "a condition called love",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "my adventures with superman",
+        "season": 2,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "chained soldier",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "the daily life of the immortal king",
+        "season": 5,
+        "episode": 3,
+        "type": "series"
+    },
+    {
+        "title": "the dragon prince",
+        "season": 7,
+        "episode": 9,
+        "type": "series"
+    },
+    {
+        "title": "fairy tail: 100 years quest",
+        "season": 2,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "frieren: beyond journey's end",
+        "season": 1,
+        "episode": 28,
+        "type": "series"
+    },
+    {
+        "title": "halo",
+        "season": 2,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "harley quinn",
+        "season": 5,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "hazbin hotel",
+        "season": 2,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "helluva boss ",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "invincible",
+        "season": 3,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "suicide squad isekai",
+        "season": 1,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "jobless reincarnation ",
+        "season": 2,
+        "episode": 25,
+        "type": "series"
+    },
+    {
+        "title": "jurassic world: chaos theory",
+        "season": 4,
+        "episode": 9,
+        "type": "series"
+    },
+    {
+        "title": "kaiju no. 8",
+        "season": 1,
+        "episode": 23,
+        "type": "series"
+    },
+    {
+        "title": "kite man: hell yeah!",
+        "season": 1,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "love, death & robots",
+        "season": 4,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "moon knight",
+        "season": 1,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "tsukimichi: moonlit fantasy",
+        "season": 2,
+        "episode": 25,
+        "type": "series"
+    },
+    {
+        "title": "nier: automata ver1.1a",
+        "season": 1,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "peaky blinders",
+        "season": 6,
+        "episode": 6,
+        "type": "series"
+    },
+    {
+        "title": "percy jackson and the olympians",
+        "season": 2,
+        "episode": 3,
+        "type": "series"
+    },
+    {
+        "title": "re: monster",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "re:zero \u2212 starting life in another world",
+        "season": 3,
+        "episode": 16,
+        "type": "series"
+    },
+    {
+        "title": "reginald the vampire ",
+        "season": 2,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "that time i got reincarnated as a slime",
+        "season": 3,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "the reincarnation of the strongest exorcist in another world",
+        "season": 1,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "the returner's magic should be special",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "the richest man in game",
+        "season": 1,
+        "episode": 16,
+        "type": "series"
+    },
+    {
+        "title": "rick and morty",
+        "season": 8,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "scott pilgrim takes off",
+        "season": 1,
+        "episode": 9,
+        "type": "series"
+    },
+    {
+        "title": "solo levelling",
+        "season": 2,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "strong girl nam-soon ",
+        "season": 1,
+        "episode": 16,
+        "type": "series"
+    },
+    {
+        "title": "sweet home",
+        "season": 3,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "ted",
+        "season": 1,
+        "episode": 9,
+        "type": "series"
+    },
+    {
+        "title": "the boys ",
+        "season": 4,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "tower of god",
+        "season": 2,
+        "episode": 26,
+        "type": "series"
+    },
+    {
+        "title": "train to the end of the world",
+        "season": 1,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "undead unluck ",
+        "season": 1,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "wondla",
+        "season": 5,
+        "episode": 6,
+        "type": "series"
+    },
+    {
+        "title": "twilight of the gods",
+        "season": 1,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "demon lord 2099",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "the legend of vox machina",
+        "season": 3,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "one piece",
+        "season": 22,
+        "episode": 1122,
+        "type": "series"
+    },
+    {
+        "title": "secret level",
+        "season": 1,
+        "episode": 15,
+        "type": "series"
+    },
+    {
+        "title": "alya sometimes hides her feelings in russian",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "squid game",
+        "season": 3,
+        "episode": 6,
+        "type": "series"
+    },
+    {
+        "title": "what if",
+        "season": 3,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "shangri-la frontier",
+        "season": 2,
+        "episode": 25,
+        "type": "series"
+    },
+    {
+        "title": "is it wrong to pick up girls in a dungeon?",
+        "season": 5,
+        "episode": 15,
+        "type": "series"
+    },
+    {
+        "title": "x men 97",
+        "season": 1,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "billy the kid",
+        "season": 3,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "castlevania",
+        "season": 4,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "made in abyss",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "claymore",
+        "season": 1,
+        "episode": 26,
+        "type": "series"
+    },
+    {
+        "title": "overlord",
+        "season": 4,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "ubel blatt",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "no longer allowed in another world",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "devil may cry",
+        "season": 1,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "knuckles",
+        "season": 1,
+        "episode": 6,
+        "type": "series"
+    },
+    {
+        "title": "to be hero x",
+        "season": 1,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "erased",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "severance",
+        "season": 2,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "the beginning after the end",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "the all-devouring whale: homecoming",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "gargantia on the verdurous planet",
+        "season": 1,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "those about to die",
+        "season": 1,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "solar opposites",
+        "season": 6,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "demon slayer: kimetsu no yaiba",
+        "season": 5,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "bungo stray dogs",
+        "season": 5,
+        "episode": 11,
+        "type": "series"
+    },
+    {
+        "title": "classroom of the elite",
+        "season": 3,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "i was reincarnated as the 7th prince so i can take my time perfecting my magical ability",
+        "season": 1,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "konosuba -god's blessing on this wonderful world!",
+        "season": 3,
+        "episode": 11,
+        "type": "series"
+    },
+    {
+        "title": "your friendly neighborhood spider-man",
+        "season": 1,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "murderbot",
+        "season": 1,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "bofuri: i don't want to get hurt, so i'll max out my defense",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "the brilliant healer's new life in the shadows",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "synduality noir",
+        "season": 1,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "fallout",
+        "season": 1,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "blood blockade battlefront",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "alice in borderland",
+        "season": 3,
+        "episode": 6,
+        "type": "series"
+    },
+    {
+        "title": "phineas and ferb",
+        "season": 5,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "call of the night",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "lord of mysteries",
+        "season": 1,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "creature commandos",
+        "season": 1,
+        "episode": 7,
+        "type": "series"
+    },
+    {
+        "title": "ironheart",
+        "season": 1,
+        "episode": 6,
+        "type": "series"
+    },
+    {
+        "title": "cyberpunk: edgerunners",
+        "season": 1,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "dota: dragon's blood",
+        "season": 3,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "metallic rouge",
+        "season": 1,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "blood of zeus",
+        "season": 3,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "apocalypse bringer mynoghra: world conquest starts with the civilization of ruin",
+        "season": 1,
+        "episode": 9,
+        "type": "series"
+    },
+    {
+        "title": "lazarus",
+        "season": 1,
+        "episode": 13,
+        "type": "series"
+    },
+    {
+        "title": "clevatess",
+        "season": 1,
+        "episode": 9,
+        "type": "series"
+    },
+    {
+        "title": "the sandman",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "tires",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "daredevil: born again",
+        "season": 1,
+        "episode": 9,
+        "type": "series"
+    },
+    {
+        "title": "in another world with my smartphone",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "black clover",
+        "season": 1,
+        "episode": 171,
+        "type": "series"
+    },
+    {
+        "title": "the rising of the shield hero",
+        "season": 4,
+        "episode": 7,
+        "type": "series"
+    },
+    {
+        "title": "wednesday",
+        "season": 2,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "eyes of wakanda",
+        "season": 1,
+        "episode": 4,
+        "type": "series"
+    },
+    {
+        "title": "grand blue dreaming",
+        "season": 2,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "gachiakuta",
+        "season": 1,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "dr stone",
+        "season": 4,
+        "episode": 24,
+        "type": "series"
+    },
+    {
+        "title": "raised by wolves",
+        "season": 2,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "saga of tanya the evil",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "mission: yozakura family",
+        "season": 2,
+        "episode": 1,
+        "type": "series"
+    },
+    {
+        "title": "the summer hikaru died",
+        "season": 1,
+        "episode": 9,
+        "type": "series"
+    },
+    {
+        "title": "juni taisen: zodiac war",
+        "season": 1,
+        "episode": 2,
+        "type": "series"
+    },
+    {
+        "title": "the haunted palace",
+        "season": 1,
+        "episode": 7,
+        "type": "series"
+    },
+    {
+        "title": "the cuphead show!",
+        "season": 1,
+        "episode": 2,
+        "type": "series"
+    },
+    {
+        "title": "the amazing world of gumball",
+        "season": 2,
+        "episode": 30,
+        "type": "series"
+    },
+    {
+        "title": "sanda",
+        "season": 1,
+        "episode": 11,
+        "type": "series"
+    },
+    {
+        "title": "marvel zombies",
+        "season": 1,
+        "episode": 4,
+        "type": "series"
+    },
+    {
+        "title": "stranger things",
+        "season": 5,
+        "episode": 5,
+        "type": "series"
+    },
+    {
+        "title": "the amazing digital circus",
+        "season": 1,
+        "episode": 8,
+        "type": "series"
+    },
+    {
+        "title": "dusk beyond the end of the world",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "farming life in another world",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "worldend: what do you do at the end of the world? are you busy? will you save us?",
+        "season": 1,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "log horizon",
+        "season": 3,
+        "episode": 12,
+        "type": "series"
+    },
+    {
+        "title": "haunted hotel",
+        "season": 1,
+        "episode": 10,
+        "type": "series"
+    },
+    {
+        "title": "Spider-Man: Brand New Day",
+        "type": "watchlist_movie"
+    },
+    {
+        "title": "Your Letter",
+        "type": "watchlist_movie"
+    },
+    {
+        "title": "The Naked Gun",
+        "type": "watchlist_movie"
+    },
+    {
+        "title": "Die My Love",
+        "type": "watchlist_movie"
+    },
+    {
+        "title": "Wonder Man",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "fantasy high",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "The Mighty Nein",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "worldend",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "World's End",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "Sentenced to Be a Hero",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "Fate/strange Fake",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "cashhero",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "in the clear moonlight dusk",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "TRIGUN",
+        "type": "watchlist_series"
+    },
+    {
+        "title": "Monarch: Legacy of Monsters",
+        "type": "watchlist_series"
+    }
+]

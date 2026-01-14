@@ -26,13 +26,12 @@ async def add_or_update_user_movie(user_id: int, title: str, tmdb_id:int=None,wa
         # 1. Look up or insert movie into movies table
         media_data = await get_cached_media(MediaType.MOVIE.value, title)
         db_id = media_data.id if media_data else None
-        print("Cached media data:", media_data)
+        
         if media_data is None:
             media_data, db_id = await cache_media(MediaType.MOVIE.value, tmdb_id) 
         if media_data is None:
             raise ValueError("Failed to fetch or cache movie data.")
         # 2. Insert or update user_media record
-        print(media_data)
         row = await conn.upsert("user_media", data={
             "user_id": user_id,
             "media_id": db_id,
@@ -54,7 +53,7 @@ async def add_or_update_user_series(user_id: int, title: str, season=None, episo
         
         media_data = await get_cached_media(MediaType.SERIES.value, title)
         db_id = media_data.id if media_data else None
-        print("Cached media data:", media_data)
+       # print("Cached media data:", media_data)
         if media_data is None:
             media_data,id = await cache_media(MediaType.SERIES.value, tmdb_id)
             db_id = id
@@ -178,7 +177,7 @@ async def get_cached_media(media_type: str, title: str):
     conn = await Rimiru.shion()
     try:
         table = MediaType.find_media_type(media_type).table_name
-        print(f"Looking for cached media: {media_type} - {title}, table: {table}")
+        #print(f"Looking for cached media: {media_type} - {title}, table: {table}")
         if not table:
             return None
         if table == "movies":
@@ -214,13 +213,13 @@ async def cache_media(media_type: str,tmdb_id: str):
 
         media_data = await get_media_details(media_type.value, tmdb_id)
         row = await conn.upsert("media", data=media_data.to_media_dict(), conflict_column="tmdb_id")
-        print(row)
+        #print(row)
         insert_data = media_data.to_db_dict()
         insert_data["id"] = row["id"]
-        print("Insert data for specific table:", insert_data)
+        #print("Insert data for specific table:", insert_data)
         await conn.upsert(f"{table}", data=insert_data, conflict_column="id")
         
-        print("Cached media:", media_data.title)
+        #print("Cached media:", media_data.title)
         return media_data, row["id"]
     except Exception as e:
         error_handler.handle(e, context="cache_media")
@@ -233,7 +232,7 @@ async def search_media_multiple(media_type: str, name: str):
         List of dicts: [{id, title, year, poster_url, overview, similarity_score}, ...]
     """
     url = f"{MOVIE_BASE_URL}/search/{media_type}?query={name.replace(' ', '+')}&api_key={MOVIE_API_KEY}"
-    print(url)
+    #print(url)
     
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as r:
@@ -287,7 +286,7 @@ async def get_media_details(media_type: str, media_id: str = None):
 
     async with aiohttp.ClientSession() as session:
         url = f"{MOVIE_BASE_URL}/{media_type}/{media_id}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
-        print(url)
+        #print(url)
         async with session.get(url) as resp:
             data = await resp.json()
 
@@ -433,13 +432,14 @@ async def send_upcoming_episode_reminders(client):
                     params=[user_id, 7],
                     fetch_type=FetchType.FETCH
                 )
+                
                 reminders = [Series.from_db(dict(r)) for r in reminders]
                 
                 if reminders:
                     user_reminders.append((user_id, reminders))
             except Exception as e:
                 error_handler.handle(e, context=f"fetch_reminders_{user_id}")
-                continue  # FIXED: Continue instead of return
+                continue  
         
         if not user_reminders:
             print("[REMINDERS] No upcoming episodes to notify about")
@@ -677,3 +677,4 @@ async def start_background_updaters(client):
         asyncio.create_task(send_upcoming_episode_reminders(client))
     ]
     await asyncio.gather(*tasks)
+    

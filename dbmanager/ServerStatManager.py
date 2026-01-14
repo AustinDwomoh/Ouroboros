@@ -12,6 +12,8 @@ async def get_server_state(guild_id: int):
     conn = await Rimiru.shion()
     try:       
         val = await conn.select("servers", columns=["state"], filters={"guild_id": guild_id})
+        if not val:
+            return "off"
         return val[0]['state'] or "off"
     except Exception as e:
         error_handler.handle(e, context="get_server_state")
