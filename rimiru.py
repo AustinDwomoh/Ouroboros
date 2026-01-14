@@ -135,28 +135,31 @@ class Rimiru:
                     :param data: Dictionary of column-value pairs
                     :param conflict_column: Column name to check for conflicts
             """
-        columns = list(data.keys())
-        values = [
-            json.dumps(v) if isinstance(v, (dict, list)) else v
-            for v in data.values()
-        ]
+        try:
+            columns = list(data.keys())
+            values = [
+                json.dumps(v) if isinstance(v, (dict, list)) else v
+                for v in data.values()
+            ]
 
-        placeholders = ", ".join(f"${i+1}" for i in range(len(values)))
-        cols = ", ".join(columns)
-        update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in columns if k != conflict_column)
+            placeholders = ", ".join(f"${i+1}" for i in range(len(values)))
+            cols = ", ".join(columns)
+            update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in columns if k != conflict_column)
 
-        sql = f"""
-            INSERT INTO {table} ({cols}) 
-            VALUES ({placeholders})
-            ON CONFLICT ({conflict_column}) 
-            DO UPDATE SET {update_cols}
-            RETURNING *;
-        """
+            sql = f"""
+                INSERT INTO {table} ({cols}) 
+                VALUES ({placeholders})
+                ON CONFLICT ({conflict_column}) 
+                DO UPDATE SET {update_cols}
+                RETURNING *;
+            """
 
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow(sql, *values) 
-            return dict(row) if row else None
-
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(sql, *values) 
+                return dict(row) if row else None
+        except Exception as e:
+            print(f"Error during upsert into {table}: {e}")
+            raise
         # -------------------------
         # DELETE
     # -------------------------
