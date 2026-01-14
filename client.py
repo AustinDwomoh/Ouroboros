@@ -2,10 +2,11 @@ from time import time
 
 import asyncpg, discord, logging
 from discord.ext import commands
+from pyparsing import Path
 from rimiru import Rimiru
 from settings import *
 from dbmanager import MovieManager
-from gather_data import NotificationManager
+from old_migrations.gather_data import NotificationManager
 
 # Logging setup
 logging.basicConfig(level=logging.DEBUG)
@@ -52,14 +53,21 @@ class Client(commands.Bot):
         state = (message.author.id in ALLOWED_ID) and (message.content.strip() == "$GodOfLies")
         print("State:", state)
         print("Author ID:", message.author.id," Allowed IDs:", ALLOWED_ID)
-        
+          
+        with open(Path("old_migrations/data") / "user_ids.json", 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        print(len(data), "user IDs found.")
+        conn = await Rimiru.shion()
+        print("Connection established successfully.")
+        append_count = 0
 
-        if state:
-            await message.channel.send("Ready to serve, Master.")
-            await NotificationManager.notify_users(self)
-            await message.add_reaction("✅")
-            return  # stop ONLY this message # Ignore messages from users not in ALLOWED_ID
-       
+        for user_id in data:
+            print(f"Inserting user ID: {user_id}")
+            append_count += 1
+            await conn.upsert(
+                    "users", {"discord_id": user_id,"username": f"{user_id} + Not found"}, conflict_column="discord_id"
+                )
+            print(f"Inserted user ID: {user_id}")
         await self.process_commands(message)
      
         # -------------------------------------------------

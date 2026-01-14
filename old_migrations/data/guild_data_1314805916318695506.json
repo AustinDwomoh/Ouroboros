@@ -1,0 +1,25 @@
+{
+    "guild_id": 1314805916318695506,
+    "welcome_channel_id": null,
+    "goodbye_channel_id": null,
+    "chat_channel_id": "Null",
+    "signup_channel_id": "Null",
+    "fixtures_channel_id": "Null",
+    "tourstate": "Null",
+    "state": "off",
+    "player_role": "off",
+    "tour_manager_role": "Tour Player",
+    "winner_role": "Tour manager",
+    "notification_channel_id": null,
+    "levels": {
+        "683696000065470550": {
+            "level": 5,
+            "xp": 1
+        },
+        "755872891601551511": {
+            "level": 5,
+            "xp": 1
+        }
+    },
+    "efootball_scores": {}
+}

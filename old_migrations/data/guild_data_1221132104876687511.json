@@ -1,0 +1,57 @@
+{
+    "guild_id": 1221132104876687511,
+    "welcome_channel_id": 1221132105971531811,
+    "goodbye_channel_id": 1221132105971531811,
+    "chat_channel_id": "Null",
+    "signup_channel_id": "Null",
+    "fixtures_channel_id": "Null",
+    "tourstate": "Null",
+    "state": "off",
+    "player_role": "off",
+    "tour_manager_role": "Tour Player",
+    "winner_role": "Tour manager",
+    "notification_channel_id": 1221132105971531811,
+    "levels": {
+        "518426279079313408": {
+            "level": 10,
+            "xp": 1
+        },
+        "543859303593934848": {
+            "level": 10,
+            "xp": 1
+        },
+        "733744165191418031": {
+            "level": 5,
+            "xp": 1
+        },
+        "747110176259047495": {
+            "level": 30,
+            "xp": 2
+        },
+        "755872891601551511": {
+            "level": 83,
+            "xp": 6
+        },
+        "761500124043411457": {
+            "level": 5,
+            "xp": 1
+        },
+        "1304303225989627927": {
+            "level": 60,
+            "xp": 1
+        },
+        "1311116889593745510": {
+            "level": 70,
+            "xp": 1
+        },
+        "1408525814601093321": {
+            "level": 15,
+            "xp": 1
+        },
+        "1416555553777258578": {
+            "level": 15,
+            "xp": 1
+        }
+    },
+    "efootball_scores": {}
+}

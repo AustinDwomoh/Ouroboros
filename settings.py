@@ -219,8 +219,6 @@ class ErrorHandler:
             loop.run_until_complete(
                 self._send_discord_webhook(error, context, traceback_text, log_path, timestamp)
             )
-        except Exception as e:
-            self._log_notification_failure(e)
         finally:
             loop.close()
 

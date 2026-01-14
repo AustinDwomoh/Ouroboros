@@ -10,7 +10,6 @@ from pathlib import Path
 from dbmanager.MovieManager import (
     add_or_update_user_movie,
     add_or_update_user_series,
-    add_to_watchlist,
     search_media_multiple,
     MediaType
 )

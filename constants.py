@@ -1,4 +1,3 @@
-
 from discord import Enum
 import discord
 from settings import ALLOWED_ID
@@ -20,12 +19,10 @@ class gameType(Enum):
                 return gtype
         return None
 
-
 class FetchType(Enum):
     FETCH = "fetch"
     FETCHVAL = "fetchval"
     FETCHROW = "fetchrow"
-
 
 class channelType(Enum):
     WELCOME = "welcome"
@@ -66,6 +63,7 @@ class WatchStatus(Enum):
     PAUSED = "paused"
     DROPPED = "dropped"
     PLANNED = "planned"
+
 class MediaType(Enum):
     MOVIE = "movie"
     SERIES = "tv" 
@@ -95,6 +93,7 @@ class MediaType(Enum):
             MediaType.SERIES: "series"
         }
         return tables[self]
+
 class Roles(Enum):
     PLAYER = "player_role"
     TOUR_MANAGER = "tour_manager_role"
