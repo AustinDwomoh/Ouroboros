@@ -30,7 +30,7 @@ jobs:
           script: |
             set -euo pipefail
 
-            cd ~/Ourobors-fixed
+            cd ~/Ouroboros
 
             # Activate virtualenv
             source ouroboros/bin/activate
