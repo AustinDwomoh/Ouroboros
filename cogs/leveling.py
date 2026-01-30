@@ -15,6 +15,8 @@ class Levelling(commands.Cog):
         try:
             if message.author.bot:
                 return  # Ignore bot messages
+            if message.guild is None:
+                return  # Ignore DMs
             guild_id = message.guild.id
             user_id = message.author.id
             # Fetch the user's XP and level, or initialize them

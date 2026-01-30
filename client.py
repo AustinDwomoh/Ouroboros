@@ -6,7 +6,6 @@ from pyparsing import Path
 from rimiru import Rimiru
 from settings import *
 from dbmanager import MovieManager
-from old_migrations.gather_data import NotificationManager
 
 # Logging setup
 logging.basicConfig(level=logging.DEBUG)
@@ -26,6 +25,8 @@ class Client(commands.Bot):
         self.synced = False
         self.db_pool: asyncpg.Pool | None = None
         self._seen_users: dict[int, float] = {}
+        self.pending_announcements = {}
+        self.pending_previews = {}
 
     async def setup_hook(self):
         self.db = await Rimiru.shion() 
@@ -46,28 +47,88 @@ class Client(commands.Bot):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """This meant to b used for updates to users"""
         if message.author.bot:
-            return  # Ignore messages from bots
-        print("Message received:", message.content)
-        state = (message.author.id in ALLOWED_ID) and (message.content.strip() == "$GodOfLies")
-        print("State:", state)
-        print("Author ID:", message.author.id," Allowed IDs:", ALLOWED_ID)
-          
-        with open(Path("old_migrations/data") / "user_ids.json", 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        print(len(data), "user IDs found.")
-        conn = await Rimiru.shion()
-        print("Connection established successfully.")
-        append_count = 0
+            return
 
-        for user_id in data:
-            print(f"Inserting user ID: {user_id}")
-            append_count += 1
-            await conn.upsert(
-                    "users", {"discord_id": user_id,"username": f"{user_id} + Not found"}, conflict_column="discord_id"
-                )
-            print(f"Inserted user ID: {user_id}")
+        uid = message.author.id
+        content = message.content.strip().lower()
+
+        # ARM
+        if uid in ALLOWED_ID and content == "$godoflies":
+            self.pending_announcements[uid] = True
+            await message.channel.send("📝 Announcement mode armed. Send the content.")
+            return
+
+        # BUILD PREVIEW
+        if uid in self.pending_announcements:
+            user_id = self.pending_announcements.pop(uid)
+
+            title, summary, body, footer = self.parse_announcement(message.content)
+
+            embed = discord.Embed(
+                title=title,
+                description=body,
+                color=discord.Color.gold(),
+                timestamp=discord.utils.utcnow()
+            )
+
+            if summary:
+                embed.add_field(name="Summary", value=summary, inline=False)
+
+            embed.set_footer(text=footer or f"Posted by {message.author.display_name}")
+
+            self.pending_previews[uid] = embed
+
+            await message.author.send(
+                "👀 **Announcement Preview**\n"
+                "Type `confirm` to publish or `cancel` to discard."
+            )
+            await message.author.send(embed=embed)
+            return
+
+        # CONFIRM / CANCEL
+        if uid in self.pending_previews:
+            if content == "cancel":
+                self.pending_previews.pop(uid)
+                await message.author.send("❌ Announcement cancelled.")
+                return
+
+            if content == "confirm":
+                embed = self.pending_previews.pop(uid)
+                for guild in self.guilds:
+                    news_channels = [
+                        ch for ch in guild.channels
+                        if ch.type == discord.ChannelType.news
+                        and ch.permissions_for(guild.me).send_messages
+                        and ch.permissions_for(guild.me).manage_messages
+                    ]
+
+                    # CASE A — announcement channels exist
+                    if news_channels:
+                        for ch in news_channels:
+                            try:
+                                msg = await ch.send(embed=embed)
+                                await msg.publish()
+                            except Exception as e:
+                                print(f"Publish failed in {ch.name}: {e}")
+                        return
+
+                    # CASE B — fallback to system or current channel
+                    fallback_channel = (
+                        guild.system_channel
+                        if guild.system_channel
+                        and guild.system_channel.permissions_for(guild.me).send_messages
+                        else None
+                    )
+                    if fallback_channel:
+                        await fallback_channel.send(embed=embed)
+                        await message.channel.send(
+                            "⚠️ No announcement channels found. Sent as a normal message instead."
+                        )
+
+                await message.author.send("✅ Announcement published.")
+                return
+
         await self.process_commands(message)
      
         # -------------------------------------------------
@@ -87,6 +148,22 @@ class Client(commands.Bot):
             )
 
         self._seen_users[uid] = now
+    
+    def parse_announcement(self, raw: str):
+        sections = [s.strip() for s in raw.split("---")]
+
+        # header
+        if "|" in sections[0]:
+            title, summary = map(str.strip, sections[0].split("|", 1))
+        else:
+            title = sections[0]
+            summary = None
+
+        body = sections[1] if len(sections) > 1 else ""
+        footer = sections[2] if len(sections) > 2 else None
+
+        return title, summary, body, footer
+
 
     # -------------------------------------------------
     # Discord Events

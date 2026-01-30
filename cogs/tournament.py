@@ -512,7 +512,6 @@ class DailyTournament(commands.Cog):
     async def register_player(self, interaction: discord.Interaction, guild_id: int):
         """Register a player for the tournament"""
         tournament = self.get_tournament(guild_id)
-        print(tournament)
         player_role = self.player_roles.get(guild_id)
         channels = self.channels.get(guild_id, {})
         chat_channel = channels.get(channelType.CHAT)
@@ -531,7 +530,6 @@ class DailyTournament(commands.Cog):
 
         # Register player
         tournament.players.append(interaction.user.id)
-        print(tournament)
         await interaction.user.add_roles(player_role)
         
         if chat_channel:

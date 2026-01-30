@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ext import commands
 from dbmanager import MovieManager
 from views.movieView import MediaSelectionView, create_selection_embed
-
+from constants import MediaType
 
 errorHandler = ErrorHandler()
 
@@ -121,7 +121,6 @@ class Movies(commands.Cog):
                 await interaction.followup.send(embed=embed, view=view)
                 return
             else:
-                print("Single media option found:", media_options)
                 media = media_options[0]
                 if "tmdb_id" in media: #since there are times the api will return only one page and an accrute one so tmdb_id will be there but as id
                     tmbd_id = media['tmdb_id']
@@ -216,10 +215,11 @@ class Movies(commands.Cog):
     # ============================================================================ #
 
     @app_commands.command(name="watchlist", description="View your watchlist for movies or series. Shows up to 10 items.")
+    @app_commands.describe(media_type="Type of media: movie or series")
     @app_commands.dm_only()
     async def view_watchlist(
         self,
-        interaction: discord.Interaction
+        interaction: discord.Interaction,media_type: str = None
          ):
         """View user's watchlist."""
         await interaction.response.defer(ephemeral=True)
@@ -233,12 +233,22 @@ class Movies(commands.Cog):
                 )
                 return
             
+            
             embed = discord.Embed(
             title=f"Your Watchlist",
             description=f"You have {len(watchlist_items)} item(s) in your watchlist",
             color=discord.Color.blue()
             )
-
+            if media_type:
+                watchlist_items = [item for item in watchlist_items if item.get("media_type") == media_type]
+                embed.title = f"Your {media_type.title()} Watchlist"
+                embed.description = f"You have {len(watchlist_items)} {media_type.value}(s) in your watchlist"
+                if not watchlist_items:
+                    await interaction.followup.send(
+                        f"Your {media_type} watchlist is empty!"
+                    )
+                    return
+            
             for idx, item in enumerate(watchlist_items[:10]):
                 title = item.get("title") or "Unknown title"
 
@@ -260,21 +270,27 @@ class Movies(commands.Cog):
             await interaction.followup.send(f"Error: Failed to retrieve watchlist.", ephemeral=True)
 
     @app_commands.command(name="incomplete", description="Check what media you haven't finished watching")
+    @app_commands.describe(media_type="Type of media: movie or series")
     @app_commands.dm_only()
-    async def check_incomplete(self, interaction: discord.Interaction):
+    async def check_incomplete(self, interaction: discord.Interaction, media_type: str = None):
         """Check user's incomplete media."""
         await interaction.response.defer(ephemeral=True)
         
         try:
             incomplete_media = await MovieManager.check_user_completion(interaction.user.id)
-            
+            media_type = MediaType.find_media_type(media_type)
+          
             if not incomplete_media:
                 await interaction.followup.send(
                     "You're all caught up! No incomplete media found.",
                     ephemeral=True
                 )
                 return
-
+            if media_type:
+                incomplete_media = [
+                    media for media in incomplete_media
+                    if media.media_type == media_type
+                ]
             embed = discord.Embed(
                 title="Your Incomplete Media",
                 description=f"You have {len(incomplete_media)} item(s) to catch up on",
@@ -412,6 +428,8 @@ class Movies(commands.Cog):
     # ============================================================================ #
 
     @add_to_watchlist.autocomplete("media_type")
+    @view_watchlist.autocomplete("media_type")
+    @check_incomplete.autocomplete("media_type")
     async def media_type_autocomplete(
         self,
         interaction: discord.Interaction,

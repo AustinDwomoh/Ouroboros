@@ -8,6 +8,7 @@ Welcome to the **[OUROBOROS]** Discord bot repository! This bot is designed to a
 - **Custom Commands:** The bot includes commands to retrieve information, manage server settings, and more.
 - **Short Games:** Games like RPS and Number guesses.
 - **Efootball Tournament:** Automated scorekeeping and match results for server members with real-time updates to player stats.
+- **Media Commands:**  Designed to track and moniter user wacthlists and current wacthings
 
 ## Installation
  **Invite the bot to your server:**
@@ -48,11 +49,16 @@ This section outlines the available commands for **[Ouroboros]**.
 | `/set_welcome_channel` | used to set welcome channel|
 | `/set_goodye_channel` | used to set goodbye channel|
 | `/activate_tournament` | Activate the daily Tournamentfor the server played at intervals(one time call)|
-| `/delete_channels` | Deletes chanenls|
-| `/delete_categories` | Delete categories|
-| `/clear_messages` | Delete All messages in the called channel unless a spefic number is given|
 
 
+### Media Commands
+| Command | Description |
+| ------- | ----------- |
+| `/add_movie` |  Record it as watched|
+|`/add_series` | Record it as watched |
+| `/add_to_watchlist` | Add a series or movie to watchlist|
+| `/view_watchlist` | See your watchlist basedon media type|
+| `/incomplete` |check how far you are in to your series and movies|
 
 ## License
 

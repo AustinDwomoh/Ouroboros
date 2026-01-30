@@ -316,7 +316,7 @@ async def send_reminder_to_user(client, user_id: int, reminders: List[Series], s
         try:
             user = await client.fetch_user(user_id)
             if not user:
-                print(f"[REMINDERS] User {user_id} not found")
+ 
                 return
             
             # Send header embed

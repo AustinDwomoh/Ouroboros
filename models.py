@@ -526,9 +526,7 @@ class UserMedia:
             progress = json.loads(row["user_progress"]) if row["user_progress"] else None
         if isinstance(row.get("last_episode_info"), str):
             last_episode = json.loads(row["last_episode_info"]) if row["last_episode_info"] else None
-        print("Parsed next_episode_info:", next_episode)
-        print("Parsed user_progress:", progress)
-        print("Parsed last_episode_info:", last_episode)
+       
         return cls(
             id=row["id"],
             media_type=MediaType.find_media_type(row["media_type"]),
