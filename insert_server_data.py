@@ -8,8 +8,8 @@ class InsertServerDataMigration:
     
     async def setup(self):
         self.rimiru = await Rimiru.shion()
-        Path("old_migrations/data").mkdir(parents=True, exist_ok=True)
-        for file in Path("old_migrations/data").glob("*.json"):
+        Path("dolo").mkdir(parents=True, exist_ok=True)
+        for file in Path("dolo").glob("*.json"):
             try:
                 print(f"Found data file: {file.name}")
                 print(f"Guild ID: {file.stem}")
@@ -27,7 +27,7 @@ class InsertServerDataMigration:
         print("Starting server data insertion migration...")
         for filename in self.guild_data:
             print(f"Processing file: {filename}")
-            with open(Path("old_migrations/data") / filename, 'r', encoding='utf-8') as f:
+            with open(Path("dolo") / filename, 'r', encoding='utf-8') as f:
                 data = json.load(f) 
             print(f"Loaded data for guild {filename}: {data.keys()}")
             #print(type(data["guild_id"]))
