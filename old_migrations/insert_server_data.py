@@ -8,13 +8,20 @@ class InsertServerDataMigration:
     
     async def setup(self):
         self.rimiru = await Rimiru.shion()
-        Path("dolo").mkdir(parents=True, exist_ok=True)
-        for file in Path("dolo").glob("*.json"):
+        Path("old_migrations/data").mkdir(parents=True, exist_ok=True)
+        for file in Path("old_migrations/data").glob("*.json"):
             try:
                 print(f"Found data file: {file.name}")
                 print(f"Guild ID: {file.stem}")
                 if file.name == "user_ids.json":
                     print("Skipping user_ids.json")
+                    with open(file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    print(f"User IDs loaded: {len(data)}")
+                    for uid in data:
+                        await self.rimiru.upsert(
+                            "users", {"discord_id": uid,"username": f"{uid} + Not found"}, conflict_column="discord_id"
+                        )
                     continue
                 self.guild_data.append(file.name)
             except Exception as e:
@@ -27,7 +34,7 @@ class InsertServerDataMigration:
         print("Starting server data insertion migration...")
         for filename in self.guild_data:
             print(f"Processing file: {filename}")
-            with open(Path("dolo") / filename, 'r', encoding='utf-8') as f:
+            with open(Path("old_migrations/data") / filename, 'r', encoding='utf-8') as f:
                 data = json.load(f) 
             print(f"Loaded data for guild {filename}: {data.keys()}")
             #print(type(data["guild_id"]))
@@ -59,3 +66,5 @@ if __name__ == "__main__":
     import asyncio
     #asyncio.run(migration.setup())
     asyncio.run(migration.run())
+    print("Server data insertion migration completed.")
+    print("Server data insertion migration completed.")
