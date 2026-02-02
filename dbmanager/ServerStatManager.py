@@ -102,6 +102,7 @@ async def get_greetings_channel_ids(guild_id: int):
     try:
         row = await conn.select('servers', 
         columns=["welcome_channel_id", "goodbye_channel_id"], filters={"guild_id": guild_id})
+        row = row[0] if row else None
         if not row:
             return {
                 channelType.WELCOME.value: None, 

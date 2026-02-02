@@ -115,7 +115,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.WELCOME.value, channel.id)
+        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.WELCOME, channel.id)
         await interaction.response.send_message(
             f"Welcome channel set to {channel.mention}", ephemeral=True
         )
@@ -145,7 +145,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.GOODBYE.value, channel.id)
+        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.GOODBYE, channel.id)
         await interaction.response.send_message(
             f"Goodbye channel set to {channel.mention}", ephemeral=True
         )
