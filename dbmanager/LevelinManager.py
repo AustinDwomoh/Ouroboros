@@ -22,6 +22,7 @@ async def insert_or_update_user(guild_id: int, user_id: int, xp: int, level: int
     """Insert or update XP and level for a user in a guild."""
     conn = await Rimiru.shion()
     try:
+        await conn.upsert("users", {"discord_id": user_id, "username": f"{user_id}+not found"}, conflict_column="discord_id") #since this is the only other place a new user is introduced
         await conn.upsert(table="levels", data={"guild_id": guild_id, "user_id": user_id, "xp": xp, "level": level}, conflict_column="user_id,guild_id")
     except Exception as e:
         error_handler.handle(e, context="insert_or_update_user")
