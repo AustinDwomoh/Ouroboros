@@ -85,8 +85,8 @@ class Movies(commands.Cog):
         self, 
         interaction: discord.Interaction, 
         title: str,
-        season: int,
-        episode: int,
+        season: int=None,
+        episode: int=None,
         watchlist: bool = False
         ):
         """Add a series with conflict resolution."""    
@@ -278,7 +278,7 @@ class Movies(commands.Cog):
         
         try:
             incomplete_media = await MovieManager.check_user_completion(interaction.user.id)
-            media_type = MediaType.find_media_type(media_type)
+           
           
             if not incomplete_media:
                 await interaction.followup.send(
@@ -287,6 +287,7 @@ class Movies(commands.Cog):
                 )
                 return
             if media_type:
+                media_type = MediaType.find_media_type(media_type)
                 incomplete_media = [
                     media for media in incomplete_media
                     if media.media_type == media_type

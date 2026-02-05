@@ -47,89 +47,92 @@ class Client(commands.Bot):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot:
-            return
-
-        uid = message.author.id
-        content = message.content.strip().lower()
-
-        # ARM
-        if uid in ALLOWED_ID and content == "$godoflies":
-            self.pending_announcements[uid] = True
-            await message.channel.send("📝 Announcement mode armed. Send the content.")
-            return
-
-        # BUILD PREVIEW
-        if uid in self.pending_announcements:
-            user_id = self.pending_announcements.pop(uid)
-
-            title, summary, body, footer = self.parse_announcement(message.content)
-
-            embed = discord.Embed(
-                title=title,
-                description=body,
-                color=discord.Color.gold(),
-                timestamp=discord.utils.utcnow()
-            )
-
-            if summary:
-                embed.add_field(name="Summary", value=summary, inline=False)
-
-            embed.set_footer(text=footer or f"Posted by {message.author.display_name}")
-
-            self.pending_previews[uid] = embed
-
-            await message.author.send(
-                "👀 **Announcement Preview**\n"
-                "Type `confirm` to publish or `cancel` to discard."
-            )
-            await message.author.send(embed=embed)
-            return
-
-        # CONFIRM / CANCEL
-        if uid in self.pending_previews:
-            if content == "cancel":
-                self.pending_previews.pop(uid)
-                await message.author.send("❌ Announcement cancelled.")
+        try:
+            if message.author.bot:
                 return
 
-            if content == "confirm":
-                embed = self.pending_previews.pop(uid)
-                for guild in self.guilds:
-                    news_channels = [
-                        ch for ch in guild.channels
-                        if ch.type == discord.ChannelType.news
-                        and ch.permissions_for(guild.me).send_messages
-                        and ch.permissions_for(guild.me).manage_messages
-                    ]
+            uid = message.author.id
+            content = message.content.strip().lower()
 
-                    # CASE A — announcement channels exist
-                    if news_channels:
-                        for ch in news_channels:
-                            try:
-                                msg = await ch.send(embed=embed)
-                                await msg.publish()
-                            except Exception as e:
-                                print(f"Publish failed in {ch.name}: {e}")
-                        return
+            # ARM
+            if uid in ALLOWED_ID and content == "$godoflies":
+                self.pending_announcements[uid] = True
+                await message.channel.send("📝 Announcement mode armed. Send the content.")
+                return
 
-                    # CASE B — fallback to system or current channel
-                    fallback_channel = (
-                        guild.system_channel
-                        if guild.system_channel
-                        and guild.system_channel.permissions_for(guild.me).send_messages
-                        else None
-                    )
-                    if fallback_channel:
-                        await fallback_channel.send(embed=embed)
-                        await message.channel.send(
-                            "⚠️ No announcement channels found. Sent as a normal message instead."
+            # BUILD PREVIEW
+            if uid in self.pending_announcements:
+                user_id = self.pending_announcements.pop(uid)
+
+                title, summary, body, footer = self.parse_announcement(message.content)
+
+                embed = discord.Embed(
+                    title=title,
+                    description=body,
+                    color=discord.Color.gold(),
+                    timestamp=discord.utils.utcnow()
+                )
+
+                if summary:
+                    embed.add_field(name="Summary", value=summary, inline=False)
+
+                embed.set_footer(text=footer or f"Posted by {message.author.display_name}")
+
+                self.pending_previews[uid] = embed
+
+                await message.author.send(
+                    "👀 **Announcement Preview**\n"
+                    "Type `confirm` to publish or `cancel` to discard."
+                )
+                await message.author.send(embed=embed)
+                return
+
+            # CONFIRM / CANCEL
+            if uid in self.pending_previews:
+                if content == "cancel":
+                    self.pending_previews.pop(uid)
+                    await message.author.send("❌ Announcement cancelled.")
+                    return
+
+                if content == "confirm":
+                    embed = self.pending_previews.pop(uid)
+                    for guild in self.guilds:
+                        news_channels = [
+                            ch for ch in guild.channels
+                            if ch.type == discord.ChannelType.news
+                            and ch.permissions_for(guild.me).send_messages
+                            and ch.permissions_for(guild.me).manage_messages
+                        ]
+
+                        # CASE A — announcement channels exist
+                        if news_channels:
+                            for ch in news_channels:
+                                try:
+                                    msg = await ch.send(embed=embed)
+                                    await msg.publish()
+                                except Exception as e:
+                                    print(f"Publish failed in {ch.name}: {e}")
+                            return
+
+                        # CASE B — fallback to system or current channel
+                        fallback_channel = (
+                            guild.system_channel
+                            if guild.system_channel
+                            and guild.system_channel.permissions_for(guild.me).send_messages
+                            else None
                         )
+                        if fallback_channel:
+                            await fallback_channel.send(embed=embed)
+                            await message.channel.send(
+                                "⚠️ No announcement channels found. Sent as a normal message instead."
+                            )
 
-                await message.author.send("✅ Announcement published.")
-                return
+                    await message.author.send("✅ Announcement published.")
+                    return
 
-        await self.process_commands(message)
+            await self.process_commands(message)
+        except Exception as e:
+            ErrorHandler().handle(e, context="$godoflies:on_message")
      
         # -------------------------------------------------
         # DB Utilities
