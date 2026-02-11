@@ -5,7 +5,7 @@ from discord.ext import commands
 from pyparsing import Path
 from rimiru import Rimiru
 from settings import *
-from dbmanager import MovieManager
+from dbmanager.MovieManager import MovieManager
 
 # Logging setup
 logging.basicConfig(level=logging.DEBUG)
@@ -174,9 +174,9 @@ class Client(commands.Bot):
     async def on_ready(self):
         await self.change_presence(activity=discord.Game(name="Eternal loop"))
         logger.info("Ouroboros is ready")
-        asyncio.sleep(5)  # Give bot time to initialize
+        await asyncio.sleep(5)  # Give bot time to initialize
         print("[Movies Cog] Starting background updaters...")
-        asyncio.create_task(MovieManager.start_background_updaters(self))
+        asyncio.create_task(MovieManager().start_background_updaters(self))
 
         print("[Movies Cog] Background updaters started!")
 

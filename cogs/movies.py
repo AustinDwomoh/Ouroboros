@@ -2,12 +2,13 @@ from settings import ErrorHandler
 import discord,typing,asyncio
 from discord import app_commands
 from discord.ext import commands
-from dbmanager import MovieManager
+from dbmanager.MovieManager import MovieManager
 from views.movieView import MediaSelectionView, create_selection_embed
 from constants import MediaType
 
 errorHandler = ErrorHandler()
 
+movieManager = MovieManager()
 
 
 
@@ -99,7 +100,7 @@ class Movies(commands.Cog):
                 
                 }]
             else:
-                media_options = await MovieManager.search_media_multiple("tv", title)
+                media_options = await movieManager.search_media_multiple("tv", title)
             
             if not media_options:
                 await interaction.followup.send( f"No series found for: `{title}`", ephemeral=True)
@@ -127,7 +128,7 @@ class Movies(commands.Cog):
                 else:
                     tmbd_id = media['id']
 
-                media_data = await MovieManager.add_or_update_user_series( interaction.user.id,  title, season=season, episode=episode, tmdb_id=tmbd_id, watchlist=watchlist
+                media_data = await movieManager.add_or_update_user_series( interaction.user.id,  title, season=season, episode=episode, tmdb_id=tmbd_id, watchlist=watchlist
                     )
               
                 
@@ -171,7 +172,7 @@ class Movies(commands.Cog):
                     'tmdb_id': self.movie_title_cache[title]["tmdb_id"]
                 }]
             else:
-                media_options = await MovieManager.search_media_multiple("movie", title)
+                media_options = await movieManager.search_media_multiple("movie", title)
     
             
             if not media_options:
@@ -189,7 +190,7 @@ class Movies(commands.Cog):
                 else:
                     tmdb_id = media['id']
 
-                media_data = await MovieManager.add_or_update_user_movie(interaction.user.id, title, tmdb_id=tmdb_id, watchlist=watchlist)
+                media_data = await movieManager.add_or_update_user_movie(interaction.user.id, title, tmdb_id=tmdb_id, watchlist=watchlist)
 
                 if media_data:
                     status_text = "added to watchlist" if watchlist else "marked as watched"
@@ -225,7 +226,7 @@ class Movies(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            watchlist_items = await MovieManager.get_watchlist(interaction.user.id)
+            watchlist_items = await movieManager.get_watchlist(interaction.user.id)
             
             if not watchlist_items:
                 await interaction.followup.send(
@@ -277,7 +278,7 @@ class Movies(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            incomplete_media = await MovieManager.check_user_completion(interaction.user.id)
+            incomplete_media = await movieManager.check_user_completion(interaction.user.id)
            
           
             if not incomplete_media:
@@ -362,7 +363,7 @@ class Movies(commands.Cog):
                 )
                 #we shoudlnt even get here
                 return
-            success = await MovieManager.delete_user_media(interaction.user.id, media_id["id"])
+            success = await movieManager.delete_user_media(interaction.user.id, media_id["id"])
             
             if success:
                 await interaction.followup.send(
@@ -396,7 +397,7 @@ class Movies(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            results = await MovieManager.fetch_user_media(interaction.user.id, self.movie_title_cache.get(title)["id"])
+            results = await movieManager.fetch_user_media(interaction.user.id, self.movie_title_cache.get(title)["id"])
             
             if not results:
                 await interaction.followup.send( f"No results found for: `{title}`", ephemeral=True )
@@ -460,7 +461,7 @@ class Movies(commands.Cog):
     ) -> typing.List[app_commands.Choice[str]]:
         """Autocomplete for media titles."""
         try:
-            self.movie_title_cache = await MovieManager.fetch_media_names()
+            self.movie_title_cache = await movieManager.fetch_media_names()
     
             filtered = [
                 app_commands.Choice(name=title, value=title)
