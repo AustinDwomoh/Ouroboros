@@ -4,9 +4,9 @@
 
 import discord
 from settings import ErrorHandler
-from dbmanager import MovieManager
+from dbmanager.MovieManager import MovieManager
 errorHandler = ErrorHandler()
-
+movieManager = MovieManager()
 class MediaSearchPaginator(discord.ui.View):
     """A Discord UI view with buttons for pagination."""
 
@@ -162,14 +162,14 @@ class MediaSelectionView(discord.ui.View):
         # Save to database
         try:
             if self.media_type == "movie":
-                media_data = await MovieManager.add_or_update_user_movie(
+                media_data = await movieManager.add_or_update_user_movie(
                     self.user_id, 
                     self.original_query,
                     tmdb_id=int(selected_id),
                     watchlist=self.watchlist
                 )
             else:  # series/tv
-                media_data = await MovieManager.add_or_update_user_series(
+                media_data = await movieManager.add_or_update_user_series(
                     self.user_id, 
                     self.original_query,
                     season=self.season,
