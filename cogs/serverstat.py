@@ -3,6 +3,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import ServerStatManager
+from constants import Roles
 
   # it works leave it alone 
 #i get it now it hasnt been initialized yet is why
@@ -68,7 +69,7 @@ class ServerStat(commands.Cog):
                             name, category=category, overwrites=overwrites
                         )
                     except Exception as e:
-                        ErrorHandler.handle(e, context="Error creating voice channel for server stats")
+                        ErrorHandler().handle(e, context="Error creating voice channel for server stats")
 
     @update_stats.before_loop
     async def before_update_stats(self):
@@ -90,28 +91,21 @@ class ServerStat(commands.Cog):
     @app_commands.guild_only()
     @app_commands.describe(state="The state to set (on or off)")
     async def server_stats(self, interaction: discord.Interaction, state: str):
-        if interaction.user.id not in ALLOWED_ID and not any(
-            role.permissions.administrator
-            or role.permissions.manage_roles
-            or role.permissions.ban_members
-            or role.permissions.kick_members
-            or role.name == "Tour manager"
-            or interaction.user.id == interaction.user.guild.owner_id
-            for role in interaction.user.roles):
+        if not Roles.check_role_permission(interaction.user, "Tour manager"):
             embed = discord.Embed(
-                title="Permission Denied",
-                description="You are not allowed to invoke this command.",
-                color=discord.Color.red(),
+            title="Permission Denied",
+            description="You don't have permission to use this command.",
+            color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         try:
             await interaction.response.defer()
-            guild_id = interaction.guild.id
+            guild_id = interaction.guild.id #type: ignore
             state = "on" if state == "on" else "off"  # Ensures only "on" or "off" is stored
             await ServerStatManager.set_server_state(guild_id, state)  # Use DatabaseManager to set server state
 
-            await interaction.followup.send(f"Server_stat set to '{state}' for {interaction.guild.name}")
+            await interaction.followup.send(f"Server_stat set to '{state}' for {interaction.guild.name}") #type: ignore
             await self.update_stats()
         except Exception as e:
             ErrorHandler().handle(e, context="Error in server_stats command")

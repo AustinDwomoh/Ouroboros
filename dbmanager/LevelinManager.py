@@ -6,17 +6,19 @@ error_handler = ErrorHandler()
 # -------------------------------------------------------------
 # BASIC LEVEL OPERATIONS
 # -------------------------------------------------------------
-async def get_user_level(guild_id: int, user_id: int)-> tuple[int, int] | None:
+async def get_user_level(guild_id: int, user_id: int)-> tuple[int, int] | tuple[None, None]:
     """Return (xp, level) for a user in a guild from the centralized `levels` table."""
     conn = await Rimiru.shion() 
     try:
         row = await conn.selectOne(table="levels", columns=["xp", "level"], filters={"guild_id": guild_id, "user_id": user_id})
-        print(row)
-        if row:
-            return row.get('xp'), row.get('level')
+        #print(row)
+        if not row:
+            return None, None
+        return row.get('xp'), row.get('level')
+        
     except Exception as e:
         error_handler.handle(e, context="get_user_level")
-        return None
+        return None, None
 
 async def insert_or_update_user(guild_id: int, user_id: int, xp: int, level: int) -> None:
     """Insert or update XP and level for a user in a guild."""
@@ -31,7 +33,7 @@ async def insert_or_update_user(guild_id: int, user_id: int, xp: int, level: int
 # -------------------------------------------------------------
 # LEADERBOARD / RANKING
 # -------------------------------------------------------------
-async def fetch_top_users(guild_id: int, limit: int = 10) -> list[tuple[int, int, int]]:
+async def fetch_top_users(guild_id: int, limit: int = 10) -> list[dict]:
     """Return top N users in a guild by level and XP."""
     conn = await Rimiru.shion()
     try:
@@ -42,6 +44,7 @@ async def fetch_top_users(guild_id: int, limit: int = 10) -> list[tuple[int, int
             order_by=f"level DESC, xp DESC",
             limit=limit
         )
+        #print(rows)
         return rows
     except Exception as e:
         error_handler.handle(e, context="fetch_top_users")

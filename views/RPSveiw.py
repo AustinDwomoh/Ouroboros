@@ -4,7 +4,7 @@ import discord
 from constants import gameType
 from dbmanager import Games
 
-
+#type: ignore
 class OpponentAcceptView(ui.View):
     """Creates a veiw for the opponent to accept the invite
     """
@@ -21,12 +21,14 @@ class OpponentAcceptView(ui.View):
             await interaction.response.send_message(
                 f"{self.opponent.mention} has accepted the challenge!", ephemeral=False
             )
-            round_start_message = await interaction.channel.send(
+            round_start_message = await interaction.channel.send( #type: ignore
+
                 f"5 rounds between {interaction.user.mention} and {self.opponent.mention}."
             )
 
             # Sends the first round message
-            first_round_message = await interaction.channel.send(
+            first_round_message = await interaction.channel.send( #type: ignore
+
                 f"Round 1: {interaction.user.mention}, click a button to make your choice.",
                 view=self.game_view,
             )
@@ -77,7 +79,8 @@ class RPSview(ui.View):
         self.player2_score = 0
         self.choices = {
             player1.id: None,
-            "bot" if self.is_bot_game else player2.id: None
+            "bot" if self.is_bot_game else player2.id: None #type: ignore
+
         }
         self.message = None  # Store the original message to edit
 
@@ -139,7 +142,8 @@ class RPSview(ui.View):
                 return
         else:
             # In PvP game, only the two players can click
-            if interaction.user.id not in [self.player1.id, self.player2.id]:
+            if interaction.user.id not in [self.player1.id, self.player2.id]: #type: ignore
+
                 await interaction.response.send_message(
                     "This isn't your game!", ephemeral=True
                 )
@@ -151,11 +155,13 @@ class RPSview(ui.View):
         # For bot games, generate bot choice immediately
         if self.is_bot_game:
             bot_choice = random.choice([self.ROCK, self.PAPER, self.SCISSORS])
-            self.choices["bot"] = bot_choice
+            self.choices["bot"] = bot_choice #type: ignore
+
         
         # Get both choices
         player1_choice = self.choices[self.player1.id]
-        player2_key = "bot" if self.is_bot_game else self.player2.id
+        player2_key = "bot" if self.is_bot_game else self.player2.id #type: ignore
+
         player2_choice = self.choices[player2_key]
         
         # In PvP mode, wait for both players to choose
@@ -163,7 +169,8 @@ class RPSview(ui.View):
             # Edit the message to show someone has chosen
             await interaction.response.edit_message(
                 content=f"Round {self.current_round} of {self.total_rounds}\n"
-                        f"Score: {self.player1.mention} {self.player1_score} - {self.player2_score} {self.player2.mention}\n"
+                        f"Score: {self.player1.mention} {self.player1_score} - {self.player2_score} {self.player2.mention}\n" #type: ignore
+
                         f"{interaction.user.mention} has made their choice! Waiting for the other player...",
                 view=self
             )
@@ -173,7 +180,7 @@ class RPSview(ui.View):
         winner = self.rps_game(player1_choice, player2_choice)
         
         # Update scores and create result message
-        player2_name = "Ouroboros" if self.is_bot_game else self.player2.mention
+        player2_name = "Ouroboros" if self.is_bot_game else self.player2.mention #type: ignore
         
         if winner == self.PLAYER1:
             self.player1_score += 1
@@ -207,11 +214,14 @@ class RPSview(ui.View):
             )
             if self.is_bot_game:
                 # Save game result for player vs bot
-                await Games.save_game_result(interaction.guild.id, self.player1.id, self.player1_score, gameType.PVB)
+                await Games.save_game_result(interaction.guild.id, self.player1.id, self.player1_score, gameType.PVB) #type: ignore
+
             else:
                 # Save game result for player vs player
-                await Games.save_game_result(interaction.guild.id, self.player1.id, self.player1_score, gameType.PVP)
-                await Games.save_game_result(interaction.guild.id, self.player2.id, self.player2_score, gameType.PVP)
+                await Games.save_game_result(interaction.guild.id, self.player1.id, self.player1_score, gameType.PVP) #type: ignore
+
+                await Games.save_game_result(interaction.guild.id, self.player2.id, self.player2_score, gameType.PVP) #type: ignore
+
         
             
             self.stop()

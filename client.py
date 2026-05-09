@@ -2,7 +2,6 @@ from time import time
 
 import asyncpg, discord, logging
 from discord.ext import commands
-from pyparsing import Path
 from rimiru import Rimiru
 from settings import *
 from dbmanager.MovieManager import MovieManager

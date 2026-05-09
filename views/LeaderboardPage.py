@@ -6,7 +6,7 @@ from settings import FONT_DIR
 from functools import lru_cache
 
 class LeaderboardPaginationView(discord.ui.View):
-    def __init__(self, data, sep=5, timeout=180, text=None):
+    def __init__(self, data, sep=5, timeout: int | None=180, text=None):
         super().__init__(timeout=timeout)
         self.data = data
         self.sep = sep
@@ -18,10 +18,12 @@ class LeaderboardPaginationView(discord.ui.View):
     async def on_timeout(self):
         """Disable buttons when view times out"""
         for item in self.children:
-            item.disabled = True
+            item.disabled = True #type: ignore
+
         if self.message:
             try:
-                await self.message.edit(view=self)
+                await self.message.edit(view=self) #type: ignore
+
             except:
                 pass
 
@@ -166,12 +168,12 @@ class LeaderboardPaginationView(discord.ui.View):
         total_pages = self.get_total_pages()
         
         # Disable first/prev on page 1
-        self.children[0].disabled = self.current_page == 1
-        self.children[1].disabled = self.current_page == 1
+        self.children[0].disabled = self.current_page == 1 #type: ignore
+        self.children[1].disabled = self.current_page == 1 #type: ignore
         
         # Disable next/last on final page
-        self.children[2].disabled = self.current_page >= total_pages
-        self.children[3].disabled = self.current_page >= total_pages
+        self.children[2].disabled = self.current_page >= total_pages #type: ignore
+        self.children[3].disabled = self.current_page >= total_pages #type: ignore
 
     async def update_message(self, interaction: discord.Interaction):
         """Update the message with new page"""
@@ -202,7 +204,8 @@ class LeaderboardPaginationView(discord.ui.View):
         # Update button states
         self._update_buttons()
 
-        await self.message.edit(embed=embed, attachments=[file], view=self)
+        await self.message.edit(embed=embed, attachments=[file], view=self) #type: ignore
+
 
     @discord.ui.button(label="⏮️", style=discord.ButtonStyle.secondary)
     async def first_page_button(self, interaction: discord.Interaction, button: discord.ui.Button):

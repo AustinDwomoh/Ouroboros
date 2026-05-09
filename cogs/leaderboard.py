@@ -33,29 +33,31 @@ class Leaderboard(commands.Cog):
     )
     @app_commands.guild_only()
     async def leaderboard(
-        self, interaction: discord.Interaction, game_type: str = None
+        self, interaction: discord.Interaction, game_type: str | None = None
     ):
         """Show the leaderboard for the current guild with pagination or a specific game type."""
         await interaction.response.defer()
         
         try:
             rows = None
-            if game_type:
-                game_type = gameType.find_game_type(game_type)  # since its a string we convert it
-                # Fetch specific game type scores
-                rows = await Games.get_leaderboard(interaction.guild.id, game_type)
+            game_type_obj = gameType.find_game_type(game_type) 
+            if game_type_obj:
+                rows = await Games.get_leaderboard(interaction.guild.id, game_type_obj)  #type: ignore
             else:
                 # Fetch overall leaderboard
-                rows = await Games.get_leaderboard(interaction.guild.id)
+                rows = await Games.get_leaderboard(interaction.guild.id) #type: ignore
             # Process rows into a list of (user_id, total_score)
             rows = [(row['user_id'], row['total_score']) for row in rows]
             if not rows:
-                    await interaction.followup.send(f"No leaderboard available for {game_type.value}.")
-                    return
+                if game_type_obj:
+                    await interaction.followup.send(f"No leaderboard available for {game_type_obj.value}.")
+                else:
+                    await interaction.followup.send("No leaderboard available.")
+                return
             # Build leaderboard data with member info
             leaderboard_data = []
             for idx, (player_id, score) in enumerate(rows, start=1):
-                member = interaction.guild.get_member(player_id)
+                member = interaction.guild.get_member(player_id) # Get the member object #type: ignore
                 if member:
                     avatar = await member.display_avatar.read()
                     leaderboard_data.append((idx, member.display_name, score, 0, avatar))  # rank, username, score, placeholder, avatar bytes
@@ -99,9 +101,7 @@ class Leaderboard(commands.Cog):
             await interaction.followup.send("An error occurred while fetching the leaderboard.")
 
     @leaderboard.autocomplete("game_type")
-    async def game_type_autocomplete(
-        self, interaction: discord.Interaction, current: str
-    ):
+    async def game_type_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
         """Autocomplete for game types."""
         try:
             current = current.strip() if current else ""
@@ -111,23 +111,18 @@ class Leaderboard(commands.Cog):
                 for game in game_types
                 if current.lower() in game.value.lower()
             ]
-            if filtered_choices:
-                await interaction.response.autocomplete(filtered_choices)
-            else:
-                await interaction.response.autocomplete(
-                    [app_commands.Choice(name="No matches found", value="none")]
-                )
-        except discord.errors.NotFound:
-            pass
+            return filtered_choices if filtered_choices else [
+            app_commands.Choice(name="No matches found", value="none")]
         except Exception as e:
             self.error_handler.handle(e, context="leaderboard_autocomplete")
+            return [app_commands.Choice(name="Error occurred", value="none")]
 
     # ================================ RANK SCRIPT =============================== #
 
     @app_commands.guild_only()
     @app_commands.command(name="rank", description="Rank with score in mini games")
     async def rank(
-        self, interaction: discord.Interaction, member: discord.Member = None
+        self, interaction: discord.Interaction, member: discord.Member|None|discord.User = None
     ):
         """Show the rank of a member in the current guild."""
         await interaction.response.defer()
@@ -135,7 +130,7 @@ class Leaderboard(commands.Cog):
         if member is None:
             member = interaction.user
         
-        guild_id = interaction.guild.id
+        guild_id = interaction.guild.id #type: ignore
         
         try:
             # Fetch scores for each game type

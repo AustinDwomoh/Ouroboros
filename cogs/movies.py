@@ -1,4 +1,7 @@
+from turtle import title
+
 from settings import ErrorHandler
+
 import discord,typing,asyncio
 from discord import app_commands
 from discord.ext import commands
@@ -20,7 +23,7 @@ class Movies(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.loop_lock = asyncio.Lock()
-        self.movie_title_cache = {} #{title: tmdb_id}
+        self.movie_title_cache: dict[str, dict[str, int]] = {} #{title: tmdb_id}
         
         
 
@@ -86,17 +89,17 @@ class Movies(commands.Cog):
         self, 
         interaction: discord.Interaction, 
         title: str,
-        season: int=None,
-        episode: int=None,
+        season: int|None=None,
+        episode: int|None=None,
         watchlist: bool = False
         ):
         """Add a series with conflict resolution."""    
         try:
             if self.movie_title_cache.get(title):
                 media_options = [{
-                    'id': self.movie_title_cache[title]["id"],
+                    'id': self.movie_title_cache.get(title, {}).get("id"),
                     'title': title,
-                    'tmdb_id': self.movie_title_cache[title]["tmdb_id"]
+                    'tmdb_id': self.movie_title_cache.get(title, {}).get("tmdb_id")
                 
                 }]
             else:
@@ -130,8 +133,10 @@ class Movies(commands.Cog):
 
                 media_data = await movieManager.add_or_update_user_series( interaction.user.id,  title, season=season, episode=episode, tmdb_id=tmbd_id, watchlist=watchlist
                     )
-              
-                
+                if not media_data:
+                    await interaction.followup.send("Failed to save series", ephemeral=True)
+                    return
+
                 if media_data:
                     status_text = "added to watchlist" if watchlist else "progress updated"
                     embed = discord.Embed(
@@ -144,9 +149,9 @@ class Movies(commands.Cog):
                    
                     embed.set_thumbnail(url=media_data.poster_url)
                   
-                    embed.add_field(name="Overview", value=media_data.overview[:200], inline=False)
-                    embed.add_field(name="Latest Release Info", value=str(media_data.latest_release_info), inline=True)
-                    embed.add_field(name="Next Episode", value=str(media_data.next_release_info), inline=True)
+                    embed.add_field(name="Overview", value=media_data.overview[:200], inline=False) #type: ignore
+                    embed.add_field(name="Latest Release Info", value=str(media_data.latest_release_info), inline=True) #type: ignore
+                    embed.add_field(name="Next Episode", value=str(media_data.next_release_info), inline=True) #type: ignore
                     
                     await interaction.followup.send(embed=embed)
                 else:
@@ -167,9 +172,9 @@ class Movies(commands.Cog):
             # Search for media options 
             if self.movie_title_cache.get(title):
                 media_options = [{
-                    'id': self.movie_title_cache[title]["id"],
+                    'id': self.movie_title_cache.get(title, {}).get("id"),
                     'title': title,
-                    'tmdb_id': self.movie_title_cache[title]["tmdb_id"]
+                    'tmdb_id': self.movie_title_cache.get(title, {}).get("tmdb_id")
                 }]
             else:
                 media_options = await movieManager.search_media_multiple("movie", title)
@@ -192,7 +197,7 @@ class Movies(commands.Cog):
 
                 media_data = await movieManager.add_or_update_user_movie(interaction.user.id, title, tmdb_id=tmdb_id, watchlist=watchlist)
 
-                if media_data:
+                if media_data is not None:
                     status_text = "added to watchlist" if watchlist else "marked as watched"
                     embed = discord.Embed(
                         title=f"Movie {status_text.title()}",
@@ -201,7 +206,7 @@ class Movies(commands.Cog):
                     )
                     embed.set_thumbnail(url=media_data.poster_url)
                     embed.add_field(name="Release Date", value=str(media_data.release_date), inline=True)
-                    embed.add_field(name="Overview", value=media_data.overview[:200], inline=False)
+                    embed.add_field(name="Overview", value=media_data.overview[:200], inline=False) #type: ignore
                     
                     await interaction.followup.send(embed=embed)
                 else:
@@ -220,7 +225,7 @@ class Movies(commands.Cog):
     @app_commands.dm_only()
     async def view_watchlist(
         self,
-        interaction: discord.Interaction,media_type: str = None
+        interaction: discord.Interaction,media_type: str | None = None
          ):
         """View user's watchlist."""
         await interaction.response.defer(ephemeral=True)
@@ -243,7 +248,7 @@ class Movies(commands.Cog):
             if media_type:
                 watchlist_items = [item for item in watchlist_items if item.get("media_type") == media_type]
                 embed.title = f"Your {media_type.title()} Watchlist"
-                embed.description = f"You have {len(watchlist_items)} {media_type.value}(s) in your watchlist"
+                embed.description = f"You have {len(watchlist_items)} {media_type}(s) in your watchlist"
                 if not watchlist_items:
                     await interaction.followup.send(
                         f"Your {media_type} watchlist is empty!"
@@ -273,7 +278,7 @@ class Movies(commands.Cog):
     @app_commands.command(name="incomplete", description="Check what media you haven't finished watching")
     @app_commands.describe(media_type="Type of media: movie or series")
     @app_commands.dm_only()
-    async def check_incomplete(self, interaction: discord.Interaction, media_type: str = None):
+    async def check_incomplete(self, interaction: discord.Interaction, media_type: str | None = None):
         """Check user's incomplete media."""
         await interaction.response.defer(ephemeral=True)
         
@@ -287,11 +292,11 @@ class Movies(commands.Cog):
                     ephemeral=True
                 )
                 return
-            if media_type:
-                media_type = MediaType.find_media_type(media_type)
+            media_type_obj= MediaType.find_media_type(media_type)
+            if media_type_obj:
                 incomplete_media = [
                     media for media in incomplete_media
-                    if media.media_type == media_type
+                    if media.media_type == media_type_obj and not media.has_next_episode
                 ]
             embed = discord.Embed(
                 title="Your Incomplete Media",
@@ -397,7 +402,8 @@ class Movies(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            results = await movieManager.fetch_user_media(interaction.user.id, self.movie_title_cache.get(title)["id"])
+            
+            results = await movieManager.fetch_user_media(interaction.user.id, self.movie_title_cache.get(title))
             
             if not results:
                 await interaction.followup.send( f"No results found for: `{title}`", ephemeral=True )
@@ -421,10 +427,12 @@ class Movies(commands.Cog):
             if embed_data.get("thumbnail"):
                 send_embed.set_thumbnail(url=embed_data["thumbnail"])
             await interaction.followup.send(embed=send_embed)
-            
+        except ValueError as e:
+            await interaction.followup.send(f"Media possibly not in your list:", ephemeral=True)
         except Exception as e:
             errorHandler.handle(e, context=f"search_media({title})")
             await interaction.followup.send(f"Error: Finding media", ephemeral=True)
+       
     # ============================================================================ #
     #                                AUTOCOMPLETE                                  #
     # ============================================================================ #

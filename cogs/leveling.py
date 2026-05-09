@@ -9,6 +9,7 @@ from io import BytesIO
 class Levelling(commands.Cog):
     def __init__(self, client):
         self.client = client
+        self.error_handler = ErrorHandler()
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -20,13 +21,13 @@ class Levelling(commands.Cog):
             guild_id = message.guild.id
             user_id = message.author.id
             # Fetch the user's XP and level, or initialize them
-            user_data = await LevelinManager.get_user_level(guild_id, user_id)
-            if user_data:
-                xp, level = user_data
-            else:
-                xp, level = 0, 1
+            xp, level = await LevelinManager.get_user_level(guild_id, user_id)
+            if not xp or not level:
+                xp, level = 0, 1 #realistically if only one is None, the other should be as well or there is a data inconsistency
+                
                 await LevelinManager.insert_or_update_user(guild_id, user_id, xp, level)
             # Add XP and check for level up
+            
             xp += 5  # Customize the XP per message
 
             def level_up_xp(level, base_xp=100, growth_factor=1.15):
@@ -50,7 +51,7 @@ class Levelling(commands.Cog):
                 await message.channel.send(embed=embed)
             await LevelinManager.insert_or_update_user(guild_id, user_id, xp, level)
         except Exception as e:
-            await ErrorHandler().handle(e, context="Levelling Cog on_message")
+            self.error_handler.handle(e, context="Levelling Cog on_message")
 
     @app_commands.command(name="level_self", description="Check your level")
     @app_commands.guild_only()
@@ -58,7 +59,7 @@ class Levelling(commands.Cog):
         try:
             await interaction.response.defer()
             user_data = await LevelinManager.get_user_level(
-                interaction.guild.id, interaction.user.id
+                interaction.guild.id, interaction.user.id #type: ignore
             )
             if not user_data:
                 await interaction.followup.send(
@@ -66,7 +67,7 @@ class Levelling(commands.Cog):
                 )
                 return
             xp, level = user_data
-            rank = await LevelinManager.get_rank(interaction.guild.id, interaction.user.id)  # Get the user's rank
+            rank = await LevelinManager.get_rank(interaction.guild.id, interaction.user.id)#type: ignore  # Get the user's rank
             
             embed = discord.Embed(
                 title="🎉 Current Lvl!",
@@ -78,7 +79,7 @@ class Levelling(commands.Cog):
             embed.set_thumbnail(url=str(interaction.user.display_avatar.url))
             await interaction.followup.send(embed=embed)
         except Exception as e:
-            await ErrorHandler().handle(e, context="Levelling Cog level_self command")
+            self.error_handler.handle(e, context="Levelling Cog level_self command")
         
 
     @app_commands.command(name="level_server", description="Check the server leaderboard.")
@@ -89,14 +90,14 @@ class Levelling(commands.Cog):
             await interaction.response.defer()
             limit = min(limit, 50)  # Cap the limit to 50
             # Fetch leaderboard data
-            top_users = await LevelinManager.fetch_top_users(interaction.guild.id, limit)
+            top_users = await LevelinManager.fetch_top_users(interaction.guild.id, limit) #type: ignore
 
             table_data = []
             for idx, data in enumerate(top_users,start=1):
                 user_id = data.get("user_id")
                 level = data.get("level")
                 xp = data.get("xp")
-                member = interaction.guild.get_member(user_id)
+                member = interaction.guild.get_member(user_id) #type: ignore
                 if member:
                     avatar = await member.display_avatar.read()
                     table_data.append(
@@ -135,7 +136,7 @@ class Levelling(commands.Cog):
                 view=pagination_view
             )
         except Exception as e:
-            await ErrorHandler().handle(e, context="Levelling Cog level_server command")
+            self.error_handler.handle(e, context="Levelling Cog level_server command")
 
 
 async def setup(client):

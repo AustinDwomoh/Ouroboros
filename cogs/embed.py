@@ -14,7 +14,7 @@ class EmbedCog(commands.Cog):
     )
     @app_commands.guild_only()
     async def create_embed(
-        self, interaction: discord.Interaction, title: str, description: str, tag: str = None
+        self, interaction: discord.Interaction, title: str, description: str, tag: str = " "
     ):
         await interaction.response.defer()
         embed_color = discord.Color.from_rgb(
@@ -35,7 +35,7 @@ class EmbedCog(commands.Cog):
             await interaction.response.send_message("Not for you!", ephemeral=True)
             return
         try:
-            1 / 0
+            1 / 0 #type: ignore
         except Exception as e:
             ErrorHandler().handle(e, context="Embed Trigger Error")
             await interaction.response.send_message("Triggered error for testing.", ephemeral=True)

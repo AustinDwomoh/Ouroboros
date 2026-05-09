@@ -198,7 +198,7 @@ class ErrorHandler:
 
             # FIXED: Use json.dumps() instead of str() to create valid JSON
             response = requests.post(
-                DISCORD_WEBHOOK_URL, 
+                DISCORD_WEBHOOK_URL,  #type: ignore
                 data={"payload_json": json.dumps(data)}, 
                 files=files
             )

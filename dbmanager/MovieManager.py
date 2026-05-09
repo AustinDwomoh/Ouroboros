@@ -2,7 +2,7 @@
 # MODULE: MovieManager.py
 
 # ============================================================================ #
-
+from dataclasses import replace
 import aiohttp
 from difflib import SequenceMatcher
 import discord
@@ -26,23 +26,22 @@ class MovieManager:
         self.tasks = []
         self.running = False
 
-    async def add_or_update_user_movie(self, user_id: int, title: str, tmdb_id:int=None,watchlist: bool=False):
+    async def add_or_update_user_movie(self, user_id: int, title: str, tmdb_id:int|None=None,watchlist: bool=False):
         """Insert or update a movie watch record for a user."""
     
         conn = await Rimiru.shion()
         try:
             # 1. Look up or insert movie into movies table
             media_data = await self.get_cached_media(MediaType.MOVIE.value, title)
-            db_id = media_data.id if media_data else None
 
             if media_data is None:
-                media_data, db_id = await self.cache_media(MediaType.MOVIE.value, tmdb_id) 
+                media_data = await self.cache_media(MediaType.MOVIE.value, tmdb_id) 
             if media_data is None:
                 raise ValueError("Failed to fetch or cache movie data.")
             # 2. Insert or update user_media record
             row = await conn.upsert("user_media", data={
                 "user_id": user_id,
-                "media_id": db_id,
+                "media_id": media_data.id,
                 "status": "watchlist" if watchlist else "watched"
                 }, conflict_column="user_id, media_id")
             if row:
@@ -52,7 +51,7 @@ class MovieManager:
         except Exception as e:
             error_handler.handle(e, context=f"add_or_update_user_movie({title})")
 
-    async def add_or_update_user_series(self, user_id: int, title: str, season=None, episode=None, tmdb_id:int=None, watchlist: bool=False ):
+    async def add_or_update_user_series(self, user_id: int, title: str, season=None, episode=None, tmdb_id:int=0, watchlist: bool=False ):
         """Insert or update a movie watch record for a user."""
     
         conn = await Rimiru.shion()
@@ -60,17 +59,15 @@ class MovieManager:
             # 1. Look up or insert movie into movies table
 
             media_data = await self.get_cached_media(MediaType.SERIES.value, title)
-            db_id = media_data.id if media_data else None
-           # print("Cached media data:", media_data)
             if media_data is None:
-                media_data,id = await self.cache_media(MediaType.SERIES.value, tmdb_id)
-                db_id = id
+                media_data = await self.cache_media(MediaType.SERIES.value, tmdb_id)
+              
             if media_data is None:
                 raise ValueError("Failed to fetch or cache movie data.")
             # 2. Insert or update user_media record
             row = await conn.upsert("user_media", data={
                 "user_id": user_id,
-                "media_id": db_id,
+                "media_id": media_data.id ,
                 "progress": {"season": season, "episode": episode} if season and episode else None,
                 "status": "watchlist" if watchlist else "watching"
                 }, conflict_column="user_id, media_id")
@@ -82,26 +79,24 @@ class MovieManager:
             error_handler.handle(e, context=f"add_or_update_series({title})")
             return None
     
-    async def add_to_watchlist(self, user_id: int, title: str, media_type:str,tmdb_id:int=None):
+    async def add_to_watchlist(self, user_id: int, title: str, media_type:str,tmdb_id:int|None=None):
         """Add a media entry to a user's watchlist."""
         conn = await Rimiru.shion()
         try:
             # 1. Look up or insert movie into movies table
-            media_type = MediaType.find_media_type(media_type)
-            media_data = await self.get_cached_media(media_type.value, title)
+            media_type_obj = MediaType.find_media_type(media_type)
+            if not media_type_obj:
+                raise ValueError("Invalid media type.")
+            media_data = await self.get_cached_media(media_type_obj.value, title)
             if media_data is None:
-                media_data = await self.cache_media(media_type.value, tmdb_id) 
+                media_data = await self.cache_media(media_type_obj.value, tmdb_id) 
             if media_data is None:
                 raise ValueError("Failed to fetch or cache movie data.")
-            row = await conn.upsert("user_media", 
-                            data={"user_id": user_id, 
-                                "media_id": media_data.id,
-                                "status": "watchlist"},
-                                    conflict_column="user_id, media_id")
+            row = await conn.upsert("user_media", data={"user_id": user_id, "media_id": media_data.id, "status": "watchlist"}, conflict_column="user_id, media_id")
             if row:
                 return media_data
         except Exception as e:
-            error_handler.handle(e, context=f"add_to_watchlist({user_id}, {media_data.id})")
+            error_handler.handle(e, context=f"add_to_watchlist({user_id}, {title})")
             return None
 
 
@@ -141,10 +136,15 @@ class MovieManager:
 
     # ============================================================================ #
 
-    async def fetch_user_media(self, user_id:int, media_id:int):
+    async def fetch_user_media(self, user_id:int, media_dict:dict[str, int]|None) -> UserMedia | None:
         """Fetch a specific media entry for a user by title and type."""
         conn = await Rimiru.shion()
         try:
+            if not media_dict:
+                return None
+            media_id = media_dict.get("id")
+            if not media_id:
+                return None
             rows = await conn.call_function(fn="get_user_media_by_id", params=[user_id, media_id], fetch_type=FetchType.FETCH)
 
             if rows:
@@ -177,14 +177,14 @@ class MovieManager:
     # ============================================================
     # LOCAL ID CACHE - Check DB first before API
     # ============================================================
-    async def get_cached_media(self, media_type: str, title: str):
+    async def get_cached_media(self, media_type: str, title: str) -> Movie | Series | None:
         """
         Check if we already have this media stored locally.
         Returns (tmdb_id, local_db_id) if found, else None.
         """
         conn = await Rimiru.shion()
         try:
-            table = MediaType.find_media_type(media_type).table_name
+            table = MediaType.find_media_type(media_type).table_name #type: ignore
             #print(f"Looking for cached media: {media_type} - {title}, table: {table}")
             if not table:
                 return None
@@ -203,7 +203,7 @@ class MovieManager:
             return None
 
 
-    async def cache_media(self, media_type: str,tmdb_id: str):
+    async def cache_media(self, media_type: str,tmdb_id: int|None=None)->Movie | Series | None:
         """
         When this is called it means this is a new entry we don't have cached yet.
         Fetch from TMDB and store in local DB.
@@ -216,21 +216,30 @@ class MovieManager:
         """
         conn = await Rimiru.shion()
         try:
-            media_type = MediaType.find_media_type(media_type)
-            table = media_type.table_name
+            media_type_obj = MediaType.find_media_type(media_type)
+            if not media_type_obj:
+                return None
+            table = media_type_obj.table_name
 
-            media_data = await self.get_media_details(media_type.value, tmdb_id)
-            row = await conn.upsert("media", data=media_data.to_media_dict(), conflict_column="tmdb_id")
+            if not tmdb_id:
+                return None
+            media_data = await self.get_media_details(media_type_obj.value, tmdb_id)
+            if not media_data:
+                return None
+            row = await conn.upsert("media", data=media_data.to_media_dict(), conflict_column="tmdb_id") 
             #print(row)
+            if not row:
+                return None
             insert_data = media_data.to_db_dict()
-            insert_data["id"] = row["id"]
+            insert_data["id"] = row.get("id")
             #print("Insert data for specific table:", insert_data)
             await conn.upsert(f"{table}", data=insert_data, conflict_column="id")
 
-            #print("Cached media:", media_data.title)
-            return media_data, row["id"]
+            media_data = replace(media_data, id=row.get("id"))
+            return media_data
         except Exception as e:
             error_handler.handle(e, context="cache_media")
+            return None
 
     async def search_media_multiple(self, media_type: str, name: str):
         """
@@ -277,7 +286,7 @@ class MovieManager:
         return results
 
 
-    async def get_media_details(self, media_type: str, media_id: str = None):
+    async def get_media_details(self, media_type: str, media_id: int | None = None)->Movie | Series | None:
         """
         Fetch media metadata from TMDB.
 
@@ -290,7 +299,7 @@ class MovieManager:
         """
 
         if not media_id:
-            return {}
+            return None
 
         async with aiohttp.ClientSession() as session:
             url = f"{MOVIE_BASE_URL}/{media_type}/{media_id}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
@@ -299,10 +308,10 @@ class MovieManager:
                 data = await resp.json()
 
         if data.get("status_code") == 34:
-            return {}
+            return None
 
         if not data.get("title") and not data.get("name"):
-            return {}
+            return None
 
         return Series.from_api(data) if media_type == "tv" else Movie.from_api(data)
 

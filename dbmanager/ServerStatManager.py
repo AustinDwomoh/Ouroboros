@@ -53,7 +53,7 @@ async def set_server_tourstate(guild_id: int, state: str):
 # -------------------------------------------------------------
 # ROLE MANAGEMENT
 # -------------------------------------------------------------
-async def get_role(guild_id: int, role: Roles) -> str:
+async def get_role(guild_id: int, role: Roles) -> str|None:
     """Return a specific role (player_role, tour_manager_role, or winner_role)."""
     if role not in Roles.get_roles():
         raise ValueError("Invalid role column")
@@ -82,7 +82,7 @@ async def set_role(guild_id: int, role: Roles, role_value: str):
 # -------------------------------------------------------------
 # CHANNEL MANAGEMENT
 # -------------------------------------------------------------
-async def set_channel_id(guild_id: int, channel: channelType, channel_id: int):
+async def set_channel_id(guild_id: int, channel: channelType, channel_id: int|None):
     """Set or update a specific channel ID in the serverstats table."""
     if channel not in channelType.get_channel_types():
         raise ValueError(f"Invalid channel type: {channel}")
@@ -153,7 +153,7 @@ async def get_tournament_servers():
         return {r["guild_id"]: {channelType.SIGNUP: r["signup_channel_id"], channelType.CHAT: r["chat_channel_id"], channelType.FIXTURES: r["fixtures_channel_id"]} for r in rows}
     except Exception as e:
         error_handler.handle(e, context="get_tournament_servers")
-        return []
+        return {}
 
 # -------------------------------------------------------------
 # GLOBAL OVERVIEW

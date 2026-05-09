@@ -134,7 +134,7 @@ class MediaSelectionView(discord.ui.View):
     async def select_callback(self, interaction: discord.Interaction):
         """Handle when user selects a media option."""
         
-        selected_id = interaction.data['values'][0]
+        selected_id = interaction.data['values'][0] #type: ignore
         selected_title = None   
         
         # Find selected media
@@ -152,7 +152,7 @@ class MediaSelectionView(discord.ui.View):
         
         # Disable selection
         for item in self.children:
-            item.disabled = True
+            item.disabled = True #type: ignore
         
         await interaction.response.edit_message(
             content=f"✅ Selected: **{selected_title}**\n⏳ Saving to database...",

@@ -36,7 +36,7 @@ class Rpvp(commands.Cog):
                 opponent_id = int(
                     match.group(1)
                 )  # Extract the user ID from the mention
-                opponent = interaction.guild.get_member(opponent_id)
+                opponent = interaction.guild.get_member(opponent_id)  # type: ignore
                 if opponent and opponent.id != interaction.user.id:
                     # Prepare the game view and opponent accept view
                     game_view = RPSview(interaction.user, opponent)
@@ -55,9 +55,8 @@ class Rpvp(commands.Cog):
                 )
         except Exception as e:
             errorHandler = ErrorHandler()
-            embed = errorHandler.help_embed()
             errorHandler.handle(e, context="rpvp command")
-            await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message("An error occurred while processing your request.")
 
 
 # ============================================================================ #

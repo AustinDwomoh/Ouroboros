@@ -49,9 +49,9 @@ class MatchView(ui.View):
     async def on_timeout(self):
         """Disable the ready button to prevent further inputs"""
         for child in self.children:
-            child.disabled = True
+            child.disabled = True #type: ignore
         if self.message:
-            await self.message.edit(view=self)
+            await self.message.edit(view=self) #type: ignore
 
     async def record_ready(self, interaction: discord.Interaction):
         """Handle player readiness"""
@@ -83,7 +83,7 @@ class MatchView(ui.View):
         # Notify the opponent
         opponent_id = match.get_opponent(interaction.user.id)
         if opponent_id:
-            opponent = await interaction.guild.fetch_member(opponent_id)
+            opponent = await interaction.guild.fetch_member(opponent_id) #type: ignore
             if opponent:
                 try:
                     message = await opponent.send(
@@ -101,10 +101,10 @@ class MatchView(ui.View):
                 except Exception as e:
                     errorHandler.handle(e, context="DM Error in Tournament Ready")
 
-    async def update_embed(self, interaction: discord.Interaction = None):
+    async def update_embed(self, interaction: discord.Interaction|None = None):
         """Update the embed to display all matches and their readiness statuses"""
         current_time = datetime.now()
-        future_time = current_time + timedelta(seconds=self.timeout)
+        future_time = current_time + timedelta(seconds=self.timeout)#type: ignore
         unix_timestamp = int(future_time.timestamp())
         
         embed = discord.Embed(
@@ -129,7 +129,7 @@ class MatchView(ui.View):
         if interaction and interaction.message:
             await interaction.message.edit(embed=embed)
         elif self.message:
-            await self.message.edit(embed=embed)
+            await self.message.edit(embed=embed) #type: ignore
 
 
 class WinLossButton(ui.Button):
@@ -176,10 +176,10 @@ class ResultsView(discord.ui.View):
         """Handle timeout"""
         # Disable buttons
         for child in self.children:
-            child.disabled = True
+            child.disabled = True #type: ignore 
         if self.message:
             try:
-                await self.message.edit(view=self)
+                await self.message.edit(view=self) #type: ignore
             except discord.NotFound:
                 pass
 
@@ -190,7 +190,7 @@ class ResultsView(discord.ui.View):
             opponent_id = self.match.get_opponent(player_id)
             choice = self.choices[player_id]
             
-            await self.message.channel.send(
+            await self.message.channel.send( #type: ignore
                 f"<@{player_id}> chose {choice}, but <@{opponent_id}> did not respond. "
                 f"<@{player_id}> wins by default for being active."
             )
@@ -198,7 +198,7 @@ class ResultsView(discord.ui.View):
             
         elif len(self.choices) == 0:
             # No player responded
-            await self.message.channel.send(
+            await self.message.channel.send( #type: ignore
                 "Neither player responded. Match requires admin intervention."
             )
             await self.result_callback(None, None)
@@ -209,7 +209,7 @@ class ResultsView(discord.ui.View):
 
         # Clean up
         try:
-            await self.message.delete()
+            await self.message.delete() #type: ignore
         except discord.NotFound:
             pass
 
@@ -232,7 +232,7 @@ class ResultsView(discord.ui.View):
             inline=False,
         )
         
-        await interaction.channel.send(
+        await interaction.channel.send( #type: ignore
             content=f"<@{opponent_id}>",
             embed=embed,
             delete_after=60
@@ -251,14 +251,14 @@ class ResultsView(discord.ui.View):
         if choice1 == choice2:
             # Conflict: both chose the same outcome
             self.conflict_counter += 1
-            await self.message.channel.send(
+            await self.message.channel.send( #type: ignore
                 f"Conflict detected: both <@{player1}> and <@{player2}> chose {choice1}. "
                 "Please re-confirm your choices."
             )
             self.choices.clear()
             
             if self.conflict_counter >= 3:
-                await self.message.channel.send(
+                await self.message.channel.send( #type: ignore
                     "Too many conflicts! Match cancelled. Admin intervention required."
                 )
                 await self.result_callback(None, None)
@@ -306,7 +306,7 @@ class DailyTournament(commands.Cog):
         self.player_roles: Dict[int, discord.Role] = {}
         self.manager_roles: Dict[int, discord.Role] = {}
         self.winner_roles: Dict[int, discord.Role] = {}
-        self.channels: Dict[int, Dict[str, discord.TextChannel]] = {}  # {guild_id: {channel_type: channel}}
+        self.channels: Dict[int, Dict[channelType, discord.TextChannel]] = {}  # {guild_id: {channel_type: channel}}
         
         self.daily_tournament_loop.start()
 
@@ -530,7 +530,7 @@ class DailyTournament(commands.Cog):
 
         # Register player
         tournament.players.append(interaction.user.id)
-        await interaction.user.add_roles(player_role)
+        await interaction.user.add_roles(player_role) #type: ignore
         
         if chat_channel:
             await chat_channel.set_permissions(player_role, send_messages=True)
@@ -612,13 +612,13 @@ class DailyTournament(commands.Cog):
                 await match_view.update_embed()
                 
                 message = await fixtures_channel.send(
-                    content=f"<@&{player_role.id}>",
+                    content=f"<@&{player_role.id}>", #type: ignore
                     view=match_view
                 )
-                match_view.message = message
+                match_view.message = message #type: ignore
 
                 # Wait for ready timeout
-                await asyncio.sleep(match_view.timeout)
+                await asyncio.sleep(match_view.timeout)   #type: ignore
 
             # Process ready statuses
             await self.process_ready_statuses(guild_id)
@@ -708,7 +708,7 @@ class DailyTournament(commands.Cog):
                 fixtures_channel
             )
             
-            timeout_timestamp = int((datetime.now() + timedelta(seconds=results_view.timeout)).timestamp())
+            timeout_timestamp = int((datetime.now() + timedelta(seconds=results_view.timeout)).timestamp()) #type: ignore
             embed = discord.Embed(
                 title=f"Match {match.match_id} Results",
                 description=f"Confirm your result! Timeout <t:{timeout_timestamp}:R>",
@@ -720,7 +720,7 @@ class DailyTournament(commands.Cog):
                 embed=embed,
                 view=results_view
             )
-            results_view.message = message
+            results_view.message = message #type: ignore
             result_views.append(results_view)
 
         # Wait for all results views to timeout
@@ -849,7 +849,7 @@ class DailyTournament(commands.Cog):
     @app_commands.guild_only()
     async def activate_tournament(self, interaction: discord.Interaction, state: str):
         """Activate or deactivate tournament system"""
-        req_role = await ServerStatManager.get_role(interaction.guild.id, Roles.TOUR_MANAGER)
+        req_role = await ServerStatManager.get_role(interaction.guild.id, Roles.TOUR_MANAGER) #type: ignore
         
         if not Roles.check_role_permission(interaction.user, req_role):
             embed = discord.Embed(
@@ -863,12 +863,12 @@ class DailyTournament(commands.Cog):
         state = "on" if state.lower() == "on" else "off"
 
         if state == "on":
-            await ServerStatManager.set_server_tourstate(interaction.guild.id, state)
-            category = discord.utils.get(interaction.guild.categories, name="🏆 Quick-Tournament")
+            await ServerStatManager.set_server_tourstate(interaction.guild.id, state) #type: ignore
+            category = discord.utils.get(interaction.guild.categories, name="🏆 Quick-Tournament") #type: ignore
 
             if category is None:
                 await interaction.response.send_message("Activating tournament...", ephemeral=True)
-                await self.setup_guild_channel(interaction.guild)
+                await self.setup_guild_channel(interaction.guild) #type: ignore
             else:
                 await interaction.response.send_message(
                     "Tournament channels already exist.", ephemeral=True
@@ -877,18 +877,18 @@ class DailyTournament(commands.Cog):
             await interaction.response.send_message(
                 "Deactivating tournament and cleaning up...", ephemeral=True
             )
-            await ServerStatManager.set_server_tourstate(interaction.guild.id, state)
-            await ServerStatManager.set_channel_id(interaction.guild.id, channelType.SIGNUP, None)
-            await ServerStatManager.set_channel_id(interaction.guild.id, channelType.FIXTURES, None)
-            await ServerStatManager.set_channel_id(interaction.guild.id, channelType.CHAT, None)
+            await ServerStatManager.set_server_tourstate(interaction.guild.id, state) #type: ignore
+            await ServerStatManager.set_channel_id(interaction.guild.id, channelType.SIGNUP, None) #type: ignore
+            await ServerStatManager.set_channel_id(interaction.guild.id, channelType.FIXTURES, None) #type: ignore
+            await ServerStatManager.set_channel_id(interaction.guild.id, channelType.CHAT, None) #type: ignore
 
             # Remove tournament data
-            self.end_tournament(interaction.guild.id)
-            if interaction.guild.id in self.channels:
-                del self.channels[interaction.guild.id]
+            self.end_tournament(interaction.guild.id) #type: ignore
+            if interaction.guild.id in self.channels: #type: ignore
+                del self.channels[interaction.guild.id]      #type: ignore
 
             # Delete channels
-            category = discord.utils.get(interaction.guild.categories, name="🏆 Quick-Tournament")
+            category = discord.utils.get(interaction.guild.categories, name="🏆 Quick-Tournament") #type: ignore
             if category:
                 for channel in category.channels:
                     await channel.delete()
@@ -909,7 +909,7 @@ class DailyTournament(commands.Cog):
         role_type: str
     ):
         """Change tournament role"""
-        req_role = await ServerStatManager.get_role(interaction.guild.id, Roles.TOUR_MANAGER)
+        req_role = await ServerStatManager.get_role(interaction.guild.id, Roles.TOUR_MANAGER) #type: ignore
 
         if not Roles.check_role_permission(interaction.user, req_role):
             embed = discord.Embed(
@@ -932,7 +932,7 @@ class DailyTournament(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        await ServerStatManager.set_role(interaction.guild.id, role_enum, new_role)
+        await ServerStatManager.set_role(interaction.guild.id, role_enum, new_role) #type: ignore
 
         embed = discord.Embed(
             title="Role Updated",

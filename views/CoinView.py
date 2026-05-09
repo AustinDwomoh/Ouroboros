@@ -54,7 +54,7 @@ class CoinFlipView(View):
                 result = random.choice([CoinFlipView.CHOICE_1, CoinFlipView.CHOICE_2])
                 results.append(result)
                 await interaction.followup.edit_message(
-                    interaction.message.id,
+                    interaction.message.id, #type: ignore
                     content=f"Throw {i + 1}: Coin landed on **{result}**.",
                 )
 
@@ -82,7 +82,6 @@ class CoinFlipView(View):
                 )
             )
         except Exception as e:
-           embed = errorHandler.help_embed()
            errorHandler.handle(e,context=f'Coinflip start command interaction')
-           await interaction.response.send_message(embed=embed)
+           await interaction.response.send_message("An error occurred while processing the coin flip.")
 

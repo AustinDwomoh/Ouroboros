@@ -18,7 +18,7 @@ class Rimiru:
 
     """
     _instance = None          
-    _pool: asyncpg.Pool = None 
+    _pool: asyncpg.Pool = None # type: ignore
     def __init__(self, pool: asyncpg.Pool):
         self.pool = pool
 
@@ -58,14 +58,14 @@ class Rimiru:
                 await db.async_create(...)
                 await db.async_update(...)
         """
-        return self.pool.transaction()
+        return self.pool.transaction() # type: ignore
 
     # ----------------------------------------------------
     #  CRUD
     # ----------------------------------------------------
-    async def select(self, table: str, columns: list = None, filters: dict = None, 
-                raw_where: str = None, raw_params: list = None,
-                order_by: str = None, limit: int = None):
+    async def select(self, table: str, columns: list|None = None, filters: dict|None = None, 
+                raw_where: str|None = None, raw_params: list|None = None,
+                order_by: str|None = None, limit: int|None = None) -> list[dict]:
         """
         Select records with optional filtering
         
@@ -110,7 +110,7 @@ class Rimiru:
             rows = await conn.fetch(sql, *params)
             return [dict(r) for r in rows]
 
-    async def selectOne(self, table: str, columns: list = None, filters: dict = None, order_by: str = None):
+    async def selectOne(self, table: str, columns: list|None = None, filters: dict|None = None, order_by: str|None = None):
         """
         Select a single record with optional filtering
         

@@ -144,7 +144,7 @@ class Series(Media):
         next_episode = Episode.from_dict(next_ep_data)
         
         return cls(
-            title=data.get("name") or data.get("original_name"),
+            title=data.get("name") or data.get("original_name"), # type: ignore
             tmdb_id=data["id"],
             overview=data.get("overview"),
             poster_path=data.get("poster_path"),
@@ -199,7 +199,7 @@ class Series(Media):
             "seasons": self.seasons,
         }
     
-    def to_media_dict(self) -> dict:
+    def to_media_dict(self) -> dict[str, object]:
         """Convert to dict for DB insertion (for media table)"""
         return {
             "media_type": "series",
@@ -299,7 +299,7 @@ class Movie(Media):
             "collection": self.collection,
         }
     
-    def to_media_dict(self) -> dict:
+    def to_media_dict(self) -> dict[str, object]:
         """Convert to dict for DB insertion (for media table)"""
         return {
             "media_type": "movies",
@@ -438,7 +438,9 @@ class UserMedia:
             return f"S{season}E{episode}"
 
         return None
-
+    @property
+    def has_next_episode(self) -> bool:
+        return self.next_episode_info is not None
     @property
     def color(self) -> int:
         return {
@@ -529,7 +531,7 @@ class UserMedia:
        
         return cls(
             id=row["id"],
-            media_type=MediaType.find_media_type(row["media_type"]),
+            media_type=MediaType.find_media_type(row.get("media_type", "")), # type: ignore
             title=row["title"],
             tmdb_id=row["tmdb_id"],
             overview=row.get("overview"),
@@ -575,7 +577,7 @@ class Match:
         """Get the opponent of a given player"""
         return next((p for p in self.players if p != player_id), None)
 
-    def record_result(self, winner_id: int, loser_id: int):
+    def record_result(self, winner_id: int|None, loser_id: int | None):
         """Record the match result"""
         self.winner = winner_id
         self.loser = loser_id

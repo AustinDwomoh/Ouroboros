@@ -27,9 +27,9 @@ class Sporty(commands.Cog):
         )
         except Exception as e:
             errorHandler = ErrorHandler()
-            embed = errorHandler.help_embed()
+
             errorHandler.handle(e,context=f"Error in sporty command")
-            await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message("An error occurred while processing your request.")
 
 
 # ============================================================================ #

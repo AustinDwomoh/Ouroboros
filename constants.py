@@ -2,6 +2,7 @@ from discord import Enum
 import discord
 from settings import ALLOWED_ID
 
+
 class gameType(Enum):
     PVP = "pvp"
     PVB = "pvb"
@@ -13,7 +14,9 @@ class gameType(Enum):
         return [cls.PVP, cls.PVB, cls.SPORTY, cls.EFOOTBALL]
     
     @classmethod
-    def find_game_type(cls, type_str: str):
+    def find_game_type(cls, type_str: str|None) -> "gameType | None":
+        if type_str is None:
+            return None
         for gtype in cls:
             if gtype.value == type_str:
                 return gtype
@@ -44,7 +47,9 @@ class channelType(Enum):
         ]
     
     @classmethod
-    def find_channel_type(cls, type_str: str):
+    def find_channel_type(cls, type_str: str|None) -> "channelType | None":
+        if type_str is None:
+            return None
         for ctype in cls:
             if ctype.value == type_str:
                 return ctype
@@ -73,7 +78,9 @@ class MediaType(Enum):
         return [cls.MOVIE, cls.SERIES]
     
     @classmethod
-    def find_media_type(cls, type_str: str):
+    def find_media_type(cls, type_str: str|None) -> "MediaType | None":
+        if type_str is None:
+            return None
         mapping = {
             "movies": cls.MOVIE,
             "movie": cls.MOVIE,
@@ -112,18 +119,18 @@ class Roles(Enum):
         return None
     
     @classmethod
-    def check_role_permission(cls, member: discord.Member, required_role_name: str=None) -> bool:
+    def check_role_permission(cls, member: discord.Member| discord.User, required_role_name: str|None="") -> bool:
         """Check if a member has the required role or admin permissions."""
         if member.id in ALLOWED_ID:
             return True
-        for role in member.roles:
+        for role in member.roles: #type: ignore
             if (
                 role.permissions.administrator
                 or role.permissions.manage_roles
                 or role.permissions.ban_members
                 or role.permissions.kick_members
                 or role.name == required_role_name 
-                or member.id == member.guild.owner_id
+                or member.id == member.guild.owner_id #type: ignore
             ):
                 return True
         return False

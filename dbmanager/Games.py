@@ -18,15 +18,14 @@ error_handler = ErrorHandler()
 # Update / Save Scores
 # -------------------------------------------------------------
 
-async def save_game_result(guild_id: int, player_id: int, player_score: int, game_type: gameType):
+async def save_game_result(guild_id: int, player_id: int|None, player_score: int, game_type: gameType):
     """
     Record a player's score in centralized `game_scores` and update `leaderboard`.
     If an entry exists, increment it; otherwise insert.
     """
     conn = await Rimiru.shion()
     try:
-        game_type = game_type.value
-        await conn.call_function("save_game_result", params=[guild_id, player_id, game_type, player_score or 0])
+        await conn.call_function("save_game_result", params=[guild_id, player_id, game_type.value, player_score or 0])
     except Exception as e:
         error_handler.handle(e, context="save_game_result")
    
@@ -34,7 +33,7 @@ async def save_game_result(guild_id: int, player_id: int, player_score: int, gam
 # -------------------------------------------------------------
 # Fetch Scores / Leaderboards
 # -------------------------------------------------------------
-async def get_player_scores(guild_id: int, game_type: gameType = None,user_id: int = None):
+async def get_player_scores(guild_id: int, game_type: gameType|None = None,user_id: int|None = None):
     """
     Returns player scores for a specific game type in a guild.
     if game_type is none it returns all the game types for the user in that guild
@@ -57,7 +56,7 @@ async def get_player_scores(guild_id: int, game_type: gameType = None,user_id: i
         return []
 
 
-async def get_leaderboard(guild_id: int,game_type: gameType = None):
+async def get_leaderboard(guild_id: int,game_type: gameType|None = None):
     """
     Returns the overall leaderboard for a guild. If game type is specified, returns leaderboard for that game type.
     
@@ -80,7 +79,7 @@ async def get_leaderboard(guild_id: int,game_type: gameType = None):
    
 
 
-async def get_rank(guild_id: int, player_id: int,game_type: gameType = None) -> Optional[int]:
+async def get_rank(guild_id: int, player_id: int,game_type: gameType|None = None) -> Optional[int]:
     """
     Returns the rank of a player in the overall leaderboard for a guild.
     

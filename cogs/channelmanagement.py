@@ -5,6 +5,7 @@ import discord, asyncio
 from discord import app_commands
 from discord.ext import commands
 from settings import ErrorHandler,ALLOWED_ID
+from constants import Roles
 
 errorHandler = ErrorHandler()
 # ============================================================================
@@ -49,10 +50,13 @@ class ChannelManagement(commands.Cog):
         channels (discord.TextChannel): The channel to be deleted.
         """
 
-        # Check if the user has permission to delete channels
-        if ( interaction.user.id not in ALLOWED_ID and not any( role.permissions.administrator for role in interaction.user.roles)
-            and not any( role.permissions.manage_roles or role.permissions.ban_members or role.permissions.kick_members for role in interaction.user.roles)):
-            embed = discord.Embed( title="Permission Denied", description="You are not allowed to invoke this command.", color=discord.Color.red(),)
+       
+        if not Roles.check_role_permission(interaction.user, " "):
+            embed = discord.Embed(
+            title="Permission Denied",
+            description="You don't have permission to use this command.",
+            color=discord.Color.red(),
+            )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         try:
@@ -87,9 +91,8 @@ class ChannelManagement(commands.Cog):
             )
             errorHandler.handle(e,context="ChannelManagement.delete_channels")
         except Exception as e:
-            embed = errorHandler.help_embed()
             errorHandler.handle(e, context="ChannelManagement.delete_channels final except")
-            await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message("An error occurred while processing your request.", ephemeral=True)
 
 
     # ============================================================================
@@ -111,12 +114,11 @@ class ChannelManagement(commands.Cog):
         """
 
         # Check if the user has permission to delete categories
-        if ( interaction.user.id not in ALLOWED_ID and not any(role.permissions.administrator for role in interaction.user.roles)
-            and not any( role.permissions.manage_roles or role.permissions.ban_members or role.permissions.kick_members for role in interaction.user.roles )):
+        if not Roles.check_role_permission(interaction.user, " "):
             embed = discord.Embed(
-                title="Permission Denied",
-                description="You are not allowed to invoke this command.",
-                color=discord.Color.red(),
+            title="Permission Denied",
+            description="You don't have permission to use this command.",
+            color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -154,9 +156,11 @@ class ChannelManagement(commands.Cog):
             )
             errorHandler.handle(e, context="ChannelManagement.delete_categories")
         except Exception as e:
-            embed = errorHandler.help_embed()
+            await interaction.followup.send(
+                "An error occurred while processing your request.",
+                ephemeral=True,
+            )
             errorHandler.handle(e, context="ChannelManagement.delete_categories")
-            await interaction.response.send_message(embed=embed)
     # ============================================================================
     #                             CLEAR MESSAGES COMMAND                         =
     # ============================================================================
@@ -171,17 +175,11 @@ class ChannelManagement(commands.Cog):
         channel (Optional[discord.TextChannel]): The channel from which messages will be cleared. Defaults to the current channel if None.
         limit (int): The number of messages to delete.
         """
-        if ( interaction.user.id not in ALLOWED_ID and not any( role.permissions.administrator for role in interaction.user.roles) and not any(
-                role.permissions.manage_roles
-                or role.permissions.ban_members
-                or role.permissions.kick_members
-                for role in interaction.user.roles
-            )
-        ):
+        if not Roles.check_role_permission(interaction.user, " "):
             embed = discord.Embed(
-                title="Permission Denied",
-                description="You are not allowed to invoke this command.",
-                color=discord.Color.red(),
+            title="Permission Denied",
+            description="You don't have permission to use this command.",
+            color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -212,9 +210,8 @@ class ChannelManagement(commands.Cog):
                     ephemeral=True,
                 )
             except Exception as e:
-                embed = errorHandler.help_embed()
                 errorHandler.handle(e, context="ChannelManagement.clear_messages")
-                await interaction.response.send_message(embed=embed)
+                await interaction.response.send_message("An error occurred while processing your request.")
 
     @app_commands.command(name="hi", description="To esatblish a dm connection")
     @app_commands.guild_only()
@@ -262,9 +259,8 @@ class ChannelManagement(commands.Cog):
             errorHandler.handle(e,context="ChannelManagement.hi could not send DM")
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
         except Exception as e:
-            embed = errorHandler.help_embed()
             errorHandler.handle(e,context="ChannelManagement.hi final except")
-            await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message("An error occurred while processing your request.")
    
     @app_commands.command(name="cleandms", description="Clean the bot dms")
     async def cleandms(self, interaction: discord.Interaction):

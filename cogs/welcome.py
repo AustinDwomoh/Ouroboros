@@ -3,7 +3,7 @@ import discord,random
 from discord import app_commands
 from discord.ext import commands
 from dbmanager import ServerStatManager
-from constants import channelType
+from constants import Roles, channelType
 errorHandler = ErrorHandler()
 img_dir = IMGS_DIR
 
@@ -99,23 +99,15 @@ class WelcomeGoodbyeCog(commands.Cog):
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ):
         """Set the welcome channel for the guild."""
-        if interaction.user.id not in ALLOWED_ID and not any(
-            role.permissions.administrator
-            or role.permissions.manage_roles
-            or role.permissions.ban_members
-            or role.permissions.kick_members
-            or role.name == "Tour manager"
-            or interaction.user.id == interaction.user.guild.owner_id
-            for role in interaction.user.roles
-        ):
+        if not Roles.check_role_permission(interaction.user, " "):
             embed = discord.Embed(
-                title="Permission Denied",
-                description="You are not allowed to invoke this command.",
-                color=discord.Color.red(),
+            title="Permission Denied",
+            description="You don't have permission to use this command.",
+            color=discord.Color.red(),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.WELCOME, channel.id)
+        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.WELCOME, channel.id) #type: ignore
         await interaction.response.send_message(
             f"Welcome channel set to {channel.mention}", ephemeral=True
         )
@@ -129,15 +121,7 @@ class WelcomeGoodbyeCog(commands.Cog):
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ):
         """Set the goodbye channel for the guild."""
-        if interaction.user.id not in ALLOWED_ID and not any(
-            role.permissions.administrator
-            or role.permissions.manage_roles
-            or role.permissions.ban_members
-            or role.permissions.kick_members
-            or role.name == "Tour manager"
-            or interaction.user.id == interaction.user.guild.owner_id
-            for role in interaction.user.roles
-        ):
+        if not Roles.check_role_permission(interaction.user, ""):
             embed = discord.Embed(
                 title="Permission Denied",
                 description="You are not allowed to invoke this command.",
@@ -145,7 +129,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.GOODBYE, channel.id)
+        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.GOODBYE, channel.id) #type: ignore
         await interaction.response.send_message(
             f"Goodbye channel set to {channel.mention}", ephemeral=True
         )
