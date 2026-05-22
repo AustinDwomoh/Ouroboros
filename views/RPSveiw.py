@@ -212,14 +212,9 @@ class RPSview(ui.View):
                 content=f"{result_message}\n{final_message}",
                 view=None
             )
-            if self.is_bot_game:
-                # Save game result for player vs bot
-                await Games.save_game_result(interaction.guild.id, self.player1.id, self.player1_score, gameType.PVB) #type: ignore
-
-            else:
+            if not self.is_bot_game:
                 # Save game result for player vs player
                 await Games.save_game_result(interaction.guild.id, self.player1.id, self.player1_score, gameType.PVP) #type: ignore
-
                 await Games.save_game_result(interaction.guild.id, self.player2.id, self.player2_score, gameType.PVP) #type: ignore
 
         

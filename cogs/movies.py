@@ -39,7 +39,7 @@ class Movies(commands.Cog):
     @app_commands.dm_only()
     async def add_to_watchlist(self, interaction: discord.Interaction, title: str,media_type: str):
         """Add media to watchlist."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         try:
             if media_type.lower() == "movie":
                 await self.add_movie_template(interaction, title, watchlist=True)
@@ -58,7 +58,7 @@ class Movies(commands.Cog):
     @app_commands.dm_only()
     async def add_movie(self, interaction: discord.Interaction, title: str):
         """Add a movie with automatic conflict resolution."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         
         try:
             await self.add_movie_template(interaction, title, watchlist=False)
@@ -76,8 +76,8 @@ class Movies(commands.Cog):
     @app_commands.dm_only()
     async def add_series(self, interaction: discord.Interaction, title: str,season: int,episode: int):
         """Add a series with conflict resolution."""
-        await interaction.response.defer(ephemeral=True)
-        
+        await interaction.response.defer()
+    
         try: 
             await self.add_series_template(interaction, title, season, episode, watchlist=False)       
         except Exception as e:

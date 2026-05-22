@@ -391,7 +391,7 @@ class MovieManager:
                         description=embed_data["description"],
                         color=embed_data["color"]             
                     )
-
+                    
                     if embed_data.get("thumbnail"):
                         embed.set_thumbnail(url=embed_data["thumbnail"])
 

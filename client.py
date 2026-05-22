@@ -143,12 +143,15 @@ class Client(commands.Bot):
 
         last_seen = self._seen_users.get(uid)
         if last_seen and now - last_seen < CACHE_TTL:
+            logger.info(f"User {uid} seen recently, skipping DB check")
+            logger.info(f"Current _seen_users: {self._seen_users}")
             return
-        
-        await self.db.upsert(
+        logger.info(f"User {uid} not seen recently, proceeding with DB check")
+        logger.info(f"Current _seen_users: {self._seen_users}")
+        hw = await self.db.upsert(
                 "users", {"discord_id": uid, "username": interaction.user.name}, conflict_column="discord_id"
             )
-
+        logger.info(f"User {uid} saved to DB: {hw}")
         self._seen_users[uid] = now
     
     def parse_announcement(self, raw: str):
@@ -181,13 +184,19 @@ class Client(commands.Bot):
 
     async def on_interaction(self, interaction: discord.Interaction):
         """Handle all interactions and ensure user exists in database."""
+        # Log the interaction
+        logger.info(f"[Interaction] Received interaction from {interaction.user} with ID {interaction.id}")
         if interaction.user.bot:
+            logger.info(f"Interaction from bot ignored: {interaction.user}")
             return
         
         # Run ensure_user in background without blocking the interaction
-        self.loop.create_task(
-            self.ensure_user(interaction)
-        )
+        try:
+            logger.info(f"Ensuring user {interaction.user.id} exists in DB")
+            await self.ensure_user(interaction)
+        except Exception as e:
+            # Log but don't break the interaction
+            logger.error(f"Error ensuring user in DB: {e}")
 
 
     async def load_commands(self):
