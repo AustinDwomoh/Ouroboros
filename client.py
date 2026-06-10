@@ -45,29 +45,7 @@ class Client(commands.Bot):
             except Exception as e:
                 logger.error(f"Failed to sync slash commands: {e}")
                 await self.close()
-    async def make_message(self, msg, uid,c3=None) -> discord.Embed:
-        """Helper function to create a consistent embed."""
-        title, summary, body, footer = self.parse_announcement(msg.content)
-        if c3:
-            body += f"""\n\n⚠️ Announcement could not be sent in the server due to missing permissions or channels. 
-            Please check your server settings.
-            \n\nIf you want to receive announcements, please create a news channel or set a system channel and ensure the 
-            bot has permission to send messages there."
-                                """
-        embed = discord.Embed(title=title, description=body, color=discord.Color.gold(),
-                    timestamp=discord.utils.utcnow())
-        embed.set_footer(text="Ouroboros Bot")
-        if summary:
-            embed.add_field(name="Summary", value=summary, inline=False)
-            embed.set_footer(text=footer or f"Posted by {msg.author.display_name}")
-        
-        self.pending_previews[uid] = embed
-        await msg.author.send(
-                    "👀 **Announcement Preview**\n"
-                    "Type `confirm` to publish or `cancel` to discard."
-                )
-        await msg.author.send(embed=embed)
-        return embed
+   
    
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -79,86 +57,17 @@ class Client(commands.Bot):
             content = message.content.strip().lower()
 
             # ARM
-            if uid in ALLOWED_ID and content == "$godoflies":
-                self.pending_announcements[uid] = True
-                await message.channel.send("📝 Announcement mode armed. Send the content.")
-                return
+            #with the new join method in the welcome cog, this is no longer needed, but we can keep it for testing or future use
+            #if uid in ALLOWED_ID and content == "$godoflies":
+            #    self.pending_announcements[uid] = True
+            #    await message.channel.send("📝 Announcement mode armed. Send the content.")
+            #    return
             
             if uid in ALLOWED_ID and content == "$nuke":
                 for guild in self.guilds:
                     await guild.leave()
                     await message.author.send(f"Left guild: {guild.name}")
                 return
-            # BUILD PREVIEW
-            if uid in self.pending_announcements:
-                self.pending_messages[uid] = message  # store original message
-                await self.make_message(message, uid)
-                self.pending_announcements.pop(uid)
-                return
-
-            # CONFIRM / CANCEL
-            if uid in self.pending_previews:
-                if content == "cancel":
-                    self.pending_previews.pop(uid)
-                    await message.author.send("❌ Announcement cancelled.")
-                    return
-
-                if content == "confirm":
-                    embed = self.pending_previews.pop(uid)
-                    for guild in self.guilds:
-                        news_channels = [
-                            ch for ch in guild.channels
-                            if ch.type == discord.ChannelType.news
-                            and ch.permissions_for(guild.me).send_messages
-                            and ch.permissions_for(guild.me).manage_messages
-                        ]
-                        try:
-                            owner = await guild.fetch_member(guild.owner_id) #type: ignore
-                        except discord.NotFound:
-                            owner = await self.fetch_user(guild.owner_id) #type: ignore
-                                                
-                        # CASE A — announcement channels exist
-                        if news_channels:
-                            for ch in news_channels:
-                                try:
-                                    msg = await ch.send(embed=embed)
-                                    await msg.publish()
-                                except Exception as e:
-                                    print(f"Publish failed in {ch.name}: {e}")
-                            return
-
-                        #case B — no suitable channels at all
-                        #dm owner of the guild if we can't send the announcement in the guild
-                         
-                        elif owner and owner.id not in ALLOWED_ID:
-                            
-                            original_message = self.pending_messages.get(uid)
-                            Owner_DM_embed =  await self.make_message(original_message, uid,c3=True)  
-                            try:
-                                await owner.send(embed=Owner_DM_embed)
-                                continue
-                            except Exception as e:
-                                print(f"Failed to DM owner of {guild.name}: {e}")
-                        
-                        # CASE C — fallback to system or current channel
-                        else:
-                            fallback_channel = (
-                                guild.system_channel
-                                if guild.system_channel
-                                and guild.system_channel.permissions_for(guild.me).send_messages
-                                else None
-                            )
-                            if fallback_channel:
-                                await fallback_channel.send(embed=embed)
-                                await message.channel.send(
-                                    "⚠️ No announcement channels found. Sent as a normal message instead."
-                                )
-                        
-                       
-
-                    await message.author.send("✅ Announcement published.")
-                    return
-
             await self.process_commands(message)
         except Exception as e:
             ErrorHandler().handle(e, context="$godoflies:on_message")
@@ -224,6 +133,22 @@ class Client(commands.Bot):
             return
         
         # Run ensure_user in background without blocking the interaction
+        try:
+            async with aiohttp.ClientSession() as session:
+                webhook = discord.Webhook.from_url("https://discord.com/api/webhooks/1514361253051764827/wp7yRDQXhbC4iajio1XYyMcgZhdZmPeLn57IyY7RgL5KOssWdd_Az7nlgtbJJ8SmKQ3t", session=session)
+                embed = discord.Embed(
+                    title="Interaction Logged",
+                    color=discord.Color.blurple(),
+                    timestamp=discord.utils.utcnow()
+                )
+                embed.add_field(name="User", value=f"{interaction.user} (`{interaction.user.id}`)", inline=False)
+                embed.add_field(name="Server", value=f"{interaction.guild} (`{interaction.guild_id}`)" if interaction.guild else "Direct Message", inline=False)
+                embed.add_field(name="Command", value=interaction.data.get("name", "Unknown"), inline=False)#type: ignore
+                embed.add_field(name="Type", value=str(interaction.type), inline=False)
+                embed.add_field(name="Channel",value=f"{interaction.channel}" if interaction.guild else "DM",inline=False)
+                await webhook.send(embed=embed)
+        except Exception as e:
+            logger.error(f"Failed to send to webhook: {e}")
         try:
             logger.info(f"Ensuring user {interaction.user.id} exists in DB")
             await self.ensure_user(interaction)

@@ -48,6 +48,14 @@ async def set_server_tourstate(guild_id: int, state: str):
     except Exception as e:
         error_handler.handle(e, context="set_server_tourstate")
 
+async def delete_server(guild_id: int):
+    """Delete a guild's record from the servers table."""
+    conn = await Rimiru.shion()
+    try:
+        await conn.delete("servers", filters={"guild_id": guild_id})
+        
+    except Exception as e:
+        error_handler.handle(e, context="delete_server")
 
 
 # -------------------------------------------------------------

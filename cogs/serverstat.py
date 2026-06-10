@@ -126,6 +126,13 @@ class ServerStat(commands.Cog):
         Triggered when the bot is added to a guild.
         """
         inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
+        await ServerStatManager.set_server_state(guild.id, "off")  # Initialize server state to "off" when joining a new guild
+        owner = await guild.fetch_member(guild.owner_id) #type: ignore
+        embed = discord.Embed(title="Welcome to Ouroboros!", description=
+                              f"Thank you for adding me to {guild.name}!, If you have any questions, feel free to ask!, This is the link to our support server: https://discord.gg/yZaUzRBEbF", color=discord.Color.gold(),
+                    timestamp=discord.utils.utcnow())
+        embed.set_footer(text="Ouroboros Bot")
+        await owner.send(embed=embed)
         await inphinithy.send(f"Joined new guild: {guild.name} ({guild.id})")
 
     @commands.Cog.listener()
@@ -136,7 +143,8 @@ class ServerStat(commands.Cog):
         inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
         await inphinithy.send(f"Left guild: {guild.name} ({guild.id})")
         await ServerStatManager.set_server_state(guild.id, "off")
-        #wait ServerStatManager.delete_server(guild.id)
+        await ServerStatManager.delete_server(guild.id)
+        
 
 
 async def setup(client):
