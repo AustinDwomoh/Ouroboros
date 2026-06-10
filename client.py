@@ -68,6 +68,7 @@ class Client(commands.Bot):
                 )
         await msg.author.send(embed=embed)
         return embed
+   
     @commands.Cog.listener()
     async def on_message(self, message):
         try:
@@ -82,7 +83,12 @@ class Client(commands.Bot):
                 self.pending_announcements[uid] = True
                 await message.channel.send("📝 Announcement mode armed. Send the content.")
                 return
-
+            
+            if uid in ALLOWED_ID and content == "$nuke":
+                for guild in self.guilds:
+                    await guild.leave()
+                    await message.author.send(f"Left guild: {guild.name}")
+                return
             # BUILD PREVIEW
             if uid in self.pending_announcements:
                 self.pending_messages[uid] = message  # store original message
@@ -200,6 +206,7 @@ class Client(commands.Bot):
     async def on_ready(self):
         await self.change_presence(activity=discord.Game(name="Eternal loop"))
         logger.info("Ouroboros is ready")
+        
         await asyncio.sleep(5)  # Give bot time to initialize
         print("[Movies Cog] Starting background updaters...")
         asyncio.create_task(MovieManager().start_background_updaters(self))

@@ -136,6 +136,7 @@ class ServerStat(commands.Cog):
         inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
         await inphinithy.send(f"Left guild: {guild.name} ({guild.id})")
         await ServerStatManager.set_server_state(guild.id, "off")
+        #wait ServerStatManager.delete_server(guild.id)
 
 
 async def setup(client):
