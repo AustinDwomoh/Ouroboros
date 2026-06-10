@@ -130,8 +130,8 @@ class Client(commands.Bot):
                         #case B — no suitable channels at all
                         #dm owner of the guild if we can't send the announcement in the guild
                          
-                        elif guild.owner:
-                            owner = guild.owner
+                        elif owner and owner.id not in ALLOWED_ID:
+                            
                             original_message = self.pending_messages.get(uid)
                             Owner_DM_embed =  await self.make_message(original_message, uid,c3=True)  
                             try:
