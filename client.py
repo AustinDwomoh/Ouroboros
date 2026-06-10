@@ -16,7 +16,7 @@ intents.message_content = True
 intents.guild_messages = True
 intents.members = True
 
-CACHE_TTL = 1
+CACHE_TTL = 300
 
 class Client(commands.Bot):
     def __init__(self):
@@ -26,13 +26,15 @@ class Client(commands.Bot):
         self._seen_users: dict[int, float] = {}
         self.pending_announcements = {}
         self.pending_previews = {}
+        self.pending_messages = {} 
 
     async def setup_hook(self):
         self.db = await Rimiru.shion() 
         await self.load_commands()
         await self.load_cogs()
+        self.add_listener(self.on_interaction, "on_interaction") 
         logger.info("Loaded commands and cogs")
-
+    
         if not self.synced:
             try:
                 synced = await self.tree.sync()
@@ -43,7 +45,29 @@ class Client(commands.Bot):
             except Exception as e:
                 logger.error(f"Failed to sync slash commands: {e}")
                 await self.close()
-
+    async def make_message(self, msg, uid,c3=None) -> discord.Embed:
+        """Helper function to create a consistent embed."""
+        title, summary, body, footer = self.parse_announcement(msg.content)
+        if c3:
+            body += f"""\n\n⚠️ Announcement could not be sent in the server due to missing permissions or channels. 
+            Please check your server settings.
+            \n\nIf you want to receive announcements, please create a news channel or set a system channel and ensure the 
+            bot has permission to send messages there."
+                                """
+        embed = discord.Embed(title=title, description=body, color=discord.Color.gold(),
+                    timestamp=discord.utils.utcnow())
+        embed.set_footer(text="Ouroboros Bot")
+        if summary:
+            embed.add_field(name="Summary", value=summary, inline=False)
+            embed.set_footer(text=footer or f"Posted by {msg.author.display_name}")
+        
+        self.pending_previews[uid] = embed
+        await msg.author.send(
+                    "👀 **Announcement Preview**\n"
+                    "Type `confirm` to publish or `cancel` to discard."
+                )
+        await msg.author.send(embed=embed)
+        return embed
     @commands.Cog.listener()
     async def on_message(self, message):
         try:
@@ -61,29 +85,9 @@ class Client(commands.Bot):
 
             # BUILD PREVIEW
             if uid in self.pending_announcements:
-                user_id = self.pending_announcements.pop(uid)
-
-                title, summary, body, footer = self.parse_announcement(message.content)
-
-                embed = discord.Embed(
-                    title=title,
-                    description=body,
-                    color=discord.Color.gold(),
-                    timestamp=discord.utils.utcnow()
-                )
-
-                if summary:
-                    embed.add_field(name="Summary", value=summary, inline=False)
-
-                embed.set_footer(text=footer or f"Posted by {message.author.display_name}")
-
-                self.pending_previews[uid] = embed
-
-                await message.author.send(
-                    "👀 **Announcement Preview**\n"
-                    "Type `confirm` to publish or `cancel` to discard."
-                )
-                await message.author.send(embed=embed)
+                self.pending_messages[uid] = message  # store original message
+                await self.make_message(message, uid)
+                self.pending_announcements.pop(uid)
                 return
 
             # CONFIRM / CANCEL
@@ -102,7 +106,11 @@ class Client(commands.Bot):
                             and ch.permissions_for(guild.me).send_messages
                             and ch.permissions_for(guild.me).manage_messages
                         ]
-
+                        try:
+                            owner = await guild.fetch_member(guild.owner_id) #type: ignore
+                        except discord.NotFound:
+                            owner = await self.fetch_user(guild.owner_id) #type: ignore
+                                                
                         # CASE A — announcement channels exist
                         if news_channels:
                             for ch in news_channels:
@@ -113,18 +121,34 @@ class Client(commands.Bot):
                                     print(f"Publish failed in {ch.name}: {e}")
                             return
 
-                        # CASE B — fallback to system or current channel
-                        fallback_channel = (
-                            guild.system_channel
-                            if guild.system_channel
-                            and guild.system_channel.permissions_for(guild.me).send_messages
-                            else None
-                        )
-                        if fallback_channel:
-                            await fallback_channel.send(embed=embed)
-                            await message.channel.send(
-                                "⚠️ No announcement channels found. Sent as a normal message instead."
+                        #case B — no suitable channels at all
+                        #dm owner of the guild if we can't send the announcement in the guild
+                         
+                        elif guild.owner:
+                            owner = guild.owner
+                            original_message = self.pending_messages.get(uid)
+                            Owner_DM_embed =  await self.make_message(original_message, uid,c3=True)  
+                            try:
+                                await owner.send(embed=Owner_DM_embed)
+                                continue
+                            except Exception as e:
+                                print(f"Failed to DM owner of {guild.name}: {e}")
+                        
+                        # CASE C — fallback to system or current channel
+                        else:
+                            fallback_channel = (
+                                guild.system_channel
+                                if guild.system_channel
+                                and guild.system_channel.permissions_for(guild.me).send_messages
+                                else None
                             )
+                            if fallback_channel:
+                                await fallback_channel.send(embed=embed)
+                                await message.channel.send(
+                                    "⚠️ No announcement channels found. Sent as a normal message instead."
+                                )
+                        
+                       
 
                     await message.author.send("✅ Announcement published.")
                     return
@@ -182,9 +206,11 @@ class Client(commands.Bot):
 
         print("[Movies Cog] Background updaters started!")
 
+  
     async def on_interaction(self, interaction: discord.Interaction):
         """Handle all interactions and ensure user exists in database."""
         # Log the interaction
+        print(f"[Interaction] Received interaction from {interaction.user} with ID {interaction.id}")
         logger.info(f"[Interaction] Received interaction from {interaction.user} with ID {interaction.id}")
         if interaction.user.bot:
             logger.info(f"Interaction from bot ignored: {interaction.user}")

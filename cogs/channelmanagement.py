@@ -219,6 +219,8 @@ class ChannelManagement(commands.Cog):
         """This command is used to establish a DM connection with the bot."""
         try:
             # Create an embed for the DM message
+            inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
+            await inphinithy.send(f"User {interaction.user} used the /hi command to establish a DM connection.")
             dm_embed = discord.Embed(
                 title="Hello from Ouroboros!",
                 description=(

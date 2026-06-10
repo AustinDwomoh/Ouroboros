@@ -318,6 +318,7 @@ class DailyTournament(commands.Cog):
         """Start a new tournament for a guild"""
         tournament = Round(round_number=1)
         self.tournaments[guild_id] = tournament
+        #print( "tournament:",self.tournaments,"\nendpoint:","start_tournament","\nguild_id",guild_id,"\nplayer_roles", self.player_roles,"\nmanager_roles", self.manager_roles,"\nwinner_roles", self.winner_roles,"\nchannels", self.channels)
         return tournament
 
     def get_next_round(self, guild_id: int) -> Optional[Round]:
@@ -340,7 +341,11 @@ class DailyTournament(commands.Cog):
     def end_tournament(self, guild_id: int):
         """End the tournament for a guild"""
         if guild_id in self.tournaments:
+            
+           # print( "tournament:",self.tournaments,"\nendpoint:","before_end","\nguild_id",guild_id,"\nplayer_roles", self.player_roles,"\nmanager_roles", self.manager_roles,"\nwinner_roles", self.winner_roles,"\nchannels", self.channels)
             del self.tournaments[guild_id]
+            #`print( "tournament:",self.tournaments,"\nendpoint:","after_end","\nguild_id",guild_id,"\nplayer_roles", self.player_roles,"\nmanager_roles", self.manager_roles,"\nwinner_roles", self.winner_roles,"\nchannels", self.channels)
+       
 
     async def setup_guild_channel(self, guild: discord.Guild):
         """Create tournament channels for a guild"""
@@ -352,8 +357,27 @@ class DailyTournament(commands.Cog):
             signup_channel = await category.create_text_channel("sign_up")
             fixtures_channel = await category.create_text_channel("fixtures")
             chat_channel = await category.create_text_channel("chat_channel")
+            #embed = discord.Embed(
+            #    title="Support Server Created",
+            #    description=(
+            #        "Due to Discord's rules and privacy notice, I decided to make a server "
+            #        "to host and help users best enjoy the bot.\n\n"
+            #        "The link is below here\n"
+            #        "https://discord.gg/RXTtbMfZRF"
+            #    ),
+            #    color=discord.Color.blurple()
+            #)
+#
+            #embed.add_field(
+            #    name="⚠️ Bug Notice",
+            #    value="There is currently a known bug with the tour commands. We are aware and working on a fix!",
+            #    inline=False
+            #)
 
-            # Store channels
+            #embed.set_footer(text="Thank you for your patience!")
+
+            #await signup_channel.send(content="@everyone", embed=embed)
+                        # Store channels
             self.channels[guild.id] = {
                 channelType.SIGNUP: signup_channel,
                 channelType.FIXTURES: fixtures_channel,
@@ -402,6 +426,25 @@ class DailyTournament(commands.Cog):
             manager_role = await guild.create_role(name=Roles.TOUR_MANAGER.value)
         
         self.manager_roles[guild.id] = manager_role
+    
+    async def delete_roles(self, guild: discord.Guild):
+        """Delete tournament roles for a guild"""
+        # Player role
+        stored_player_role = await ServerStatManager.get_role(guild.id, Roles.PLAYER)
+        player_role = discord.utils.get(guild.roles, name=stored_player_role) if stored_player_role != Roles.NONE.value else None
+        
+        if  player_role:
+            await player_role.delete()
+        await ServerStatManager.set_role(guild.id, Roles.PLAYER, Roles.NONE.value) #type: ignore
+        #del self.player_roles[guild.id]
+
+        stored_manager_role = await ServerStatManager.get_role(guild.id, Roles.TOUR_MANAGER)
+        manager_role = discord.utils.get(guild.roles, name=stored_manager_role) if stored_manager_role != Roles.NONE.value else None
+        
+        if  manager_role:
+            await manager_role.delete()
+        await ServerStatManager.set_role(guild.id, Roles.TOUR_MANAGER, Roles.NONE.value) #type: ignore
+        #del self.manager_roles[guild.id]
 
     async def send_guidelines(self, guild_id: int):
         """Send tournament guidelines"""
@@ -546,7 +589,8 @@ class DailyTournament(commands.Cog):
         channels = self.channels.get(guild_id, {})
         signup_channel = channels.get(channelType.SIGNUP)
         player_role = self.player_roles.get(guild_id)
-        
+        # print( "tournament:",self.tournaments,"\nendpoint:","start_tournament","\nguild_id",guild_id,"\nplayer_roles", self.player_roles,"\nmanager_roles", self.manager_roles,"\nwinner_roles", self.winner_roles,"\nchannels", self.channels)
+       
         if not tournament or not signup_channel:
             return
 
@@ -881,7 +925,7 @@ class DailyTournament(commands.Cog):
             await ServerStatManager.set_channel_id(interaction.guild.id, channelType.SIGNUP, None) #type: ignore
             await ServerStatManager.set_channel_id(interaction.guild.id, channelType.FIXTURES, None) #type: ignore
             await ServerStatManager.set_channel_id(interaction.guild.id, channelType.CHAT, None) #type: ignore
-
+            await self.delete_roles(interaction.guild) #type: ignore
             # Remove tournament data
             self.end_tournament(interaction.guild.id) #type: ignore
             if interaction.guild.id in self.channels: #type: ignore
