@@ -27,6 +27,7 @@ PUBLIC_KEY = os.getenv("TEST_PUBLIC_KEY") if IS_TESTING else os.getenv("PUBLIC_K
 CREATOR_ID = os.getenv("CREATOR")
 ALLOWED_ID = [int(CREATOR_ID)] if CREATOR_ID else []
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+DISCORD_LOGGING_WEBHOOK_URL = os.getenv("DISCORD_LOGGING_WEBHOOK_URL")
 # ---------------------------
 # External APIs
 # ---------------------------
@@ -39,7 +40,7 @@ X_ACCESS_SECRET = os.getenv("X_ACCESS_SECRET")
 MOVIE_BASE_URL = os.getenv("MOVIE_BASE_URL")
 MOVIE_API_KEY = os.getenv("MOVIE_API_KEY")
 H_BASE_URL = os.getenv("HIANIME_BASE_URL")
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+
 
 # ---------------------------
 # Database Config

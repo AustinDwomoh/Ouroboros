@@ -133,12 +133,71 @@ class Client(commands.Bot):
             return
         
         # Run ensure_user in background without blocking the interaction
+        command_color = {
+            # Universal
+            "ouroboros":        discord.Color.og_blurple(),
+            "rps":              discord.Color.blue(),
+            "sporty":           discord.Color.purple(),
+            "help":             discord.Color.light_grey(),
+            "hi":               discord.Color.teal(),
+
+            # Server only
+            "rpvp":             discord.Color.orange(),
+            "leaderboard":      discord.Color.gold(),
+            "rank":             discord.Color.yellow(),
+            "level_self":       discord.Color.green(),
+            "level_server":     discord.Color.dark_green(),
+            "coinflip":         discord.Color.greyple(),
+            "create_embed":     discord.Color.magenta(),
+
+            # DM / Media
+            "add_movie":        discord.Color.red(),
+            "add_series":       discord.Color.dark_red(),
+            "add_to_watchlist": discord.Color.brand_red(),
+            "watchlist":        discord.Color.dark_magenta(),
+            "incomplete":       discord.Color.dark_orange(),
+            "search_media":     discord.Color.blurple(),
+            "delete_media":     discord.Color.dark_grey(),
+
+            # Admin
+            "set_welcome_channel":  discord.Color.brand_green(),
+            "set_goodbye_channel":  discord.Color.dark_teal(),
+            "server_stats":         discord.Color.dark_blue(),
+            "activate_tournament":  discord.Color.fuchsia(),
+            "set_tour_role":        discord.Color.dark_gold(),
+        }
+        command_name = interaction.data.get("name", "Unknown") if interaction.data else "Unknown"
+        category_map = {
+            "ouroboros": " Universal", "rps": " Universal", "sporty": " Universal",
+            "help": " Universal", "hi": " Universal",
+            "rpvp": "Server", "leaderboard": " Server", "rank": " Server",
+            "level_self": " Server", "level_server": " Server",
+            "coinflip": "Server", "create_embed": " Server",
+            "add_movie": " DM", "add_series": " DM", "add_to_watchlist": " DM",
+            "watchlist": " DM", "incomplete": " DM",
+            "search_media": " DM", "delete_media": " DM",
+            "set_welcome_channel": " Admin", "set_goodbye_channel": " Admin",
+            "server_stats": " Admin", "activate_tournament": " Admin",
+            "set_tour_role": " Admin",
+        }
+
+        embed = discord.Embed(
+            title=f"Interaction Logged",
+            color=command_color.get(command_name, discord.Color.blurple()),
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(name="Command", value=f"`/{command_name}`", inline=True)
+        embed.add_field(name="Category", value=category_map.get(command_name, " Unknown"), inline=True)
+        embed.add_field(name="User", value=f"{interaction.user} (`{interaction.user.id}`)", inline=False)
+        embed.add_field(name="Server", value=f"{interaction.guild} (`{interaction.guild_id}`)" if interaction.guild else "💬 Direct Message", inline=False)
+        embed.add_field(name="Channel", value=f"{interaction.channel}" if interaction.guild else "DM", inline=False)
+        embed.add_field(name="Type", value=str(interaction.type), inline=True)
         try:
             async with aiohttp.ClientSession() as session:
-                webhook = discord.Webhook.from_url("https://discord.com/api/webhooks/1514361253051764827/wp7yRDQXhbC4iajio1XYyMcgZhdZmPeLn57IyY7RgL5KOssWdd_Az7nlgtbJJ8SmKQ3t", session=session)
+                webhook = discord.Webhook.from_url(DISCORD_LOGGING_WEBHOOK_URL, session=session)#type: ignore
                 embed = discord.Embed(
                     title="Interaction Logged",
-                    color=discord.Color.blurple(),
+                    color=command_color.get(command_name, discord.Color.blurple()),
                     timestamp=discord.utils.utcnow()
                 )
                 embed.add_field(name="User", value=f"{interaction.user} (`{interaction.user.id}`)", inline=False)
