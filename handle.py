@@ -162,7 +162,6 @@ class OuroborosHandler:
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         level = level.upper()
 
-        # Console output (replaces print)
         print(f"[{level}] [{context}] {message}")
 
         # Append to daily tasks log
