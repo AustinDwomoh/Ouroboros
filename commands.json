@@ -1,0 +1,119 @@
+{
+  "commands": {
+    "ouroboros": {
+      "category": "Universal",
+      "color": "og_blurple",
+      "description": "Get a quote"
+    },
+    "rps": {
+      "category": "Universal",
+      "color": "blue",
+      "description": "Rock-paper-scissors (scores not stored in DMs)"
+    },
+    "sporty": {
+      "category": "Universal",
+      "color": "purple",
+      "description": "Red/black even/odd game"
+    },
+    "hi": {
+      "category": "Universal",
+      "color": "teal",
+      "description": "Open a DM connection and show commands list"
+    },
+    "rpvp": {
+      "category": "Server",
+      "color": "orange",
+      "description": "Rock-paper-scissors vs another player"
+    },
+    "leaderboard": {
+      "category": "Server",
+      "color": "gold",
+      "description": "View game rankings"
+    },
+    "rank": {
+      "category": "Server",
+      "color": "yellow",
+      "description": "View your rank"
+    },
+    "level_self": {
+      "category": "Server",
+      "color": "green",
+      "description": "View your level"
+    },
+    "level_server": {
+      "category": "Server",
+      "color": "dark_green",
+      "description": "View the server leaderboard"
+    },
+    "coinflip": {
+      "category": "Server",
+      "color": "greyple",
+      "description": "Flip game between two users"
+    },
+    "add_movie": {
+      "category": "DM",
+      "color": "red",
+      "description": "Insert or update a movie in your records"
+    },
+    "add_series": {
+      "category": "DM",
+      "color": "dark_red",
+      "description": "Insert or update a series in your records"
+    },
+    "add_to_watchlist": {
+      "category": "DM",
+      "color": "brand_red",
+      "description": "Save media to watch later, includes reminders"
+    },
+    "watchlist": {
+      "category": "DM",
+      "color": "dark_magenta",
+      "description": "View your watchlist"
+    },
+    "incomplete": {
+      "category": "DM",
+      "color": "dark_orange",
+      "description": "Show unfinished media"
+    },
+    "search_media": {
+      "category": "DM",
+      "color": "blurple",
+      "description": "Search your saved media"
+    },
+    "delete_media": {
+      "category": "DM",
+      "color": "dark_grey",
+      "description": "Permanently delete a media record"
+    },
+    "set_welcome_channel": {
+      "category": "Admin",
+      "color": "brand_green",
+      "description": "Set the welcome channel",
+      "admin": true
+    },
+    "set_goodbye_channel": {
+      "category": "Admin",
+      "color": "dark_teal",
+      "description": "Set the goodbye channel",
+      "admin": true
+    },
+    "server_stats": {
+      "category": "Admin",
+      "color": "dark_blue",
+      "description": "Track server data",
+      "admin": true
+    },
+    "activate_tournament": {
+      "category": "Admin",
+      "color": "fuchsia",
+      "description": "Start the daily quick tour",
+      "admin": true
+    },
+    "set_tour_role": {
+      "category": "Admin",
+      "color": "dark_gold",
+      "description": "Set the tournament role",
+      "admin": true
+    }
+  }
+}

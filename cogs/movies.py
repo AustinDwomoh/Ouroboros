@@ -1,16 +1,14 @@
 
 
-from settings import ErrorHandler
-
+import asyncio
+from datetime import datetime, timezone
+from handle import handler
 import discord,typing,asyncio
 from discord import app_commands
 from discord.ext import commands
 from dbmanager.MovieManager import MovieManager
-from views.movieView import MediaSelectionView, create_selection_embed
+from views.movieView import MediaSelectionView, create_selection_embed, WatchHistoryPaginationView
 from constants import MediaType
-
-errorHandler = ErrorHandler()
-
 movieManager = MovieManager()
 
 
@@ -26,7 +24,6 @@ class Movies(commands.Cog):
         self.movie_title_cache: dict[str, dict[str, int]] = {} #{title: tmdb_id}
         
         
-
     # ============================================================================ #
     #                              ADD MEDIA COMMANDS                              #
     # ============================================================================ #
@@ -46,8 +43,8 @@ class Movies(commands.Cog):
             elif media_type.lower() == "series":
                 await self.add_series_template(interaction, title, watchlist=True)
         except Exception as e:
-            errorHandler.handle(e, context=f"add_to_watchlist({title}, {media_type})")
-            await interaction.followup.send(f" Error: Adding to watchlist failed.", ephemeral=True)
+            handler.error_handle(e, context=f"add_to_watchlist({title}, {media_type})")
+            await interaction.followup.send(f" Error: Adding to watchlist failed.")
       
 
     @app_commands.command(name="add_movie", description="Add a movie to your watched list or watchlist")
@@ -63,9 +60,35 @@ class Movies(commands.Cog):
         try:
             await self.add_movie_template(interaction, title, watchlist=False)
         except Exception as e:
-            errorHandler.handle(e, context=f"add_movie({title})")
-            await interaction.followup.send(f"Error: Saving movie failed.", ephemeral=True)
+            handler.error_handle(e, context=f"add_movie({title})")
+            await interaction.followup.send(f"Error: Saving movie failed.")
 
+
+    @app_commands.command(name="all_media", description="List Of all movies or series")
+    @app_commands.dm_only()
+    async def all_media(self, interaction: discord.Interaction):
+        """All movies and series"""
+        try:
+         
+            await interaction.response.defer(thinking=True)
+            data = await movieManager.get_user_watch_history(interaction.user.id)
+
+            if not data:
+                await interaction.followup.send(
+                    f"No  'media' found in your history."
+                )
+                return
+            
+
+            view = WatchHistoryPaginationView(data=data)
+            await interaction.followup.send(embed=view.build_embed(), view=view)
+            view.message = await interaction.original_response() #type: ignore
+
+        except discord.DiscordException as e:
+            handler.error_handle(e, context=f"all_media()")
+        except Exception as e:
+            handler.error_handle(e, context=f"all_media()")
+            await interaction.followup.send("Error: Fetching media failed.")
 
     @app_commands.command(name="add_series", description="Add a TV series to your watch list")
     @app_commands.describe(
@@ -81,8 +104,8 @@ class Movies(commands.Cog):
         try: 
             await self.add_series_template(interaction, title, season, episode, watchlist=False)       
         except Exception as e:
-            errorHandler.handle(e, context=f"add_series({title})")
-            await interaction.followup.send(f" Error: Adding series failed.", ephemeral=True)
+            handler.error_handle(e, context=f"add_series({title})")
+            await interaction.followup.send(f" Error: Adding series failed.")
 
     #cover up functions
     async def add_series_template(
@@ -106,7 +129,7 @@ class Movies(commands.Cog):
                 media_options = await movieManager.search_media_multiple("tv", title)
             
             if not media_options:
-                await interaction.followup.send( f"No series found for: `{title}`", ephemeral=True)
+                await interaction.followup.send( f"No series found for: `{title}`")
                 return
             
             # Auto-add if single high-confidence result
@@ -134,7 +157,7 @@ class Movies(commands.Cog):
                 media_data = await movieManager.add_or_update_user_series( interaction.user.id,  title, season=season, episode=episode, tmdb_id=tmbd_id, watchlist=watchlist
                     )
                 if not media_data:
-                    await interaction.followup.send("Failed to save series", ephemeral=True)
+                    await interaction.followup.send("Failed to save series")
                     return
 
                 if media_data:
@@ -155,13 +178,13 @@ class Movies(commands.Cog):
                     
                     await interaction.followup.send(embed=embed)
                 else:
-                    await interaction.followup.send("Failed to save series", ephemeral=True)
+                    await interaction.followup.send("Failed to save series")
                 return
             
             
         except Exception as e:
-            errorHandler.handle(e, context=f"add_series({title})")
-            await interaction.followup.send(f" Error: Adding series failed.", ephemeral=True)
+            handler.error_handle(e, context=f"add_series({title})")
+            await interaction.followup.send(f" Error: Adding series failed.")
 
 
     async def add_movie_template(self, interaction: discord.Interaction, title: str,watchlist: bool = False):
@@ -181,7 +204,7 @@ class Movies(commands.Cog):
     
             
             if not media_options:
-                await interaction.followup.send(f" No movies found for: `{title}`",ephemeral=True)
+                await interaction.followup.send(f" No movies found for: `{title}`")
                 return
             if len(media_options) > 1:
                 embed = create_selection_embed(media_options, "movie", title)
@@ -210,17 +233,17 @@ class Movies(commands.Cog):
                     
                     await interaction.followup.send(embed=embed)
                 else:
-                    await interaction.followup.send("Failed to save movie", ephemeral=True)
+                    await interaction.followup.send("Failed to save movie")
                 return
         except Exception as e:
-            errorHandler.handle(e, context=f"add_movie({title})")
-            await interaction.followup.send(f"Error: Saving movie failed.", ephemeral=True)
+            handler.error_handle(e, context=f"add_movie({title})")
+            await interaction.followup.send(f"Error: Saving movie failed.")
 
     # ============================================================================ #
     #                           WATCHLIST COMMANDS                                 #
     # ============================================================================ #
 
-    @app_commands.command(name="watchlist", description="View your watchlist for movies or series. Shows up to 10 items.")
+    @app_commands.command(name="watchlist", description="View your watchlist for movies or series. Shows up to 20 items.")
     @app_commands.describe(media_type="Type of media: movie or series")
     @app_commands.dm_only()
     async def view_watchlist(
@@ -228,8 +251,8 @@ class Movies(commands.Cog):
         interaction: discord.Interaction,media_type: str | None = None
          ):
         """View user's watchlist."""
-        await interaction.response.defer(ephemeral=True)
-        
+        await interaction.response.defer(thinking=True)
+
         try:
             watchlist_items = await movieManager.get_watchlist(interaction.user.id)
             
@@ -255,7 +278,7 @@ class Movies(commands.Cog):
                     )
                     return
             
-            for idx, item in enumerate(watchlist_items[:10]):
+            for idx, item in enumerate(watchlist_items[:20]):
                 title = item.get("title") or "Unknown title"
 
                 release_date = item.get("release_date")
@@ -266,21 +289,21 @@ class Movies(commands.Cog):
                     inline=False
                 )
 
-                if len(watchlist_items) > 10:
-                    embed.set_footer(text=f"+ {len(watchlist_items) - 10} more items")
+                if len(watchlist_items) > 20:
+                    embed.set_footer(text=f"+ {len(watchlist_items) - 20} more items")
                 
-                await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            errorHandler.handle(e, context=f"view_watchlist()")
-            await interaction.followup.send(f"Error: Failed to retrieve watchlist.", ephemeral=True)
+            handler.error_handle(e, context=f"view_watchlist()")
+            await interaction.followup.send(f"Error: Failed to retrieve watchlist.")
 
     @app_commands.command(name="incomplete", description="Check what media you haven't finished watching")
     @app_commands.describe(media_type="Type of media: movie or series")
     @app_commands.dm_only()
     async def check_incomplete(self, interaction: discord.Interaction, media_type: str | None = None):
         """Check user's incomplete media."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         
         try:
             incomplete_media = await movieManager.check_user_completion(interaction.user.id)
@@ -288,8 +311,7 @@ class Movies(commands.Cog):
           
             if not incomplete_media:
                 await interaction.followup.send(
-                    "You're all caught up! No incomplete media found.",
-                    ephemeral=True
+                    "You're all caught up! No incomplete media found."
                 )
                 return
             media_type_obj= MediaType.find_media_type(media_type)
@@ -304,7 +326,7 @@ class Movies(commands.Cog):
                 color=discord.Color.orange()
             )
 
-            for idx, media in enumerate(incomplete_media[:10], start=1):
+            for idx, media in enumerate(incomplete_media[:20], start=1):
                 parts = []
 
                 # Progress / status line
@@ -335,15 +357,63 @@ class Movies(commands.Cog):
                 )
 
             # Footer if truncated
-            if len(incomplete_media) > 10:
-                embed.set_footer(text=f"+ {len(incomplete_media) - 10} more items")
+            if len(incomplete_media) > 20:
+                embed.set_footer(text=f"+ {len(incomplete_media) - 20} more items")
 
             await interaction.followup.send(embed=embed)
 
         except Exception as e:
-            errorHandler.handle(e, context="check_incomplete")
-            await interaction.followup.send(f"Error: {str(e)}", ephemeral=True)
+            handler.error_handle(e, context="check_incomplete")
+            await interaction.followup.send(f"Error: {str(e)}")
 
+    @app_commands.command(name="upcoming", description="Check what media you have coming up next")
+    @app_commands.dm_only()
+    async def check_upcoming(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+        try:
+            reminders = await movieManager.upcoming_reminders(interaction.user.id)
+            if not reminders:
+                await interaction.followup.send(
+                    "No upcoming episodes found in your watchlist!"
+                )
+                return
+            header_embed = discord.Embed(
+                    title="📺 Upcoming Episodes This Week",
+                    description=f"You have **{len(reminders)}** show(s) with new episodes coming up!",
+                    color=discord.Color.blue(),
+                    timestamp=datetime.now(timezone.utc)
+                )
+            await interaction.followup.send(embed=header_embed)
+            await asyncio.sleep(0.5)
+
+                # Send individual show embeds
+            for user_show in reminders:
+                #print(f"user_show: {user_show.title}",user_show)
+                embed_data = user_show.to_embed_dict() 
+                embed = discord.Embed(
+                        title=embed_data["title"],          
+                        description=embed_data["description"],
+                        color=embed_data["color"]             
+                    )
+                    
+                if embed_data.get("thumbnail"):
+                        embed.set_thumbnail(url=embed_data["thumbnail"])
+
+                for field in embed_data["fields"]:
+                    embed.add_field(
+                            name=field["name"],
+                            value=field["value"],
+                            inline=field.get("inline", False)
+                        )
+
+                await interaction.followup.send(embed=embed)  
+            
+                await asyncio.sleep(0.5)  # Rate limit between messages
+        except Exception as e:
+            handler.error_handle(e, context="check_upcoming")
+            await interaction.followup.send(f"Error: {str(e)}")
+
+        
     # ============================================================================ #
     #                              DELETE COMMAND                                  #
     # ============================================================================ #
@@ -357,14 +427,13 @@ class Movies(commands.Cog):
         title: str
         ):
         """Delete a media entry."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(thinking=True)
         
         try:
             media_id = self.movie_title_cache.get(title)
             if not media_id:
                 await interaction.followup.send(
-                    f" Media title not found in your list: `{title}`",
-                    ephemeral=True
+                    f" Media title not found in your list: `{title}`"
                 )
                 #we shoudlnt even get here
                 return
@@ -372,18 +441,16 @@ class Movies(commands.Cog):
             
             if success:
                 await interaction.followup.send(
-                    f" Media deleted successfully!",
-                    ephemeral=True
+                    f" Media deleted successfully!"
                 )
             else:
                 await interaction.followup.send(
-                    f" Failed to delete media",
-                    ephemeral=True
+                    f" Failed to delete media"
                 )
                 
         except Exception as e:
-            errorHandler.handle(e, context=f"delete_media({title})")
-            await interaction.followup.send(f" Error: {str(e)}", ephemeral=True)
+            handler.error_handle(e, context=f"delete_media({title})")
+            await interaction.followup.send(f" Error: {str(e)}")
 
     # ============================================================================ #
     #                              SEARCH COMMANDS                                 #
@@ -399,14 +466,14 @@ class Movies(commands.Cog):
         title: str
         ):
         """Search for movies or series."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(thinking=True)
         
         try:
             
             results = await movieManager.fetch_user_media(interaction.user.id, self.movie_title_cache.get(title))
             
             if not results:
-                await interaction.followup.send( f"No results found for: `{title}`", ephemeral=True )
+                await interaction.followup.send( f"No results found for: `{title}`" )
                 return
             
 
@@ -428,10 +495,10 @@ class Movies(commands.Cog):
                 send_embed.set_thumbnail(url=embed_data["thumbnail"])
             await interaction.followup.send(embed=send_embed)
         except ValueError as e:
-            await interaction.followup.send(f"Media possibly not in your list:", ephemeral=True)
+            await interaction.followup.send(f"Media possibly not in your list:")
         except Exception as e:
-            errorHandler.handle(e, context=f"search_media({title})")
-            await interaction.followup.send(f"Error: Finding media", ephemeral=True)
+            handler.error_handle(e, context=f"search_media({title})")
+            await interaction.followup.send(f"Error: Finding media")
        
     # ============================================================================ #
     #                                AUTOCOMPLETE                                  #
@@ -454,7 +521,8 @@ class Movies(commands.Cog):
                 if current.lower() in choice.lower()
             ]
             return filtered
-        except Exception:
+        except Exception as e:
+            handler.error_handle(e, context="media_type_autocomplete")
             return [app_commands.Choice(name="movie", value="movie"), app_commands.Choice(name="series", value="series")]
         
     @add_movie.autocomplete("title")
@@ -477,7 +545,8 @@ class Movies(commands.Cog):
                 if current.lower() in title.lower()
             ][:25]  # Discord limit
             return filtered
-        except Exception:
+        except Exception as e:
+            handler.error_handle(e, context="title_autocomplete")
             return []
 
 async def setup(client):

@@ -2,14 +2,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from dbmanager import LevelinManager
-from settings import ErrorHandler
+from handle import handler
 from views.LeaderboardPage import LeaderboardPaginationView
 from io import BytesIO
 
 class Levelling(commands.Cog):
     def __init__(self, client):
         self.client = client
-        self.error_handler = ErrorHandler()
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -51,7 +50,7 @@ class Levelling(commands.Cog):
                 await message.channel.send(embed=embed)
             await LevelinManager.insert_or_update_user(guild_id, user_id, xp, level)
         except Exception as e:
-            self.error_handler.handle(e, context="Levelling Cog on_message")
+            handler.error_handle(e, context="Levelling Cog on_message")
 
     @app_commands.command(name="level_self", description="Check your level")
     @app_commands.guild_only()
@@ -79,7 +78,7 @@ class Levelling(commands.Cog):
             embed.set_thumbnail(url=str(interaction.user.display_avatar.url))
             await interaction.followup.send(embed=embed)
         except Exception as e:
-            self.error_handler.handle(e, context="Levelling Cog level_self command")
+            handler.error_handle(e, context="Levelling Cog level_self command")
         
 
     @app_commands.command(name="level_server", description="Check the server leaderboard.")
@@ -136,7 +135,7 @@ class Levelling(commands.Cog):
                 view=pagination_view
             )
         except Exception as e:
-            self.error_handler.handle(e, context="Levelling Cog level_server command")
+            handler.error_handle(e, context="Levelling Cog level_server command")
 
 
 async def setup(client):

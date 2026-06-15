@@ -1,7 +1,7 @@
-from settings import  ErrorHandler
+from handle import handler
 from rimiru import Rimiru
 from constants import FetchType
-error_handler = ErrorHandler()
+
 
 # -------------------------------------------------------------
 # BASIC LEVEL OPERATIONS
@@ -17,7 +17,7 @@ async def get_user_level(guild_id: int, user_id: int)-> tuple[int, int] | tuple[
         return row.get('xp'), row.get('level')
         
     except Exception as e:
-        error_handler.handle(e, context="get_user_level")
+        handler.error_handle(e, context="get_user_level")
         return None, None
 
 async def insert_or_update_user(guild_id: int, user_id: int, xp: int, level: int) -> None:
@@ -27,7 +27,7 @@ async def insert_or_update_user(guild_id: int, user_id: int, xp: int, level: int
         await conn.upsert("users", {"discord_id": user_id, "username": f"{user_id}+not found"}, conflict_column="discord_id") #since this is the only other place a new user is introduced
         await conn.upsert(table="levels", data={"guild_id": guild_id, "user_id": user_id, "xp": xp, "level": level}, conflict_column="user_id,guild_id")
     except Exception as e:
-        error_handler.handle(e, context="insert_or_update_user")
+        handler.error_handle(e, context="insert_or_update_user")
 
 
 # -------------------------------------------------------------
@@ -47,7 +47,7 @@ async def fetch_top_users(guild_id: int, limit: int = 10) -> list[dict]:
         #print(rows)
         return rows
     except Exception as e:
-        error_handler.handle(e, context="fetch_top_users")
+        handler.error_handle(e, context="fetch_top_users")
         return []
     
 async def get_rank(guild_id: int, user_id: int) -> int | None:
@@ -58,5 +58,5 @@ async def get_rank(guild_id: int, user_id: int) -> int | None:
         print(rank)
         return rank
     except Exception as e:
-        error_handler.handle(e, context="get_rank")
+        handler.error_handle(e, context="get_rank")
         return None

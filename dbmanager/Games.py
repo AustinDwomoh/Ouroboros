@@ -1,8 +1,8 @@
 from typing import Optional
 from constants import FetchType, gameType
-from settings import  ErrorHandler
+from handle import handler
 from rimiru import Rimiru
-error_handler = ErrorHandler()
+
 # ============================================================================ #
 #                                     NOTES                                    #
 # ============================================================================ #
@@ -27,7 +27,7 @@ async def save_game_result(guild_id: int, player_id: int|None, player_score: int
     try:
         await conn.call_function("save_game_result", params=[guild_id, player_id, game_type.value, player_score or 0])
     except Exception as e:
-        error_handler.handle(e, context="save_game_result")
+        handler.error_handle(e, context="save_game_result")
    
 
 # -------------------------------------------------------------
@@ -52,7 +52,7 @@ async def get_player_scores(guild_id: int, game_type: gameType|None = None,user_
             rows = await conn.call_function("get_player_scores", params=[user_id,guild_id])
         return [dict(r) for r in rows]
     except Exception as e:
-        error_handler.handle(e, context="get_player_scores")
+        handler.error_handle(e, context="get_player_scores")
         return []
 
 
@@ -74,7 +74,7 @@ async def get_leaderboard(guild_id: int,game_type: gameType|None = None):
             rows = await conn.call_function("get_leaderboard", params=[guild_id])
         return [dict(r) for r in rows]
     except Exception as e:
-        error_handler.handle(e, context="get_leaderboard")
+        handler.error_handle(e, context="get_leaderboard")
         return []
    
 
@@ -99,5 +99,5 @@ async def get_rank(guild_id: int, player_id: int,game_type: gameType|None = None
             rank = await conn.call_function("get_player_rank", params=[guild_id, player_id], fetch_type=fetch)
         return rank if rank else None
     except Exception as e:
-        error_handler.handle(e, context="get_rank")
+        handler.error_handle(e, context="get_rank")
         return None

@@ -4,7 +4,7 @@
 import random, discord
 from discord import app_commands, ui
 from discord.ext import commands
-from settings import ErrorHandler
+from handle import handler
 from views.sportyVeiw import GameSelectionView
 
             
@@ -26,9 +26,7 @@ class Sporty(commands.Cog):
             view=GameSelectionView(interaction.user, self.client,interaction.guild_id),ephemeral=True
         )
         except Exception as e:
-            errorHandler = ErrorHandler()
-
-            errorHandler.handle(e,context=f"Error in sporty command")
+            handler.error_handle(e, context="sporty command")
             await interaction.response.send_message("An error occurred while processing your request.")
 
 

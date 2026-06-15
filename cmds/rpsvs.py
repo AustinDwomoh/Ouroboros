@@ -4,7 +4,7 @@
 import re, discord
 from discord import app_commands
 from discord.ext import commands
-from settings import ErrorHandler
+from handle import handler
 from views.RPSveiw import RPSview, OpponentAcceptView
 
 
@@ -54,8 +54,7 @@ class Rpvp(commands.Cog):
                     "Please tag a valid player using the correct mention format.",ephemeral=True
                 )
         except Exception as e:
-            errorHandler = ErrorHandler()
-            errorHandler.handle(e, context="rpvp command")
+            handler.error_handle(e, context="rpvp command")
             await interaction.response.send_message("An error occurred while processing your request.")
 
 

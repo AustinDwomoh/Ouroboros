@@ -4,10 +4,9 @@
 import discord, asyncio
 from discord import app_commands
 from discord.ext import commands
-from settings import ErrorHandler,ALLOWED_ID
+from settings import ALLOWED_ID, DISCORD_HANDLER_WEBHOOK_URL, DISCORD_INTERACTION_WEBHOOK_URL,COMMANDS
 from constants import Roles
-
-errorHandler = ErrorHandler()
+from handle import handler
 # ============================================================================
 #                              CHANNEL MANAGEMENT COG                        =
 # ============================================================================
@@ -89,9 +88,9 @@ class ChannelManagement(commands.Cog):
                 f"An error occurred while trying to delete the channel {channels.name}.",
                 ephemeral=True,
             )
-            errorHandler.handle(e,context="ChannelManagement.delete_channels")
+            handler.error_handle(e, context="ChannelManagement.delete_channels")
         except Exception as e:
-            errorHandler.handle(e, context="ChannelManagement.delete_channels final except")
+            handler.error_handle(e, context="ChannelManagement.delete_channels final except")
             await interaction.response.send_message("An error occurred while processing your request.", ephemeral=True)
 
 
@@ -154,13 +153,13 @@ class ChannelManagement(commands.Cog):
                 f"An error occurred while trying to delete the category {category.name}.",
                 ephemeral=True,
             )
-            errorHandler.handle(e, context="ChannelManagement.delete_categories")
+            handler.error_handle(e, context="ChannelManagement.delete_categories")
         except Exception as e:
             await interaction.followup.send(
                 "An error occurred while processing your request.",
                 ephemeral=True,
             )
-            errorHandler.handle(e, context="ChannelManagement.delete_categories")
+            handler.error_handle(e, context="ChannelManagement.delete_categories")
     # ============================================================================
     #                             CLEAR MESSAGES COMMAND                         =
     # ============================================================================
@@ -210,47 +209,54 @@ class ChannelManagement(commands.Cog):
                     ephemeral=True,
                 )
             except Exception as e:
-                errorHandler.handle(e, context="ChannelManagement.clear_messages")
+                handler.error_handle(e, context="ChannelManagement.clear_messages")
                 await interaction.response.send_message("An error occurred while processing your request.")
 
-    @app_commands.command(name="hi", description="To esatblish a dm connection")
-    @app_commands.guild_only()
+    @app_commands.command(name="hi", description="To esatblish a dm connection, and get a list of commands")
     async def hi(self, interaction: discord.Interaction):
-        """This command is used to establish a DM connection with the bot."""
+        """Establish a DM connection and send the full command list."""
         try:
-            # Create an embed for the DM message
-            inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
-            await inphinithy.send(f"User {interaction.user} used the /hi command to establish a DM connection.")
+            categories = {}
+            for name, data in COMMANDS.items():
+                cat = data["category"]
+                categories.setdefault(cat, []).append((name, data))
+
+
             dm_embed = discord.Embed(
                 title="Hello from Ouroboros!",
                 description=(
-                    "I am **Ouroboros**, your versatile bot, currently in development. "
-                    "Here's how you can get started using my commands:"
+                    "I am **Ouroboros**, your versatile bot designed to assist you "
+                    "with a variety of tasks. Here's everything you can do:"
                 ),
-                color=discord.Color.green(),
+                color=discord.Color.teal(),
+                timestamp=discord.utils.utcnow()
             )
-            dm_embed.add_field(
-                name="Commands Available:",
-                value=(
-                    "1. **/help** - Displays all commands and what they do.\n"
-                    "2. **/hi** - Establish a DM connection with me."
-                ),
-                inline=False,
-            )
+
+            for cat in ["Universal", "DM", "Server", "Admin"]:
+                cmds = categories.get(cat, [])
+                if not cmds:
+                    continue
+                value = "\n".join(
+                    f"`/{name}` — {data['description']}" + (" *(admin)*" if data.get("admin") else "")
+                    for name, data in cmds
+                )
+                dm_embed.add_field(name=f" {cat}", value=value, inline=False)
+
+            dm_embed.set_footer(text="Need help? Contact Inphinithy · discord.com/users/755872891601551511")
+
             await interaction.user.send(embed=dm_embed)
             await interaction.response.send_message(
-                "I've sent you a DM with more information about me!", ephemeral=True
+                "I've sent you a DM with the full command list!", ephemeral=True
             )
+
         except discord.Forbidden as e:
             error_embed = discord.Embed(
                 title="Unable to Send DM",
-                description=(
-                    "I couldn't send you a direct message. Please make sure your DM settings allow messages from server members."
-                ),
+                description="I couldn't send you a direct message. Please make sure your DM settings allow messages from server members.",
                 color=discord.Color.red(),
             )
             error_embed.add_field(
-                name="How to Fix It:",
+                name="How to fix it:",
                 value=(
                     "1. Go to **User Settings** > **Privacy & Safety**.\n"
                     "2. Enable 'Allow direct messages from server members.'"
@@ -258,11 +264,14 @@ class ChannelManagement(commands.Cog):
                 inline=False,
             )
             error_embed.set_footer(text="Once updated, try using /hi again!")
-            errorHandler.handle(e,context="ChannelManagement.hi could not send DM")
+            handler.error_handle(e, context="hi — could not send DM")
             await interaction.response.send_message(embed=error_embed, ephemeral=True)
+
         except Exception as e:
-            errorHandler.handle(e,context="ChannelManagement.hi final except")
-            await interaction.response.send_message("An error occurred while processing your request.")
+            handler.error_handle(e, context="hi — final except")
+            await interaction.response.send_message(
+                embed=handler.get_error_embed(), ephemeral=True
+            )
    
     @app_commands.command(name="cleandms", description="Clean the bot dms")
     async def cleandms(self, interaction: discord.Interaction):
@@ -276,73 +285,6 @@ class ChannelManagement(commands.Cog):
                         pass
                     await asyncio.sleep(2)
                     
-    @app_commands.command( name="help", description="Displays a list of commands and their descriptions")
-    async def help(self, interaction: discord.Interaction):
-        """Displays a list of commands categorized by DM and Server usage."""
-        # Create the embed
-        content = (
-            "OUROBOROS COMMAND LIST\n"
-            "===========================\n"
-            "Here are all the commands you can use with Ouroboros,\n"
-            "categorized by where they are available (DMs or Server).\n\n"
-            "===========================\n"
-            "📩 DM-Only Commands\n"
-            "===========================\n"
-            "- /add-media : Insert or update a movie in your records.\n"
-            "- /all_media : Show all stored media (series or movies).\n"
-            "- /delete_movies : Delete your record completely (irreversible).\n"
-            "- /search_anime : Look up an anime and get links to watch. Refine the search key to avoid unnecessary results.\n"
-            "- /search_movie_or_series : Look up details for a movie or series in depth.\n"
-            "- /search_saved_media : Search for a media you stored.\n"
-            "- /update_watchlist : Store movies to watch later. Includes automatic reminders. Automatically removed when added to your media records.\n"
-            "- /watch_list : View your watchlist.\n\n"
-            "===========================\n"
-            "🏠 Server-Only Commands\n"
-            "===========================\n"
-            "- /activate_tournament : Initiates the daily quick tour program. [*Admin-only*]\n"
-            "- /clear_message : Delete a specified number of messages in a channel. [*Admin-only*]\n"
-            "- /coinflip : A flip game between two users; reacts to the first two clicks.\n"
-            "- /create_embed : Create an embed with a specified title and description. Can also tag members.\n"
-            "- /delete_categories : Delete all categories. [*Admin-only*]\n"
-            "- /delete_channels : Delete all channels. [*Admin-only*]\n"
-            "- /leaderboard : View the games ranking (global or specific game).\n"
-            "- /level_self : View your level in the ranking.\n"
-            "- /level_server : View the leaderboard of actives in the ranking.\n"
-            "- /rank : View your ranking in games.\n"
-            "- /rpvp : Play Rock-Paper-Scissors against another player.\n"
-            "- /setup_youtube_notifications : Automatically send video updates for added YouTube channels.\n"
-            "- /server_stats : Track server data. [*Admin-only*]\n"
-            "- /set_goodbye_channel : Set the goodbye channel. [*Admin-only*]\n"
-            "- /set_welcome_channel : Set the welcome channel. [*Admin-only*]\n\n"
-            "===========================\n"
-            "🌟 Universal Commands\n"
-            "===========================\n"
-            "- /ouroboros : Get quotes.\n"
-            "- /rps : Play Rock-Paper-Scissors (scores aren’t stored in DMs).\n"
-            "- /sporty : Play a Red or Black and Even/Odd game (scores aren’t stored in DMs).\n"
-            "- /help : Displays all commands and what they do.\n"
-            "- /hi : Establish a DM connection with me.\n\n"
-            "===========================\n"
-            "Need Help?\n"
-            "===========================\n"
-            "If an admin cannot use a command or there’s a problem, please reach out to me:\n"
-            "Inphinithy\n"
-            "https://discord.com/users/755872891601551511\n\n"
-            "===========================\n"
-            "Note:\n"
-            "Use commands in the appropriate location (DMs or Server).\n"
-            "Admin-only commands require the appropriate permissions.\n"
-        )
-
-        with open("Ouroboros_Help.txt", "w", encoding="utf-8") as file:
-            file.write(content)
-
-        await interaction.response.send_message(
-            content="Here is the full list of commands:",
-            file=discord.File("Ouroboros_Help.txt"),
-            ephemeral=True
-        )
-
 
 # ============================================================================
 #                                   SETUP FUNCTION                           =

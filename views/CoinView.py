@@ -1,9 +1,7 @@
 import discord,random,asyncio
 from discord import ButtonStyle
 from discord.ui import Button,View
-from settings import ErrorHandler
-
-errorHandler =ErrorHandler()
+from handle import handler
 class CoinFlipView(View):
     CHOICE_1 = "Heads"
     CHOICE_2 ="Tails"
@@ -82,6 +80,6 @@ class CoinFlipView(View):
                 )
             )
         except Exception as e:
-           errorHandler.handle(e,context=f'Coinflip start command interaction')
+           handler.error_handle(e, context=f'Coinflip start command interaction')
            await interaction.response.send_message("An error occurred while processing the coin flip.")
 

@@ -12,11 +12,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from views.LeaderboardPage import LeaderboardPaginationView  
-from settings import ErrorHandler
 from io import BytesIO
 from dbmanager import Games
 from constants import gameType
-
+from handle import handler
 
 # ============================================================================ #
 #                              LEADERBOARD COG                                 #
@@ -24,7 +23,6 @@ from constants import gameType
 class Leaderboard(commands.Cog):
     def __init__(self, client):
         self.client = client
-        self.error_handler = ErrorHandler()
 
     # ============================ Leaderboard COMMAND =========================== #
     @app_commands.command(name="leaderboard", description="Mini Game Rankings")
@@ -97,7 +95,7 @@ class Leaderboard(commands.Cog):
             )
             
         except Exception as e:
-            self.error_handler.handle(e, context="leaderboard_command")
+            handler.error_handle(e, context="leaderboard_command")
             await interaction.followup.send("An error occurred while fetching the leaderboard.")
 
     @leaderboard.autocomplete("game_type")
@@ -114,7 +112,7 @@ class Leaderboard(commands.Cog):
             return filtered_choices if filtered_choices else [
             app_commands.Choice(name="No matches found", value="none")]
         except Exception as e:
-            self.error_handler.handle(e, context="leaderboard_autocomplete")
+            handler.error_handle(e, context="leaderboard_autocomplete")
             return [app_commands.Choice(name="Error occurred", value="none")]
 
     # ================================ RANK SCRIPT =============================== #
@@ -171,7 +169,7 @@ class Leaderboard(commands.Cog):
             await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            self.error_handler.handle(e, context="rank_command")
+            handler.error_handle(e, context="rank_command")
             await interaction.followup.send("An error occurred while fetching rank information.")
 
 

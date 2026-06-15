@@ -7,12 +7,12 @@ import discord,asyncio
 from discord import  app_commands
 from discord.ext import commands, tasks
 from discord import ui
-from settings import ErrorHandler,BOT_MODE
+from settings import BOT_MODE
 from datetime import datetime, timedelta
 from dbmanager import Games, ServerStatManager
 from constants import gameType, channelType, Roles, Status
 from models import Round, Match
-errorHandler = ErrorHandler()
+from handle import handler
 
 
 
@@ -99,7 +99,7 @@ class MatchView(ui.View):
                         delete_after=300,
                     )
                 except Exception as e:
-                    errorHandler.handle(e, context="DM Error in Tournament Ready")
+                    handler.error_handle(e, context="DM Error in Tournament Ready")
 
     async def update_embed(self, interaction: discord.Interaction|None = None):
         """Update the embed to display all matches and their readiness statuses"""
@@ -405,7 +405,7 @@ class DailyTournament(commands.Cog):
             await self.prepare_registration(guild.id)
 
         except (discord.Forbidden, discord.HTTPException) as e:
-            errorHandler.handle(e, context="Setup Guild Channel Error")
+            handler.error_handle(e, context="Setup Guild Channel Error")
 
     async def setup_roles(self, guild: discord.Guild):
         """Setup tournament roles for a guild"""
@@ -668,7 +668,7 @@ class DailyTournament(commands.Cog):
             await self.process_ready_statuses(guild_id)
 
         except Exception as e:
-            errorHandler.handle(e, context="Run Round Error")
+            handler.error_handle(e, context="Run Round Error")
 
     async def process_ready_statuses(self, guild_id: int):
         """Process which matches are ready and handle timeouts"""
@@ -815,7 +815,7 @@ class DailyTournament(commands.Cog):
                 await self.cleanup_tournament(guild_id)
 
         except Exception as e:
-            errorHandler.handle(e, context="Prepare Next Round Error")
+            handler.error_handle(e, context="Prepare Next Round Error")
 
     async def declare_winner(self, guild_id: int, winner_id: int):
         """Declare the tournament winner"""
@@ -1022,7 +1022,7 @@ class DailyTournament(commands.Cog):
                 guild = self.client.get_guild(guild_id)
                 if not guild:
                     continue
-
+                handler.log_task(message=f"Running daily tournament loop for guild: {guild.name} ({guild_id})", level="info", context="Daily Tournament Loop")
                 # Load channels for this guild if not loaded
                 if guild_id not in self.channels:
                     self.channels[guild_id] = {
@@ -1035,7 +1035,7 @@ class DailyTournament(commands.Cog):
                 await self.prepare_registration(guild_id)
 
         except Exception as e:
-            errorHandler.handle(e, context="Daily Tournament Loop Error")
+            handler.error_handle(e, context="Daily Tournament Loop Error")
 
     @daily_tournament_loop.before_loop
     async def before_daily_tournament_loop(self):

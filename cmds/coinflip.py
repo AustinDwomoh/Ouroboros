@@ -4,11 +4,9 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from settings import ErrorHandler
+from handle import handler
 from views.CoinView import CoinFlipView
 
-
-errorHandler =ErrorHandler()
 
 
 
@@ -55,7 +53,7 @@ class Coinflip(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, view=CoinFlipView())
         except Exception as e:
-            errorHandler.handle(e, context='Coinflip command interaction')
+            handler.error_handle(e, context='Coinflip command interaction')
             await interaction.response.send_message("An error occurred while processing your request.")
 
 # ============================================================================ #

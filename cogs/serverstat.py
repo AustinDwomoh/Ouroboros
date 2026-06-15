@@ -4,14 +4,11 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from dbmanager import ServerStatManager
 from constants import Roles
-
-  # it works leave it alone 
-#i get it now it hasnt been initialized yet is why
+from handle import handler
 # ============================================================================ #
 #                                     fixes                                    #
 # ============================================================================ #
-#the import is like that since unlik the order db classes this one  has an actual class and its causing the issues
-#fixed the serverstats i think
+
 class ServerStat(commands.Cog):
     def __init__(self, client):
         self.client = client
@@ -37,7 +34,7 @@ class ServerStat(commands.Cog):
                     try:
                         category = await guild.create_category(category_name)
                     except Exception as e:
-                        ErrorHandler().handle(e, context="Error creating category for server stats")
+                        handler.error_handle(e, context="Error creating category for server stats")
                         continue
                 else:
                     category = existing_category
@@ -47,7 +44,7 @@ class ServerStat(commands.Cog):
                     try:
                         await channel.delete()
                     except Exception as e:
-                        ErrorHandler().handle(e, context="Error deleting existing channels in server stats category")
+                        handler.error_handle(e, context="Error deleting existing channels in server stats category")
 
                 # Define permission overwrites
                 overwrites = {
@@ -69,7 +66,7 @@ class ServerStat(commands.Cog):
                             name, category=category, overwrites=overwrites
                         )
                     except Exception as e:
-                        ErrorHandler().handle(e, context="Error creating voice channel for server stats")
+                        handler.error_handle(e, context="Error creating voice channel for server stats")
 
     @update_stats.before_loop
     async def before_update_stats(self):
@@ -108,7 +105,7 @@ class ServerStat(commands.Cog):
             await interaction.followup.send(f"Server_stat set to '{state}' for {interaction.guild.name}") #type: ignore
             await self.update_stats()
         except Exception as e:
-            ErrorHandler().handle(e, context="Error in server_stats command")
+            handler.error_handle(e, context="Error in server_stats command")
 
     @server_stats.autocomplete("state")
     async def state_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -125,7 +122,7 @@ class ServerStat(commands.Cog):
         """
         Triggered when the bot is added to a guild.
         """
-        inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
+       
         await ServerStatManager.set_server_state(guild.id, "off")  # Initialize server state to "off" when joining a new guild
         owner = await guild.fetch_member(guild.owner_id) #type: ignore
         embed = discord.Embed(title="Welcome to Ouroboros!", description=
@@ -133,15 +130,15 @@ class ServerStat(commands.Cog):
                     timestamp=discord.utils.utcnow())
         embed.set_footer(text="Ouroboros Bot")
         await owner.send(embed=embed)
-        await inphinithy.send(f"Joined new guild: {guild.name} ({guild.id})")
+        handler.log_task(message=f"Joined new guild: {guild.name} ({guild.id})", level="info", context="Guild Join")
+        
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild):
         """
         Triggered when the bot is removed from a guild.
         """
-        inphinithy = await self.client.fetch_user(ALLOWED_ID[0])
-        await inphinithy.send(f"Left guild: {guild.name} ({guild.id})")
+        handler.log_task(message=f"Left guild: {guild.name} ({guild.id})", level="info", context="Guild Leave")
         await ServerStatManager.set_server_state(guild.id, "off")
         await ServerStatManager.delete_server(guild.id)
         

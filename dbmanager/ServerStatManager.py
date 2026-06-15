@@ -1,8 +1,7 @@
-from settings import ErrorHandler
+from handle import handler
 from rimiru import Rimiru
 from constants import Roles,channelType
 
-error_handler = ErrorHandler()
 
 # -------------------------------------------------------------
 # STATE GETTERS / SETTERS
@@ -16,7 +15,7 @@ async def get_server_state(guild_id: int):
             return "off"
         return val[0]['state'] or "off"
     except Exception as e:
-        error_handler.handle(e, context="get_server_state")
+        handler.error_handle(e, context="get_server_state")
         return "off"
   
 async def set_server_state(guild_id: int, state: str):
@@ -25,7 +24,7 @@ async def set_server_state(guild_id: int, state: str):
     try:
         await conn.upsert("servers", {"guild_id": guild_id, "state": state}, conflict_column="guild_id")
     except Exception as e:
-        error_handler.handle(e, context="set_server_state")
+        handler.error_handle(e, context="set_server_state")
    
 
 async def get_server_tourstate(guild_id: int):
@@ -35,7 +34,7 @@ async def get_server_tourstate(guild_id: int):
         val = await conn.selectOne("servers", columns=["tourstate"], filters={"guild_id": guild_id})
         return val.get("tourstate") if val else "off"
     except Exception as e:
-        error_handler.handle(e, context="get_server_tourstate")
+        handler.error_handle(e, context="get_server_tourstate")
         return "off"
  
 
@@ -46,7 +45,7 @@ async def set_server_tourstate(guild_id: int, state: str):
     try:
         await conn.upsert("servers", {"guild_id": guild_id, "tourstate": state}, conflict_column="guild_id")
     except Exception as e:
-        error_handler.handle(e, context="set_server_tourstate")
+        handler.error_handle(e, context="set_server_tourstate")
 
 async def delete_server(guild_id: int):
     """Delete a guild's record from the servers table."""
@@ -55,7 +54,7 @@ async def delete_server(guild_id: int):
         await conn.delete("servers", filters={"guild_id": guild_id})
         
     except Exception as e:
-        error_handler.handle(e, context="delete_server")
+        handler.error_handle(e, context="delete_server")
 
 
 # -------------------------------------------------------------
@@ -70,7 +69,7 @@ async def get_role(guild_id: int, role: Roles) -> str|None:
         val = await conn.selectOne("servers", columns=[role.value], filters={"guild_id": guild_id})
         return val.get(role.value) if val else Roles.NONE.value
     except Exception as e:
-        error_handler.handle(e, context=f"get_role:{role.value}")
+        handler.error_handle(e, context=f"get_role:{role.value}")
         return Roles.NONE.value
 
 
@@ -83,7 +82,7 @@ async def set_role(guild_id: int, role: Roles, role_value: str):
     try:
         return await conn.upsert("servers", {"guild_id": guild_id, role.value: role_value}, conflict_column="guild_id")
     except Exception as e:
-        error_handler.handle(e, context=f"set_role:{role.value}")
+        handler.error_handle(e, context=f"set_role:{role.value}")
 
 
 
@@ -100,7 +99,7 @@ async def set_channel_id(guild_id: int, channel: channelType, channel_id: int|No
         await conn.upsert("servers", {"guild_id": guild_id, column: channel_id}, conflict_column="guild_id")
 
     except Exception as e:
-        error_handler.handle(e, context=f"set_channel_id:{channel.value}")
+        handler.error_handle(e, context=f"set_channel_id:{channel.value}")
  
 
 
@@ -122,7 +121,7 @@ async def get_greetings_channel_ids(guild_id: int):
             channelType.GOODBYE.value: row["goodbye_channel_id"]
             }
     except Exception as e:
-        error_handler.handle(e, context="get_greetings_channel_ids")
+        handler.error_handle(e, context="get_greetings_channel_ids")
         return {channelType.WELCOME.value: None, 
                 channelType.GOODBYE.value: None}
 
@@ -146,7 +145,7 @@ async def get_tour_channel_ids(guild_id: int):
             channelType.FIXTURES.value: row["fixtures_channel_id"],
         }
     except Exception as e:
-        error_handler.handle(e, context="get_tour_channel_ids")
+        handler.error_handle(e, context="get_tour_channel_ids")
         return {
             channelType.CHAT.value: None, 
             channelType.SIGNUP.value: None, 
@@ -160,7 +159,7 @@ async def get_tournament_servers():
         rows = await conn.select('servers', columns=["guild_id","signup_channel_id","chat_channel_id","fixtures_channel_id"], filters={"tourstate": "on"})
         return {r["guild_id"]: {channelType.SIGNUP: r["signup_channel_id"], channelType.CHAT: r["chat_channel_id"], channelType.FIXTURES: r["fixtures_channel_id"]} for r in rows}
     except Exception as e:
-        error_handler.handle(e, context="get_tournament_servers")
+        handler.error_handle(e, context="get_tournament_servers")
         return {}
 
 # -------------------------------------------------------------
@@ -173,7 +172,7 @@ async def get_all_server_states():
         rows = await conn.select('servers', columns=["guild_id", "state"])
         return {r["guild_id"]: r["state"] for r in rows}
     except Exception as e:
-        error_handler.handle(e, context="get_all_server_states")
+        handler.error_handle(e, context="get_all_server_states")
         return {}
 
 
@@ -185,7 +184,7 @@ async def get_all_server_tourstates():
         rows = await conn.select('servers', columns=["guild_id", "tourstate"])
         return {r["guild_id"]: r["tourstate"] for r in rows}
     except Exception as e:
-        error_handler.handle(e, context="get_all_server_tourstates")
+        handler.error_handle(e, context="get_all_server_tourstates")
         return {}
 
 

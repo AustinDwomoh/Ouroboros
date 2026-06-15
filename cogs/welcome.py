@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ext import commands
 from dbmanager import ServerStatManager
 from constants import Roles, channelType
-errorHandler = ErrorHandler()
+from handle import handler
 img_dir = IMGS_DIR
 
 
@@ -38,7 +38,7 @@ class WelcomeGoodbyeCog(commands.Cog):
                 if channel:
                     await self.send_welcome_banner(channel, member)
         except Exception as e:
-            errorHandler.handle(e, context="Error in on_member_join listener")
+            handler.error_handle(e, context="Error in on_member_join listener")
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
@@ -51,7 +51,7 @@ class WelcomeGoodbyeCog(commands.Cog):
                 if channel:
                     await self.send_goodbye_banner(channel, member)
         except Exception as e:
-            errorHandler.handle(e, context="Error in on_member_remove listener")
+            handler.error_handle(e, context="Error in on_member_remove listener")
 
     async def send_welcome_banner(self, channel, member):
         if not channel:
@@ -69,7 +69,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             await channel.send(embed=embed)
 
         except Exception as e:
-            errorHandler.handle(e, context="Error in send_welcome_banner method")
+            handler.error_handle(e, context="Error in send_welcome_banner method")
 
     async def send_goodbye_banner(self, channel, member):
         if not channel:
@@ -87,7 +87,7 @@ class WelcomeGoodbyeCog(commands.Cog):
             await channel.send(embed=embed)
 
         except Exception as e:
-           errorHandler.handle(e, context="Error in send_goodbye_banner method")
+           handler.error_handle(e, context="Error in send_goodbye_banner method")
 
 
     @app_commands.command(
@@ -99,18 +99,21 @@ class WelcomeGoodbyeCog(commands.Cog):
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ):
         """Set the welcome channel for the guild."""
-        if not Roles.check_role_permission(interaction.user, " "):
-            embed = discord.Embed(
-            title="Permission Denied",
-            description="You don't have permission to use this command.",
-            color=discord.Color.red(),
+        try:
+            if not Roles.check_role_permission(interaction.user, " "):
+                embed = discord.Embed(
+                title="Permission Denied",
+                description="You don't have permission to use this command.",
+                color=discord.Color.red(),
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
+            await ServerStatManager.set_channel_id(interaction.guild.id, channelType.WELCOME, channel.id) #type: ignore
+            await interaction.response.send_message(
+                f"Welcome channel set to {channel.mention}", ephemeral=True
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.WELCOME, channel.id) #type: ignore
-        await interaction.response.send_message(
-            f"Welcome channel set to {channel.mention}", ephemeral=True
-        )
+        except Exception as e:
+            handler.error_handle(e, context="Error in set_welcome_channel command")
 
     @app_commands.command(
         name="set_goodbye_channel",
@@ -121,18 +124,21 @@ class WelcomeGoodbyeCog(commands.Cog):
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ):
         """Set the goodbye channel for the guild."""
-        if not Roles.check_role_permission(interaction.user, ""):
-            embed = discord.Embed(
-                title="Permission Denied",
-                description="You are not allowed to invoke this command.",
-                color=discord.Color.red(),
-            )
+        try:
+            if not Roles.check_role_permission(interaction.user, ""):
+                embed = discord.Embed(
+                    title="Permission Denied",
+                    description="You are not allowed to invoke this command.",
+                    color=discord.Color.red(),
+                )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        await ServerStatManager.set_channel_id(interaction.guild.id, channelType.GOODBYE, channel.id) #type: ignore
-        await interaction.response.send_message(
-            f"Goodbye channel set to {channel.mention}", ephemeral=True
-        )
+            await ServerStatManager.set_channel_id(interaction.guild.id, channelType.GOODBYE, channel.id) #type: ignore
+            await interaction.response.send_message(
+                f"Goodbye channel set to {channel.mention}", ephemeral=True
+            )
+        except Exception as e:
+            handler.error_handle(e, context="Error in set_goodbye_channel command")
 
 
 async def setup(client):

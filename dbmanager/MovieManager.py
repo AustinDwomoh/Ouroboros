@@ -6,17 +6,15 @@ from dataclasses import replace
 import aiohttp
 from difflib import SequenceMatcher
 import discord
-from settings import MOVIE_BASE_URL, MOVIE_API_KEY, ErrorHandler
+from settings import MOVIE_BASE_URL, MOVIE_API_KEY
 from rimiru import Rimiru
 from models import Series, Movie,UserMedia
 from constants import FetchType, MediaType
-
-error_handler = ErrorHandler()
 import asyncio
 from datetime import datetime, timezone
 from typing import List
 from asyncio import Semaphore
-
+from handle import handler
 
 # ============================================================================ #
 #                                   DB CALLS                                   #
@@ -49,7 +47,7 @@ class MovieManager:
                 #so we can give feedback to the user with the title/poster etc
                 return media_data
         except Exception as e:
-            error_handler.handle(e, context=f"add_or_update_user_movie({title})")
+            handler.error_handle(e, context=f"add_or_update_user_movie({title})")
 
     async def add_or_update_user_series(self, user_id: int, title: str, season=None, episode=None, tmdb_id:int=0, watchlist: bool=False ):
         """Insert or update a movie watch record for a user."""
@@ -76,7 +74,7 @@ class MovieManager:
                 #so we can give feedback to the user with the title/poster etc
                 return media_data
         except Exception as e:
-            error_handler.handle(e, context=f"add_or_update_series({title})")
+            handler.error_handle(e, context=f"add_or_update_series({title})")
             return None
     
     async def add_to_watchlist(self, user_id: int, title: str, media_type:str,tmdb_id:int|None=None):
@@ -96,9 +94,8 @@ class MovieManager:
             if row:
                 return media_data
         except Exception as e:
-            error_handler.handle(e, context=f"add_to_watchlist({user_id}, {title})")
+            handler.error_handle(e, context=f"add_to_watchlist({user_id}, {title})")
             return None
-
 
     async def fetch_media_names(self):
         """Fetch all distinct media titles a user has interacted with."""
@@ -107,7 +104,7 @@ class MovieManager:
             rows = await conn.select("media", columns=["title","id","tmdb_id"], order_by="title ASC")
             return {r['title']: {"id": r["id"], "tmdb_id": r["tmdb_id"]} for r in rows}
         except Exception as e:
-            error_handler.handle(e, context="fetch_media_names")
+            handler.error_handle(e, context="fetch_media_names")
             return {}
 
     async def get_watchlist(self, user_id: int,):
@@ -121,7 +118,7 @@ class MovieManager:
                 fn="get_user_watchlist", params=[user_id], fetch_type=FetchType.FETCH)
             return [dict(row) for row in rows]
         except Exception as e:
-            error_handler.handle(e, context=f"get_watchlist({user_id})")
+            handler.error_handle(e, context=f"get_watchlist({user_id})")
             return []
 
     async def delete_user_media(self, user_id: int, media_id: int):
@@ -131,7 +128,7 @@ class MovieManager:
             await conn.delete("user_media", filters={"user_id": user_id, "media_id": media_id})
             return True
         except Exception as e:
-            error_handler.handle(e, context=f"delete_user_media({user_id}, {media_id})")
+            handler.error_handle(e, context=f"delete_user_media({user_id}, {media_id})")
             return False
 
     # ============================================================================ #
@@ -151,7 +148,7 @@ class MovieManager:
                 return UserMedia.from_db(dict(rows[0]))
             return None
         except Exception as e:
-            error_handler.handle(e, context=f"fetch_user_media({user_id}, {media_id})")
+            handler.error_handle(e, context=f"fetch_user_media({user_id}, {media_id})")
             return None
 
     async def check_user_completion(self, user_id: int):
@@ -163,9 +160,19 @@ class MovieManager:
             return [UserMedia.from_db(dict(r)) for r in rows]
 
         except Exception as e:
-            error_handler.handle(e, context=f"check_user_completion({user_id})")
+            handler.error_handle(e, context=f"check_user_completion({user_id})")
             return None
-
+        
+    async def get_user_watch_history(self, user_id: int):
+        """Fetch a user's watch history with media details."""
+        conn = await Rimiru.shion()
+        try:
+            rows = await conn.call_function(
+                fn="get_user_watch_history", params=[user_id], fetch_type=FetchType.FETCH)
+            return [UserMedia.from_db(dict(r)) for r in rows]
+        except Exception as e:
+            handler.error_handle(e, context=f"get_user_watch_history({user_id})")
+            return None
 
     # ============================================================================ #
     #                                   API CALLS                                  #
@@ -199,7 +206,7 @@ class MovieManager:
             row = row[0]
             return Series.from_db(row) if media_type == "tv" else Movie.from_db(row)
         except Exception as e:
-            error_handler.handle(e, context="get_cached_media")
+            handler.error_handle(e, context="get_cached_media")
             return None
 
 
@@ -238,7 +245,7 @@ class MovieManager:
             media_data = replace(media_data, id=row.get("id"))
             return media_data
         except Exception as e:
-            error_handler.handle(e, context="cache_media")
+            handler.error_handle(e, context="cache_media")
             return None
 
     async def search_media_multiple(self, media_type: str, name: str):
@@ -248,42 +255,46 @@ class MovieManager:
         Returns:
             List of dicts: [{id, title, year, poster_url, overview, similarity_score}, ...]
         """
-        url = f"{MOVIE_BASE_URL}/search/{media_type}?query={name.replace(' ', '+')}&api_key={MOVIE_API_KEY}"
-        #print(url)
+        try:
+            url = f"{MOVIE_BASE_URL}/search/{media_type}?query={name.replace(' ', '+')}&api_key={MOVIE_API_KEY}"
+            #print(url)
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as r:
-                data = await r.json()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as r:
+                    data = await r.json()
 
-        results = []
-        for result in data.get("results", []):
-            title = result.get("name") or result.get("title", "Unknown")
-            year = None
+            results = []
+            for result in data.get("results", []):
+                title = result.get("name") or result.get("title", "Unknown")
+                year = None
 
-            if media_type == "movie" and result.get("release_date"):
-                year = result["release_date"][:4]
-            elif media_type == "tv" and result.get("first_air_date"):
-                year = result["first_air_date"][:4]
+                if media_type == "movie" and result.get("release_date"):
+                    year = result["release_date"][:4]
+                elif media_type == "tv" and result.get("first_air_date"):
+                    year = result["first_air_date"][:4]
 
-            poster_path = result.get("poster_path")
-            poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+                poster_path = result.get("poster_path")
+                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
 
-            # Calculate similarity for sorting
-            similarity = self.is_similar(title, name, threshold=0.0)
+                # Calculate similarity for sorting
+                similarity = self.is_similar(title, name, threshold=0.0)
 
-            results.append({
-                "id": result["id"],
-                "title": title,
-                "year": year,
-                "poster_url": poster_url,
-                "overview": result.get("overview", "No description available."),
-                "similarity_score": similarity
-            })
+                results.append({
+                    "id": result["id"],
+                    "title": title,
+                    "year": year,
+                    "poster_url": poster_url,
+                    "overview": result.get("overview", "No description available."),
+                    "similarity_score": similarity
+                })
 
-        # Sort by similarity score (highest first)
-        results.sort(key=lambda x: x["similarity_score"], reverse=True)
+            # Sort by similarity score (highest first)
+            results.sort(key=lambda x: x["similarity_score"], reverse=True)
 
-        return results
+            return results
+        except Exception as e:
+            handler.error_handle(e, context=f"search_media_multiple({media_type}, {name})")
+            return []
 
 
     async def get_media_details(self, media_type: str, media_id: int | None = None)->Movie | Series | None:
@@ -297,23 +308,26 @@ class MovieManager:
         Returns:
             Dict with media details or empty dict if not found
         """
+        try:
+            if not media_id:
+                return None
 
-        if not media_id:
+            async with aiohttp.ClientSession() as session:
+                url = f"{MOVIE_BASE_URL}/{media_type}/{media_id}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
+                #print(url)
+                async with session.get(url) as resp:
+                    data = await resp.json()
+
+            if data.get("status_code") == 34:
+                return None
+
+            if not data.get("title") and not data.get("name"):
+                return None
+
+            return Series.from_api(data) if media_type == "tv" else Movie.from_api(data)
+        except Exception as e:
+            handler.error_handle(e, context=f"get_media_details({media_type}, {media_id})")
             return None
-
-        async with aiohttp.ClientSession() as session:
-            url = f"{MOVIE_BASE_URL}/{media_type}/{media_id}?api_key={MOVIE_API_KEY}&append_to_response=watch/providers"
-            #print(url)
-            async with session.get(url) as resp:
-                data = await resp.json()
-
-        if data.get("status_code") == 34:
-            return None
-
-        if not data.get("title") and not data.get("name"):
-            return None
-
-        return Series.from_api(data) if media_type == "tv" else Movie.from_api(data)
 
 
 
@@ -323,7 +337,6 @@ class MovieManager:
     # ============================================================================ #
 
     
-
     async def send_reminder_to_user(self, client, user_id: int, reminders: List[Series], semaphore: Semaphore):
         """Send episode reminders to a single user with rate limiting"""
         async with semaphore:  # Limit concurrent sends
@@ -357,12 +370,11 @@ class MovieManager:
                     await asyncio.sleep(0.5)  # Rate limit between messages
 
             except discord.Forbidden:
-                print(f"[REMINDERS] Cannot send DM to user {user_id} (DMs disabled)")
+                handler.log_task(context="Discord.Forbidden reminder media", message=f"[REMINDERS] Cannot send DM to user {user_id} (DMs disabled)", level="warning")
             except discord.HTTPException as e:
-                print(f"[REMINDERS] Discord API error for user {user_id}: {e}")
+                handler.log_task(context="Discord.HTTPException reminder media", message=f"[REMINDERS] Discord API error for user {user_id}: {e}", level="warning")
             except Exception as e:
-                error_handler.handle(e, context=f"send_reminder_to_{user_id}")
-
+                handler.error_handle(e, context=f"send_reminder_to_{user_id}")
 
     async def send_incomplete_reminder_to_user(self, client, user_id: int, incomplete: list[UserMedia], semaphore: Semaphore):
         """Send incomplete media reminders to a single user"""
@@ -370,7 +382,6 @@ class MovieManager:
             try:
                 user = await client.fetch_user(user_id)
                 if not user:
-                    print(f"[REMINDERS] User {user_id} not found")
                     return
 
                 # Send header message
@@ -413,12 +424,11 @@ class MovieManager:
                 await user.send(embed=footer_embed)
 
             except discord.Forbidden:
-                print(f"[REMINDERS] Cannot send DM to user {user_id}")
+                handler.log_task(context="Discord.Forbidden reminder media", message=f"[REMINDERS] Cannot send DM to user {user_id} (DMs disabled)", level="warning")
             except discord.HTTPException as e:
-                print(f"[REMINDERS] Discord API error for user {user_id}: {e}")
+                handler.log_task(context="Discord.HTTPException reminder media", message=f"[REMINDERS] Discord API error for user {user_id}: {e}", level="warning")
             except Exception as e:
-                error_handler.handle(e, context=f"send_incomplete_reminder_{user_id}")
-
+                handler.error_handle(e, context=f"send_incomplete_reminder_{user_id}")
 
     async def send_upcoming_episode_reminders(self, client):
         """Send reminders to users about upcoming episodes - PARALLEL VERSION"""
@@ -432,7 +442,7 @@ class MovieManager:
             )
 
             if not rows:
-                print("[REMINDERS] No users to check")
+                handler.log_task(context="REMINDERS", message="No users to check", level="Skip")
                 return
 
             # Fetch reminders for all users
@@ -451,14 +461,14 @@ class MovieManager:
                     if reminders:
                         user_reminders.append((user_id, reminders))
                 except Exception as e:
-                    error_handler.handle(e, context=f"fetch_reminders_{user_id}")
+                    handler.error_handle(e, context=f"fetch_reminders_{user_id}")
                     continue  
                 
             if not user_reminders:
-                print("[REMINDERS] No upcoming episodes to notify about")
+                handler.log_task(context="REMINDERS", message="No upcoming episodes to notify about", level="Skip")
                 return
 
-            print(f"[REMINDERS] Sending notifications to {len(user_reminders)} users")
+            handler.log_task(context="REMINDERS", message=f"Sending notifications to {len(user_reminders)} users", level="Info")
 
             # Create semaphore to limit concurrent sends (avoid rate limits)
             semaphore = Semaphore(3)  # Max 3 users being notified simultaneously
@@ -470,10 +480,24 @@ class MovieManager:
             ]
 
             await asyncio.gather(*tasks, return_exceptions=True)
-            print(f"[REMINDERS] Finished sending episode reminders")
+            handler.log_task(context="REMINDERS", message=f"[REMINDERS] Finished sending episode reminders", level="Info")
 
         except Exception as e:
-            error_handler.handle(e, context="send_upcoming_episode_reminders")
+            handler.error_handle(e, context="send_upcoming_episode_reminders")
+
+    async def upcoming_reminders(self, user_id: int) -> list[UserMedia]|None:
+        """Get reminders to users about upcoming episodes - for user requested reminder check"""
+        conn = await Rimiru.shion()
+        try:
+            reminders = await conn.call_function(
+                    fn="get_user_upcoming_episodes_with_progress",
+                    params=[user_id, 7],
+                    fetch_type=FetchType.FETCH
+                )
+            return [UserMedia.from_db(dict(r)) for r in reminders]
+        except Exception as e:
+            handler.error_handle(e, context="send_upcoming_episode_reminders")
+            return None
 
     async def send_incomplete_media_reminders(self, client):
         """Send reminders about incomplete media - PARALLEL VERSION"""
@@ -500,14 +524,14 @@ class MovieManager:
                     if incomplete:
                         user_incomplete.append((user_id, incomplete))
                 except Exception as e:
-                    error_handler.handle(e, context=f"check_completion_{user_id}")
+                    handler.error_handle(e, context=f"check_completion_{user_id}")
                     continue
                 
             if not user_incomplete:
-                print("[REMINDERS] No incomplete media to notify about")
+                handler.log_task(context="REMINDERS", message="[REMINDERS] No incomplete media to notify about", level="Skip")
                 return
 
-            print(f"[REMINDERS] Sending incomplete media notifications to {len(user_incomplete)} users")
+            handler.log_task(context="REMINDERS", message=f"[REMINDERS] Sending incomplete media notifications to {len(user_incomplete)} users", level="Info")
 
             # Create semaphore to limit concurrent sends
             semaphore = Semaphore(3)  # Max 3 users simultaneously
@@ -519,12 +543,12 @@ class MovieManager:
             ]
 
             await asyncio.gather(*tasks, return_exceptions=True)
-            print(f"[REMINDERS] Finished sending incomplete media reminders")
+            handler.log_task(context="REMINDERS", message=f"[REMINDERS] Finished sending incomplete media reminders", level="Info")
 
             await asyncio.sleep(1209600)  # Wait 2 weeks before next run
 
         except Exception as e:
-            error_handler.handle(e, context="send_incomplete_media_reminders")
+            handler.error_handle(e, context="send_incomplete_media_reminders")
 
 
     async def update_series_details(self, series_id: int, tmdb_id: int):
@@ -551,9 +575,8 @@ class MovieManager:
 
             return True
         except Exception as e:
-            error_handler.handle(e, context=f"update_series_details({series_id})")
+            handler.error_handle(e, context=f"update_series_details({series_id})")
             return False
-
 
     async def update_movie_details(self, movie_id: int, tmdb_id: int):
         """Update a single movie with latest data from TMDB."""
@@ -578,9 +601,8 @@ class MovieManager:
 
             return True
         except Exception as e:
-            error_handler.handle(e, context=f"update_movie_details({movie_id})")
+            handler.error_handle(e, context=f"update_movie_details({movie_id})")
             return False
-
 
     async def get_series_needing_update(self):
         """Get series that need updating based on their status and last update."""
@@ -592,9 +614,8 @@ class MovieManager:
             )
             return [{"id": r["id"], "tmdb_id": r["tmdb_id"]} for r in rows]
         except Exception as e:
-            error_handler.handle(e, context="get_series_needing_update")
+            handler.error_handle(e, context="get_series_needing_update")
             return []
-
 
     async def get_movies_needing_update(self):
         """Get movies that need updating (much less frequent than series)."""
@@ -606,81 +627,61 @@ class MovieManager:
             )
             return [{"id": r["id"], "tmdb_id": r["tmdb_id"]} for r in rows]
         except Exception as e:
-            error_handler.handle(e, context="get_movies_needing_update")
+            handler.error_handle(e, context="get_movies_needing_update")
             return []
 
     async def series_background_updater(self):
         """Background task to periodically update series data."""
-        print("[UPDATER] Series background updater started")
+        handler.log_task(context="UPDATER", message="[UPDATER] Series background updater started", level="Info")
+        try:
+            # Get series that need updating
+            series_list = await self.get_series_needing_update()
 
-        while self.running:
-            try:
-                # Get series that need updating
-                series_list = await self.get_series_needing_update()
+            if series_list:
+                handler.log_task(context="UPDATER", message=f"[UPDATER] Updating {len(series_list)} series...", level="Info")
 
-                if series_list:
-                    print(f"[UPDATER] Updating {len(series_list)} series...")
+                updated_count = 0
+                failed_count = 0
 
-                    updated_count = 0
-                    failed_count = 0
+                for series in series_list:
+                    success = await self.update_series_details(series["id"], series["tmdb_id"])
+                    if success:
+                        updated_count += 1
+                    else:
+                        failed_count += 1
+                    await asyncio.sleep(0.5)  # Rate limit
 
-                    for series in series_list:
-                        success = await self.update_series_details(series["id"], series["tmdb_id"])
-                        if success:
-                            updated_count += 1
-                        else:
-                            failed_count += 1
-                        await asyncio.sleep(0.5)  # Rate limit
+                handler.log_task(context="UPDATER", message=f"[UPDATER] Series update complete: {updated_count} updated, {failed_count} failed", level="Info")
+            else:
+                handler.log_task(context="UPDATER", message="[UPDATER] No series need updating at this time", level="Info")
 
-                    print(f"[UPDATER] Series update complete: {updated_count} updated, {failed_count} failed")
-                else:
-                    print("[UPDATER] No series need updating at this time")
-
-                # Wait 1 hour before next check
-                await asyncio.sleep(3600)
-
-            except Exception as e:
-                error_handler.handle(e, context="series_background_updater")
-                # Wait 5 minutes before retrying after error
-                await asyncio.sleep(300)
+        except Exception as e:
+            handler.error_handle(e, context="series_background_updater")
 
     async def movie_background_updater(self):
         """Background task to periodically update movie data (less frequent than series)."""
-        print("[UPDATER] Movie background updater started")
-
-        while self.running:
-            try:
-                # Get movies that need updating
-                movies_list = await self.get_movies_needing_update()
-
-                if movies_list:
-                    print(f"[UPDATER] Updating {len(movies_list)} movies...")
-
-                    updated_count = 0
-                    failed_count = 0
-
-                    for movie in movies_list:
-                        success = await self.update_movie_details(movie["id"], movie["tmdb_id"])
-                        if success:
-                            updated_count += 1
-                        else:
-                            failed_count += 1
-
-                        # Rate limiting
-                        await asyncio.sleep(0.5)
-
-                    print(f"[UPDATER] Movie update complete: {updated_count} updated, {failed_count} failed")
-                else:
-                    print("[UPDATER] No movies need updating at this time")
-
-                # Wait 12 hours before next check (movies change less frequently)
-                await asyncio.sleep(43200)
-
-            except Exception as e:
-                error_handler.handle(e, context="movie_background_updater")
-                # Wait 5 minutes before retrying after error
-                await asyncio.sleep(300)
-
+        handler.log_task(context="UPDATER", message="[UPDATER] Movie background updater started", level="Info")
+        try:
+            movies_list = await self.get_movies_needing_update()
+            if movies_list:
+                handler.log_task(context="UPDATER", message=f"[UPDATER] Updating {len(movies_list)} movies...", level="Info")
+                updated_count = 0
+                failed_count = 0
+                for movie in movies_list:
+                    success = await self.update_movie_details(movie["id"], movie["tmdb_id"])
+                    if success:
+                        updated_count += 1
+                    else:
+                        failed_count += 1
+                    # Rate limiting
+                    await asyncio.sleep(0.5)  # Adjust as needed to avoid hitting TMDB rate limits
+                handler.log_task(context="UPDATER", message=f"[UPDATER] Movie update complete: {updated_count} updated, {failed_count} failed", level="Info")
+            else:
+                handler.log_task(context="UPDATER", message="[UPDATER] No movies need updating at this time", level="Info")
+           
+        except Exception as e:
+            handler.error_handle(e, context="movie_background_updater")
+          
     async def send_upcoming_episode_reminders_loop(self, client):
         while self.running:
             try:
@@ -689,7 +690,7 @@ class MovieManager:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                error_handler.handle(e, context="upcoming_episode_loop")
+                handler.error_handle(e, context="upcoming_episode_loop")
                 await asyncio.sleep(300)
     
     async def send_incomplete_media_reminders_loop(self, client):
@@ -700,28 +701,21 @@ class MovieManager:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                error_handler.handle(e, context="incomplete_media_loop")
+                handler.error_handle(e, context="incomplete_media_loop")
                 await asyncio.sleep(300)
 
 
-    async def start_background_updaters(self, client):
-        if self.running:
-            return
-
-        self.running = True
-
-        self.tasks.append(asyncio.create_task(self.series_background_updater()))
-        self.tasks.append(asyncio.create_task(self.movie_background_updater()))
-        self.tasks.append(asyncio.create_task(self.send_incomplete_media_reminders_loop(client)))
-        self.tasks.append(asyncio.create_task(self.send_upcoming_episode_reminders_loop(client)))
-
-
-    async def stop_background_updaters(self):
-        self.running = False
-
+        
+    async def start_reminder_loops(self, client):
         for task in self.tasks:
             task.cancel()
-
-        await asyncio.gather(*self.tasks, return_exceptions=True)
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        
         self.tasks.clear()
-
+        self.running = True
+        self.tasks.append(asyncio.create_task(self.send_incomplete_media_reminders_loop(client)))
+        self.tasks.append(asyncio.create_task(self.send_upcoming_episode_reminders_loop(client)))
+    

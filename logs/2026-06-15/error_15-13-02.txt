@@ -1,0 +1,11 @@
+Timestamp: 2026-06-15 15:13:02.328220
+Context: Failed to send to webhook in on_interaction
+Exception: name 'DISCORD_LOGGING_WEBHOOK_URL' is not defined
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\austindwomoh23\Desktop\Ouroboros\client.py", line 190, in on_interaction
+    webhook = discord.Webhook.from_url(DISCORD_LOGGING_WEBHOOK_URL, session=session)#type: ignore
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+NameError: name 'DISCORD_LOGGING_WEBHOOK_URL' is not defined. Did you mean: 'DISCORD_HANDLER_WEBHOOK_URL'?
+

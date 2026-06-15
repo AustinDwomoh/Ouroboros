@@ -3,10 +3,11 @@
 # ============================================================================ #
 
 import discord
-from settings import ErrorHandler
+from handle import handler
 from dbmanager.MovieManager import MovieManager
-errorHandler = ErrorHandler()
 movieManager = MovieManager()
+from models import UserMedia
+
 class MediaSearchPaginator(discord.ui.View):
     """A Discord UI view with buttons for pagination."""
 
@@ -39,7 +40,7 @@ class MediaSearchPaginator(discord.ui.View):
             )
             return embed
         except Exception as e:
-            errorHandler.handle(e, context="MediaSearchPaginator.get_embed")
+            handler.error_handle(e, context="MediaSearchPaginator.get_embed")
             return discord.Embed(
                 title="Error",
                 description="An error occurred while generating the embed.",
@@ -228,9 +229,85 @@ def create_selection_embed(media_options: list, media_type: str, query: str) -> 
 
         return embed
     except Exception as e:
-        errorHandler.handle(e, context="create_selection_embed")
+        handler.error_handle(e, context="create_selection_embed")
         return discord.Embed(
             title="Error",
             description="An error occurred while creating the selection embed.",
             color=discord.Color.red(),
         )
+
+
+class WatchHistoryPaginationView(discord.ui.View):
+    def __init__(self, data: list[UserMedia], sep: int = 10, timeout: int = 60):
+        super().__init__(timeout=timeout)
+        self.data = data  # parse once upfront
+        self.sep = sep
+        self.current_page = 1
+        self.message = None
+
+    # ── helpers ──────────────────────────────────────────────────────────
+
+    def get_total_pages(self) -> int:
+        return max(1, (len(self.data) - 1) // self.sep + 1)
+
+    def get_current_page_data(self) -> list[UserMedia]:
+        start = (self.current_page - 1) * self.sep
+        return self.data[start : start + self.sep]
+
+    # ── embed builder ────────────────────────────────────────────────────
+
+    def build_embed(self) -> discord.Embed:
+        page_data = self.get_current_page_data()
+        total_pages = self.get_total_pages()
+
+        embed = discord.Embed(
+            title=f"Watch History — Page {self.current_page}/{total_pages}",
+            color=discord.Color.blurple()
+        )
+
+        for item in page_data:
+            # status badge
+         
+            # value line: progress for series, watched state for movies
+            if item.is_series:
+                value = f"Type: {item.user_status.strip()} \n Progress: {item.progress_text or 'Not started'}"
+            else:
+                value = f"Type: {item.user_status.strip()} \n Status:  {'Watched' if item.is_completed else 'Not watched'}"
+
+            embed.add_field(
+                name=f"{item.media_type.table_name.title()} • {item.title}",
+                value=value,
+                inline=False
+            )
+
+        embed.set_footer(text="Use the buttons below to navigate.")
+        return embed
+
+    # ── update helper ────────────────────────────────────────────────────
+
+    async def update_message(self, interaction: discord.Interaction):
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    # ── buttons ──────────────────────────────────────────────────────────
+
+    @discord.ui.button(label="|<", style=discord.ButtonStyle.green)
+    async def first_page_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_page = 1
+        await self.update_message(interaction)
+
+    @discord.ui.button(label="<", style=discord.ButtonStyle.primary)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page > 1:
+            self.current_page -= 1
+        await self.update_message(interaction)
+
+    @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page < self.get_total_pages():
+            self.current_page += 1
+        await self.update_message(interaction)
+
+    @discord.ui.button(label=">|", style=discord.ButtonStyle.green)
+    async def last_page_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_page = self.get_total_pages()
+        await self.update_message(interaction)
