@@ -5,7 +5,7 @@ from datetime import datetime
 # imported from your settings
 from settings import (
     DISCORD_HANDLER_WEBHOOK_URL,
-    DISCORD_INTERACTION_WEBHOOK_URL,
+    DISCORD_LOGGING_WEBHOOK_URL,
     LOG_BASE_DIR,
     BOT_MODE,
 )
@@ -29,7 +29,7 @@ class OuroborosHandler:
 
     def __init__(self):
         self.error_webhook = DISCORD_HANDLER_WEBHOOK_URL
-        self.log_webhook = DISCORD_INTERACTION_WEBHOOK_URL
+        self.log_webhook = DISCORD_LOGGING_WEBHOOK_URL
         self.log_base_dir = LOG_BASE_DIR
         self.notify = BOT_MODE != "testing"
 
@@ -38,7 +38,7 @@ class OuroborosHandler:
         if self.notify and not self.error_webhook:
             logger.warning("DISCORD_HANDLER_WEBHOOK_URL not set. Error notifications disabled.")
         if self.notify and not self.log_webhook:
-            logger.warning("DISCORD_INTERACTION_WEBHOOK_URL not set. Task log notifications disabled.")
+            logger.warning("DISCORD_LOGGING_WEBHOOK_URL not set. Task log notifications disabled.")
 
     # ------------------------------------------------------------------
     # ERROR HANDLING  (unchanged from ErrorHandler)
