@@ -18,14 +18,26 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
       - name: Run series sync
-        env:
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python sync.py --target series
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/Ouroboros
+
+            # Activate virtualenv
+            source ouroboros/bin/activate
+
+            # Install dependencies
+            pip install -r requirements.txt
+
+            # Run series sync
+            python update_media.py --target series
+
+      
 
   sync-movies:
     if: github.event.schedule == '0 0 */12 * *' || github.event_name == 'workflow_dispatch'
@@ -38,11 +50,21 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
       - name: Run movie sync
-        env:
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python sync.py --target movies
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/Ouroboros
+
+            # Activate virtualenv
+            source ouroboros/bin/activate
+
+            # Install dependencies
+            pip install -r requirements.txt
+
+            # Run movie sync
+            python update_media.py --target movies

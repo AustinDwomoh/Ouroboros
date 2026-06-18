@@ -106,7 +106,8 @@ class Client(commands.Bot):
         hw = await self.db.upsert(
                 "users", {"discord_id": uid, "username": interaction.user.name}, conflict_column="discord_id"
             )
-        handler.log_task("BOT", f"User {uid}, for {interaction.user.name} saved to DB: {hw}", level="SUCCESS")
+        hw_for_log = f"\ndiscord_id={uid}, \nusername={interaction.user.name}"
+        handler.log_task("BOT", f"User {uid}, for {interaction.user.name} \nsaved to DB: {hw_for_log}", level="SUCCESS")
         self._seen_users[uid] = now
     
     def parse_announcement(self, raw: str):
