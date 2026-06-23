@@ -1,9 +1,9 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from spotify_client import SpotifyClient, SpotifyAuthError, SpotifyAPIError
+from spotify.spotify_client import SpotifyClient, SpotifyAuthError, SpotifyAPIError
 from settings import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
-from spotify_auth import build_auth_url, get_access_token
+from spotify.spotify_auth import build_auth_url, get_access_token
 import asyncio
 def make_spotify(refresh_token) -> SpotifyClient:
     """Create a SpotifyClient from settings."""

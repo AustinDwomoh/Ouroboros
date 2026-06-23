@@ -4,7 +4,6 @@ Look am anime lover, I legit have a rimuru wallpaper in my room ok?  Don't judge
 import json
 import asyncpg
 import ssl
-
 from settings import PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
 from constants import FetchType
 class Rimiru:

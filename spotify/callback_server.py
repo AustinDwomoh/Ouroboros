@@ -9,6 +9,9 @@ from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 from rimiru import Rimiru
 from handle import handler
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 load_dotenv()
 
