@@ -1,7 +1,0 @@
-Timestamp: 2026-06-23 13:05:04.602533
-Context: Spotify callback error: Missing code/state
-Exception: Spotify callback error: Missing code/state
-
-Traceback:
-NoneType: None
-

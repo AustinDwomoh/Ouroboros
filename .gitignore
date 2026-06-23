@@ -9,3 +9,4 @@ ouroboros/
 errors/
 errors/.env.save
 .env.swp
+logs/
