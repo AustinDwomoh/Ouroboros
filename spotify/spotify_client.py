@@ -2,22 +2,7 @@ import aiohttp
 import base64
 import asyncio
 from typing import Optional
-
-
-class SpotifyAuthError(Exception):
-    """Raised when Spotify authentication fails."""
-    pass
-
-
-class SpotifyAPIError(Exception):
-    """Raised for unexpected Spotify API errors."""
-    def __init__(self, status, reason, body):
-        self.status = status
-        self.reason = reason
-        self.body = body
-        super().__init__(f"Spotify API error {status}: {reason}")
-
-
+from handle import handler
 class SpotifyClient:
     """
     Full Spotify client using the Web API (Premium account).
@@ -67,10 +52,11 @@ class SpotifyClient:
             ) as resp:
                 if resp.status != 200:
                     body = await resp.text()
-                    raise SpotifyAuthError(
-                        f"Token refresh failed ({resp.status}): {body}"
-                    )
+                    handler.error_handle(context=f"Token refresh failed ({resp.status}): {body}", error=Exception(f"Token refresh failed ({resp.status}): {body}"))
+                    raise Exception(f"Token refresh failed ({resp.status}): {body}")
                 data = await resp.json()
+                handler.log_task(context="Spotify token refresh", message=f"Access token refreshed successfully.")
+                print(f"Spotify token refreshed successfully. New access token: {data}")  # Debugging line
 
         self._access_token = data["access_token"]
         self._token_expires_at = time.time() + data["expires_in"]
@@ -102,7 +88,7 @@ class SpotifyClient:
                 elif resp.status == 204:
                     return {}           # success, no body (e.g. play/pause)
                 elif resp.status == 401:
-                    raise SpotifyAuthError("Access token rejected (401).")
+                    raise Exception ("Access token rejected (401).")
                 elif resp.status == 403:
                     return {"error": "Premium account required for this action."}
                 elif resp.status == 404:
@@ -113,7 +99,7 @@ class SpotifyClient:
                     return await self._request(method, path, **kwargs)
                 else:
                     body = await resp.text()
-                    raise SpotifyAPIError(resp.status, resp.reason, body)
+                    raise Exception(f"Spotify API error {resp.status}: {resp.reason} - {body}")
 
     # ------------------------------------------------------------------
     # Playback — currently playing
@@ -151,19 +137,29 @@ class SpotifyClient:
 
     async def play(self, device_id: Optional[str] = None) -> str:
         """Resume playback."""
-        params = {}
-        if device_id:
-            params["device_id"] = device_id
-        result = await self._request("PUT", "/me/player/play", params=params)
-        return result.get("error", "▶️ Playback started.")
+        try:
+            params = {}
+            if device_id:
+                params["device_id"] = device_id
+            result = await self._request("PUT", "/me/player/play", params=params)
+            return result.get("error", "▶️ Playback started.")
+        except Exception as e:
+            handler.error_handle(context=f"Spotify play error: {e}", error=e)
+            return "❌ An error occurred while trying to start playback."
 
     async def pause(self, device_id: Optional[str] = None) -> str:
         """Pause playback."""
-        params = {}
-        if device_id:
-            params["device_id"] = device_id
-        result = await self._request("PUT", "/me/player/pause", params=params)
-        return result.get("error", "⏸ Playback paused.")
+        try:
+            params = {}
+            if device_id:
+                params["device_id"] = device_id
+            result = await self._request("PUT", "/me/player/pause", params=params)
+            return result.get("error", "⏸ Playback paused.")
+        except Exception as e:
+            handler.error_handle(context=f"Spotify pause error: {e}", error=e)
+            return "❌ An error occurred while trying to pause playback."   
+            
+        
 
     async def skip_next(self, device_id: Optional[str] = None) -> str:
         """Skip to next track."""
@@ -219,23 +215,27 @@ class SpotifyClient:
         Search for tracks by name/artist.
         Returns a list of dicts: {name, artist, uri, duration_ms, url}
         """
-        data = await self._request(
-            "GET", "/search",
-            params={"q": query, "type": "track", "limit": limit}
-        )
-        if not data or "tracks" not in data:
-            return []
+        try:
+            data = await self._request(
+                "GET", "/search",
+                params={"q": query, "type": "track", "limit": limit}
+            )
+            if not data or "tracks" not in data:
+                return []
 
-        results = []
-        for item in data["tracks"]["items"]:
-            results.append({
-                "name": item["name"],
-                "artist": item["artists"][0]["name"],
-                "uri": item["uri"],               # spotify:track:XXXX
-                "duration_ms": item["duration_ms"],
-                "url": item["external_urls"]["spotify"],
-            })
-        return results
+            results = []
+            for item in data["tracks"]["items"]:
+                results.append({
+                    "name": item["name"],
+                    "artist": item["artists"][0]["name"],
+                    "uri": item["uri"],               # spotify:track:XXXX
+                    "duration_ms": item["duration_ms"],
+                    "url": item["external_urls"]["spotify"],
+                })
+            return results
+        except Exception as e:
+            handler.error_handle(context=f"Spotify search error: {e}", error=e)
+            return []
 
     async def add_to_queue(self, track_uri: str, device_id: Optional[str] = None) -> str:
         """Add a track URI to the playback queue."""

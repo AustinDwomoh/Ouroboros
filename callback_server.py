@@ -18,7 +18,16 @@ load_dotenv()
 
 
 app = FastAPI()
-connect_db: Rimiru = Rimiru.shion()  # async DB connection pool #type: ignore
+@app.on_event("startup")
+async def startup():
+    global connect_db
+    connect_db = await Rimiru.shion()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    if connect_db:
+        await connect_db.pool.close()
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
@@ -71,20 +80,24 @@ def _exchange_code(code: str) -> str:
     credentials = base64.b64encode(
         f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()
     ).decode()
-    data = urllib.parse.urlencode({
-        "grant_type":   "authorization_code",
-        "code":         code,
-        "redirect_uri": SPOTIFY_REDIRECT_URI,
-    }).encode()
-    req = urllib.request.Request(
-        "https://accounts.spotify.com/api/token",
-        data=data,
-        headers={
-            "Authorization": f"Basic {credentials}",
-            "Content-Type":  "application/x-www-form-urlencoded",
-        },
-    )
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())["refresh_token"]
+    try:
+        data = urllib.parse.urlencode({
+            "grant_type":   "authorization_code",
+            "code":         code,
+            "redirect_uri": SPOTIFY_REDIRECT_URI,
+        }).encode()
+        req = urllib.request.Request(
+            "https://accounts.spotify.com/api/token",
+            data=data,
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type":  "application/x-www-form-urlencoded",
+            },
+        )
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())["refresh_token"]
+    except Exception as e:
+        handler.error_handle(context=f"Error exchanging code for token: {e}", error=e)
+        raise
 
 
