@@ -1,0 +1,26 @@
+Timestamp: 2026-06-23 11:41:02.069000
+Context: Failed to load cog music.py
+Exception: Extension 'cogs.music' raised an error: ImportError: cannot import name 'SpotifyClient' from 'spotify_client' (C:\Users\austindwomoh23\Desktop\Ouroboros\spotify_client.py)
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\austindwomoh23\Desktop\Ouroboros\webguild\Lib\site-packages\discord\ext\commands\bot.py", line 951, in _load_from_module_spec
+    spec.loader.exec_module(lib)  # type: ignore
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "<frozen importlib._bootstrap_external>", line 1026, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\austindwomoh23\Desktop\Ouroboros\cogs\music.py", line 4, in <module>
+    from spotify_client import SpotifyClient, SpotifyAuthError, SpotifyAPIError
+ImportError: cannot import name 'SpotifyClient' from 'spotify_client' (C:\Users\austindwomoh23\Desktop\Ouroboros\spotify_client.py)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\austindwomoh23\Desktop\Ouroboros\client.py", line 226, in load_cogs
+    await self.load_extension(f"cogs.{cog_file.name[:-3]}")
+  File "C:\Users\austindwomoh23\Desktop\Ouroboros\webguild\Lib\site-packages\discord\ext\commands\bot.py", line 1029, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\austindwomoh23\Desktop\Ouroboros\webguild\Lib\site-packages\discord\ext\commands\bot.py", line 954, in _load_from_module_spec
+    raise errors.ExtensionFailed(key, e) from e
+discord.ext.commands.errors.ExtensionFailed: Extension 'cogs.music' raised an error: ImportError: cannot import name 'SpotifyClient' from 'spotify_client' (C:\Users\austindwomoh23\Desktop\Ouroboros\spotify_client.py)
+
