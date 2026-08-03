@@ -4,7 +4,8 @@ from discord.ext import commands
 from rimiru import Rimiru
 from settings import *
 from handle import handler
-from dbmanager.MovieManager import MovieManager
+
+
 # Logging setup
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("Ouroboros")
@@ -26,7 +27,7 @@ class Client(commands.Bot):
         self.pending_announcements = {}
         self.pending_previews = {}
         self.pending_messages = {}
-        self.manager = MovieManager() 
+        
 
     async def setup_hook(self):
         self.db = await Rimiru.shion() 
@@ -78,16 +79,12 @@ class Client(commands.Bot):
                     self._seen_users.clear()
                     await message.channel.send("🧹 User cache cleared.")
                     return
-                if content == "$reminders":
-                    await message.channel.send("🔄 Updating media information...")
-                    await self.manager.start_reminder_loops(self)
-                    await message.channel.send("✅ Media update complete.")
-                    return
+               
             await self.process_commands(message)
             
         except Exception as e:
             handler.error_handle(e, context="$godoflies:on_message")
-     
+    
         # -------------------------------------------------
         # DB Utilities
         # -------------------------------------------------
@@ -148,7 +145,7 @@ class Client(commands.Bot):
                         "`$nuke` — leave all guilds\n"
                         "`$sync` — sync slash commands\n"
                         "`$clearcache` — clear user cache\n"
-                        "`$reminders` — restart reminder loops"
+                
                     ),
                     inline=False
                 )

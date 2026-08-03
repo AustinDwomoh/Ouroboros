@@ -15,14 +15,16 @@ from datetime import datetime, timezone
 from typing import List
 from asyncio import Semaphore
 from handle import handler
-
+from discord.ext import  tasks
+from settings import BOT_MODE
 # ============================================================================ #
 #                                   DB CALLS                                   #
 # ============================================================================ #
 class MovieManager:
     def __init__(self):
-        self.tasks = []
+
         self.running = False
+        
 
     async def add_or_update_user_movie(self, user_id: int, title: str, tmdb_id:int|None=None,watchlist: bool=False):
         """Insert or update a movie watch record for a user."""
@@ -545,8 +547,6 @@ class MovieManager:
             await asyncio.gather(*tasks, return_exceptions=True)
             handler.log_task(context="REMINDERS", message=f"[REMINDERS] Finished sending incomplete media reminders", level="Info")
 
-            await asyncio.sleep(1209600)  # Wait 2 weeks before next run
-
         except Exception as e:
             handler.error_handle(e, context="send_incomplete_media_reminders")
 
@@ -674,48 +674,38 @@ class MovieManager:
                     else:
                         failed_count += 1
                     # Rate limiting
-                    await asyncio.sleep(0.5)  # Adjust as needed to avoid hitting TMDB rate limits
+                    await asyncio.sleep(0.5)  
                 handler.log_task(context="UPDATER", message=f"[UPDATER] Movie update complete: {updated_count} updated, {failed_count} failed", level="Info")
             else:
                 handler.log_task(context="UPDATER", message="[UPDATER] No movies need updating at this time", level="Info")
            
         except Exception as e:
             handler.error_handle(e, context="movie_background_updater")
-          
-    async def send_upcoming_episode_reminders_loop(self, client):
-        while self.running:
-            try:
-                await self.send_upcoming_episode_reminders(client)
-                await asyncio.sleep(604800)  # once per week
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                handler.error_handle(e, context="upcoming_episode_loop")
-                await asyncio.sleep(300)
     
+    @tasks.loop(hours=168 if BOT_MODE == "production" else 0.02)
+    async def send_upcoming_episode_reminders_loop(self, client):
+        try:
+            await self.send_upcoming_episode_reminders(client)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            handler.error_handle(e, context="upcoming_episode_loop")
+            await asyncio.sleep(300)
+    
+    @tasks.loop(hours=672 if BOT_MODE == "production" else 0.02)  # 4 weeks
     async def send_incomplete_media_reminders_loop(self, client):
-        while self.running:
-            try:
-                await self.send_incomplete_media_reminders(client)
-                await asyncio.sleep(2419200)  # 4 weeks
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                handler.error_handle(e, context="incomplete_media_loop")
-                await asyncio.sleep(300)
+       
+        try:
+            await self.send_incomplete_media_reminders(client)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            handler.error_handle(e, context="incomplete_media_loop")
+            await asyncio.sleep(300)
 
 
+    
+
         
-    async def start_reminder_loops(self, client):
-        for task in self.tasks:
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-        
-        self.tasks.clear()
-        self.running = True
-        self.tasks.append(asyncio.create_task(self.send_incomplete_media_reminders_loop(client)))
-        self.tasks.append(asyncio.create_task(self.send_upcoming_episode_reminders_loop(client)))
+   
     

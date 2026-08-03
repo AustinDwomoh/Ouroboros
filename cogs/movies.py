@@ -9,6 +9,7 @@ from discord.ext import commands
 from dbmanager.MovieManager import MovieManager
 from views.movieView import MediaSelectionView, create_selection_embed, WatchHistoryPaginationView
 from constants import MediaType
+
 movieManager = MovieManager()
 
 
@@ -22,6 +23,8 @@ class Movies(commands.Cog):
         self.client = client
         self.loop_lock = asyncio.Lock()
         self.movie_title_cache: dict[str, dict[str, int]] = {} #{title: tmdb_id}
+        movieManager.send_upcoming_episode_reminders_loop.start(self.client)
+        movieManager.send_incomplete_media_reminders_loop.start(self.client)
         
         
     # ============================================================================ #
@@ -45,7 +48,12 @@ class Movies(commands.Cog):
         except Exception as e:
             handler.error_handle(e, context=f"add_to_watchlist({title}, {media_type})")
             await interaction.followup.send(f" Error: Adding to watchlist failed.")
-      
+            
+    async def cog_load(self):
+        if not movieManager.send_incomplete_media_reminders_loop.is_running():
+            movieManager.send_incomplete_media_reminders_loop.start(self.client)
+        if not movieManager.send_upcoming_episode_reminders_loop.is_running():
+            movieManager.send_upcoming_episode_reminders_loop.start(self.client) 
 
     @app_commands.command(name="add_movie", description="Add a movie to your watched list or watchlist")
     @app_commands.describe(
@@ -213,7 +221,7 @@ class Movies(commands.Cog):
                 return
             else:
                 media = media_options[0]
-                if "tmdb_id" in media: #since there are times the api will return only one page and an accrute one so tmdb_id will be there but as id
+                if "tmdb_id" in media: #since there are times the api will return only one page and an accurate one so tmdb_id will be there but as id
                     tmdb_id = media['tmdb_id']
                 else:
                     tmdb_id = media['id']
