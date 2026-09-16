@@ -183,20 +183,8 @@ class Client(commands.Bot):
         embed.add_field(name="User", value=f"{interaction.user} (`{interaction.user.id}`)", inline=False)
         embed.add_field(name="Server", value=f"{interaction.guild} (`{interaction.guild_id}`)" if interaction.guild else "💬 Direct Message", inline=False)
         embed.add_field(name="Channel", value=f"{interaction.channel}" if interaction.guild else "DM", inline=False)
-            async with aiohttp.ClientSession() as session:
-                webhook = discord.Webhook.from_url(DISCORD_INTERACTION_WEBHOOK_URL, session=session)#type: ignore
-                embed = discord.Embed(
-                    title="Interaction Logged",
-                    color=COLOR_MAP.get(command_name, discord.Color.blurple()),
-                    timestamp=discord.utils.utcnow()
-                )
-                embed.add_field(name="User", value=f"{interaction.user} (`{interaction.user.id}`)", inline=False)
-                embed.add_field(name="Server", value=f"{interaction.guild} (`{interaction.guild_id}`)" if interaction.guild else "Direct Message", inline=False)
-                embed.add_field(name="Command", value=interaction.data.get("name", "Unknown"), inline=False)#type: ignore
-                embed.add_field(name="Channel",value=f"{interaction.channel}" if interaction.guild else "DM",inline=False)
-                await webhook.send(embed=embed)
-        except Exception as e:
-            handler.error_handle(e, context="Failed to send to webhook in on_interaction")
+        if not DISCORD_INTERACTION_WEBHOOK_URL:
+            if not self._warned_missing_interaction_webhook:
                 logger.warning("DISCORD_INTERACTION_WEBHOOK_URL not set. Interaction logging disabled.")
                 self._warned_missing_interaction_webhook = True
         else:

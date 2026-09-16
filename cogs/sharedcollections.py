@@ -113,7 +113,7 @@ class SharedCollections(commands.Cog):
             await interaction.followup.send(f"Invitation sent to {user.mention}.")
             try:
                 await user.send(
-                    f"{interaction.user.mention} invited you to shared collection `{collection_id}`.",
+                    f"{interaction.user.mention} invited you to shared collection `{collection_name}`.",
                     view=InviteView(invite["id"]),
                 )
             except discord.Forbidden:
