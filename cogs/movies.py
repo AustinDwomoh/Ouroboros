@@ -508,9 +508,11 @@ class Movies(commands.Cog):
             handler.error_handle(e, context=f"search_media({title})")
             await interaction.followup.send(f"Error: Finding media")
        
+   
     # ============================================================================ #
     #                                AUTOCOMPLETE                                  #
     # ============================================================================ #
+
 
     @add_to_watchlist.autocomplete("media_type")
     @view_watchlist.autocomplete("media_type")
