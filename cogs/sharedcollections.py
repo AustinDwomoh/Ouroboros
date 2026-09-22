@@ -8,6 +8,7 @@ from handle import handler
 from dbmanager.MovieManager import MovieManager
 from dbmanager.SharedCollectionManager import sharedCollectionManager
 from constants import MediaType
+from views.movieView import SharedMediaSelectionView, create_selection_embed
 
 movieManager = MovieManager()
 
@@ -125,8 +126,22 @@ class SharedCollections(commands.Cog):
             await interaction.followup.send("Error: Could not send invitation.", ephemeral=True)
 
     @app_commands.command(name="shared_add", description="Add media to a shared collection")
-    @app_commands.describe(collection_name="The shared collection to add media to", media_title="The title of the media to add")
-    async def shared_add(self, interaction: discord.Interaction, collection_name: str, media_title: str):
+    @app_commands.describe(
+        collection_name="The shared collection to add media to",
+        media_title="The title of the media to add",
+        media_type="Movie or series (only needed if the title isn't already known)",
+    )
+    @app_commands.choices(media_type=[
+        app_commands.Choice(name="Movie", value="movie"),
+        app_commands.Choice(name="Series", value="tv"),
+    ])
+    async def shared_add(
+        self,
+        interaction: discord.Interaction,
+        collection_name: str,
+        media_title: str,
+        media_type: app_commands.Choice[str] | None = None,
+    ):
         await interaction.response.defer()
         try:
             collection_id = await sharedCollectionManager.get_collection_id(
@@ -135,10 +150,56 @@ class SharedCollections(commands.Cog):
             )
             if collection_id is None:
                 raise ValueError("Collection not found")
+
             media_info = self.media_title_cache.get(media_title)
-            if not media_info:
-                raise ValueError(f"Media title not found: `{media_title}`")
-            result = await sharedCollectionManager.add_item(collection_id, interaction.user.id, media_info["id"])
+            if media_info:
+                result = await sharedCollectionManager.add_item(collection_id, interaction.user.id, media_info["id"])
+
+                embed = discord.Embed(
+                    title="Added to Shared Collection",
+                    description=f"**{result['title']}** ({_media_type_label(result['media_type'])}) added to **{result['collection_name']}**",
+                    color=discord.Color.green(),
+                )
+                await interaction.followup.send(embed=embed)
+
+                await self.notify_new_item(interaction.user, result)
+                return
+
+            # Not cached locally - search TMDB and let the user pick, same as Movies' add flow
+            if media_type is None:
+                raise ValueError(
+                    f"`{media_title}` isn't in the database yet. "
+                    "Pick a `media_type` (movie/series) so it can be searched for."
+                )
+
+            media_options = await movieManager.search_media_multiple(media_type.value, media_title)
+            if not media_options:
+                kind = "movies" if media_type.value == "movie" else "series"
+                raise ValueError(f"No {kind} found for: `{media_title}`")
+
+            if len(media_options) > 1:
+                embed = create_selection_embed(
+                    media_options,
+                    "movie" if media_type.value == "movie" else "series",
+                    media_title,
+                )
+                view = SharedMediaSelectionView(
+                    media_options,
+                    media_type.value,
+                    collection_id,
+                    collection_name,
+                    interaction.user.id,
+                )
+                await interaction.followup.send(embed=embed, view=view)
+                return
+
+            media = media_options[0]
+            tmdb_id = media.get("tmdb_id", media["id"])
+            media_data = await movieManager.cache_media(media_type.value, tmdb_id)
+            if not media_data:
+                raise ValueError(f"Failed to fetch details for `{media_title}`")
+
+            result = await sharedCollectionManager.add_item(collection_id, interaction.user.id, media_data.id)  # type: ignore
 
             embed = discord.Embed(
                 title="Added to Shared Collection",

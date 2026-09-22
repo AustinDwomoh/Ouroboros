@@ -466,9 +466,9 @@ class Movies(commands.Cog):
 
  
         
-    @app_commands.command(name="search_media", description="Search for movies or series")
+    @app_commands.command(name="search_saved_media", description="Search for movies or series you have in your played list or watchlist")
     @app_commands.dm_only()
-    async def search_media(
+    async def search_saved_media(
         self,
         interaction: discord.Interaction,
         title: str
@@ -505,7 +505,7 @@ class Movies(commands.Cog):
         except ValueError as e:
             await interaction.followup.send(f"Media possibly not in your list:")
         except Exception as e:
-            handler.error_handle(e, context=f"search_media({title})")
+            handler.error_handle(e, context=f"search_saved_media({title})")
             await interaction.followup.send(f"Error: Finding media")
        
    
@@ -537,7 +537,7 @@ class Movies(commands.Cog):
         
     @add_movie.autocomplete("title")
     @add_series.autocomplete("title")
-    @search_media.autocomplete("title")
+    @search_saved_media.autocomplete("title")
     @add_to_watchlist.autocomplete("title")
     @delete_media.autocomplete("title")
     async def title_autocomplete(

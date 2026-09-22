@@ -5,8 +5,17 @@
 import discord
 from handle import handler
 from dbmanager.MovieManager import MovieManager
+from dbmanager.SharedCollectionManager import sharedCollectionManager
+from constants import MediaType
 movieManager = MovieManager()
 from models import UserMedia
+
+
+def _media_type_label(media_type: str | None) -> str:
+    if not media_type:
+        return "N/A"
+    media_type_obj = MediaType.find_media_type(media_type)
+    return media_type_obj.table_name.title() if media_type_obj else media_type
 
 class MediaSearchPaginator(discord.ui.View):
     """A Discord UI view with buttons for pagination."""
@@ -235,6 +244,141 @@ def create_selection_embed(media_options: list, media_type: str, query: str) -> 
             description="An error occurred while creating the selection embed.",
             color=discord.Color.red(),
         )
+
+
+# ============================================================================ #
+#                      SHARED COLLECTION MEDIA SELECTION VIEW                  #
+# ============================================================================ #
+
+class SharedMediaSelectionView(discord.ui.View):
+    """View that displays media options when adding unrecognized media to a shared collection."""
+
+    def __init__(self, media_options: list, media_type: str, collection_id: int,
+                 collection_name: str, user_id: int):
+        super().__init__(timeout=180)
+        self.media_type = media_type
+        self.collection_id = collection_id
+        self.collection_name = collection_name
+        self.user_id = user_id
+        self.selected_media = None
+
+        # Create select menu
+        options = []
+        for media in media_options[:25]:  # Discord limit
+            label = media.get('title', 'Unknown')
+            year = media.get('year', '')
+            if year:
+                label = f"{label} ({year})"
+
+            if len(label) > 100:
+                label = label[:97] + "..."
+
+            desc = media.get('overview', 'No description')
+            if len(desc) > 100:
+                desc = desc[:97] + "..."
+
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=str(media['id']),
+                    description=desc,
+                    emoji="🎬" if media_type == "movie" else "📺"
+                )
+            )
+
+        select = discord.ui.Select(
+            placeholder=f"Select the correct {'movie' if media_type == 'movie' else 'series'}...",
+            options=options,
+            custom_id="shared_media_select"
+        )
+        select.callback = self.select_callback
+        self.add_item(select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        """Handle when user selects a media option."""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "This is not your session!", ephemeral=True
+            )
+            return
+
+        selected_id = interaction.data['values'][0]  # type: ignore
+        selected_title = None
+
+        # Find selected media
+        for item in self.children:
+            if isinstance(item, discord.ui.Select):
+                for option in item.options:
+                    if option.value == selected_id:
+                        selected_title = option.label
+                        break
+
+        self.selected_media = {
+            'id': selected_id,
+            'title': selected_title
+        }
+
+        # Disable selection
+        for item in self.children:
+            item.disabled = True  # type: ignore
+
+        await interaction.response.edit_message(
+            content=f"✅ Selected: **{selected_title}**\n⏳ Adding to collection...",
+            view=self
+        )
+
+        # Cache the media and add it to the shared collection
+        try:
+            media_data = await movieManager.cache_media(self.media_type, int(selected_id))
+            if not media_data:
+                await interaction.edit_original_response(
+                    content=f"❌ Error: Could not fetch details for **{selected_title}**",
+                    view=self
+                )
+                return
+
+            result = await sharedCollectionManager.add_item(
+                self.collection_id, self.user_id, media_data.id  # type: ignore
+            )
+
+            await interaction.edit_original_response(
+                content=(
+                    f"✅ **{result['title']}** ({_media_type_label(result['media_type'])}) "
+                    f"added to **{result['collection_name']}**!"
+                ),
+                view=self
+            )
+
+            await self._notify_members(interaction, result)
+        except (PermissionError, ValueError) as error:
+            await interaction.edit_original_response(content=f"❌ {error}", view=self)
+        except Exception as error:
+            handler.error_handle(
+                error, context=f"SharedMediaSelectionView.select_callback({self.collection_id})"
+            )
+            await interaction.edit_original_response(
+                content="❌ Error: Could not add media to the collection.",
+                view=self
+            )
+
+        self.stop()
+
+    async def _notify_members(self, interaction: discord.Interaction, result: dict):
+        """DM the other collection members about the newly added media."""
+        others = [member_id for member_id in result["member_ids"] if member_id != self.user_id]
+        if not others:
+            return
+
+        message = (
+            f"<@{self.user_id}> added **{result['title']}** ({_media_type_label(result['media_type'])}) "
+            f"to **{result['collection_name']}**!"
+        )
+        for member_id in others:
+            try:
+                user = await interaction.client.fetch_user(member_id)
+                await user.send(message)
+            except discord.HTTPException:
+                pass
 
 
 class WatchHistoryPaginationView(discord.ui.View):
