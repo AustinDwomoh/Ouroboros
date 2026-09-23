@@ -6,6 +6,7 @@ from datetime import date, datetime
 from enum import Enum as StdEnum
 from typing import Any, Literal, Optional
 
+import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -302,3 +303,14 @@ async def mark_watched(collection_id: int, media_id: int, body: MarkWatchedBody)
     return to_json(await run_shared(
         sharedCollectionManager.mark_watched(collection_id, media_id, body.user_id, body.everyone)
     ))
+
+
+if __name__ == "__main__":
+    # Bound to localhost; nginx terminates TLS for the public domain and proxies here.
+    uvicorn.run(
+        app,
+        host=os.getenv("API_HOST", "127.0.0.1"),
+        port=int(os.getenv("API_PORT", "8000")),
+        proxy_headers=True,
+        forwarded_allow_ips="127.0.0.1",
+    )
