@@ -271,5 +271,5 @@ class MusiC(commands.Cog):
             handler.error_handle(context=f"Spotify devices error for user `{interaction.user.id}`: {e}", error=e)
 
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(MusiC(bot))
+#async def setup(bot: commands.Bot):
+#    await bot.add_cog(MusiC(bot))
