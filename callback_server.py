@@ -5,12 +5,10 @@ import dataclasses
 from datetime import date, datetime
 from enum import Enum as StdEnum
 from typing import Any, Literal, Optional
-
 import uvicorn
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel
 from dotenv import load_dotenv
-
+from fastapi import Depends, FastAPI, HTTPException, Security,Query
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rimiru import Rimiru
@@ -18,19 +16,23 @@ from handle import handler
 from constants import MediaType
 from dbmanager.MovieManager import MovieManager
 from dbmanager.SharedCollectionManager import sharedCollectionManager
+from fastapi.security import APIKeyHeader
 
 load_dotenv()
 
-MEDIA_API_KEY = os.getenv("MOVIE_API_KEY")
-
 movieManager = MovieManager()
+API_KEY = os.getenv("API_KEY")
 
 
-def require_api_key(x_api_key: Optional[str] = Header(default=None)):
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def require_api_key(x_api_key: str | None = Security(api_key_header)):
     """Every endpoint acts on arbitrary Discord user IDs, so gate the whole API behind a shared key."""
-    if not MEDIA_API_KEY:
-        raise HTTPException(status_code=500, detail="MEDIA_API_KEY is not configured on the server")
-    if not x_api_key or not secrets.compare_digest(x_api_key, MEDIA_API_KEY):
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="OUROBOROS_API_KEY is not configured on the server")
+    if not x_api_key or not secrets.compare_digest(x_api_key, API_KEY):
         raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key header")
 
 
