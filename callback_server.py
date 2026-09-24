@@ -19,16 +19,7 @@ from dbmanager.SharedCollectionManager import sharedCollectionManager
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8081",   # Expo web dev server
-        "http://127.0.0.1:8081",
-    ],
-    allow_methods=["*"],
-    allow_headers=["*"],           # must cover X-API-Key and Content-Type
-    allow_credentials=False,
-)
+
 load_dotenv()
 
 movieManager = MovieManager()
@@ -48,7 +39,16 @@ def require_api_key(x_api_key: str | None = Security(api_key_header)):
 
 
 app = FastAPI(title="Ouroboros Media API", dependencies=[Depends(require_api_key)])
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8081",   # Expo web dev server
+        "http://127.0.0.1:8081",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],           # must cover X-API-Key and Content-Type
+    allow_credentials=False,
+)
 
 @app.on_event("startup")
 async def startup():
