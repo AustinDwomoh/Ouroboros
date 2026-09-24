@@ -17,7 +17,18 @@ from constants import MediaType
 from dbmanager.MovieManager import MovieManager
 from dbmanager.SharedCollectionManager import sharedCollectionManager
 from fastapi.security import APIKeyHeader
+from fastapi.middleware.cors import CORSMiddleware
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8081",   # Expo web dev server
+        "http://127.0.0.1:8081",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],           # must cover X-API-Key and Content-Type
+    allow_credentials=False,
+)
 load_dotenv()
 
 movieManager = MovieManager()
