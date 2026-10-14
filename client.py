@@ -1,9 +1,10 @@
-from time import time
 import asyncpg, discord, logging, aiohttp
+from discord import app_commands
 from discord.ext import commands
 from rimiru import Rimiru
 from settings import *
 from handle import handler
+from dbmanager import UserManager
 
 
 # Logging setup
@@ -16,14 +17,24 @@ intents.message_content = True
 intents.guild_messages = True
 intents.members = True
 
-CACHE_TTL = 300
+class OuroborosTree(app_commands.CommandTree):
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Resolve the caller's users.id before any slash command or autocomplete runs."""
+        if interaction.user.bot:
+            return True
+        try:
+            await UserManager.uid(interaction)
+        except Exception as e:
+            # Commands resolve lazily via UserManager.uid, so don't block them here
+            handler.error_handle(e, context="OuroborosTree.interaction_check")
+        return True
+
 
 class Client(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(command_prefix="!", intents=intents, tree_cls=OuroborosTree)
         self.synced = False
         self.db_pool: asyncpg.Pool | None = None
-        self._seen_users: dict[int, float] = {}
         self.pending_announcements = {}
         self.pending_previews = {}
         self.pending_messages = {}
@@ -77,7 +88,7 @@ class Client(commands.Bot):
                         await message.channel.send(f"❌ Sync failed: {e}")
                     return
                 if content == "$clearcache":
-                    self._seen_users.clear()
+                    UserManager.forget_discord_user()
                     await message.channel.send("🧹 User cache cleared.")
                     return
                
@@ -85,28 +96,6 @@ class Client(commands.Bot):
             
         except Exception as e:
             handler.error_handle(e, context="$godoflies:on_message")
-    
-        # -------------------------------------------------
-        # DB Utilities
-        # -------------------------------------------------
-   
-    async def ensure_user(self, interaction: discord.Interaction):
-        uid = interaction.user.id
-        now = time()
-
-        last_seen = self._seen_users.get(uid)
-        if last_seen and now - last_seen < CACHE_TTL:
-            #handler.log_task("BOT", f"User {uid} seen recently, skipping DB check", level="INFO")
-            #handler.log_task("BOT", f"Current _seen_users: {self._seen_users}", level="INFO")
-            return
-        #handler.log_task("BOT", f"User {uid} not seen recently, proceeding with DB check", level="INFO")
-        #handler.log_task("BOT", f"Current _seen_users: {self._seen_users}", level="INFO")
-        hw = await self.db.upsert(
-                "users", {"discord_id": uid, "username": interaction.user.name}, conflict_column="discord_id"
-            )
-        hw_for_log = f"\ndiscord_id={uid}, \nusername={interaction.user.name}"
-        handler.log_task("BOT", f"User {uid}, for {interaction.user.name} \nsaved to DB: {hw_for_log}", level="SUCCESS")
-        self._seen_users[uid] = now
     
     def parse_announcement(self, raw: str):
         sections = [s.strip() for s in raw.split("---")]
@@ -204,10 +193,10 @@ class Client(commands.Bot):
             except Exception as e:
                 handler.error_handle(e, context="Failed to send to webhook in on_interaction")
         try:
-            #handler.log_task("BOT", f"Ensuring user {interaction.user.id} exists in DB", level="INFO")
-            await self.ensure_user(interaction)
+            # Slash commands are already resolved by OuroborosTree.interaction_check; this covers
+            # buttons/selects so Discord-keyed tables (levels, game_scores) always have a users row.
+            await UserManager.resolve_discord_user(interaction.user)
         except Exception as e:
-            # Log but don't break the interaction
             handler.error_handle(e, context="Error ensuring user in DB during on_interaction")
 
 

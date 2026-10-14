@@ -7,6 +7,7 @@ from discord.ext import commands
 from handle import handler
 from dbmanager.MovieManager import MovieManager
 from dbmanager.SharedCollectionManager import sharedCollectionManager
+from dbmanager import UserManager
 from constants import MediaType
 from views.movieView import SharedMediaSelectionView, create_selection_embed
 
@@ -40,7 +41,7 @@ class InviteView(discord.ui.View):
         try:
             await sharedCollectionManager.respond_to_invite(
                 self.invite_id,
-                interaction.user.id,
+                await UserManager.uid(interaction),
                 accept,
             )
 
@@ -77,7 +78,7 @@ class SharedCollections(commands.Cog):
         await interaction.response.defer()
         try:
             collection = await sharedCollectionManager.create_collection(
-                interaction.user.id,
+                await UserManager.uid(interaction),
                 name,
                 collection_type.value,
             )
@@ -101,15 +102,18 @@ class SharedCollections(commands.Cog):
         await interaction.response.defer()
         try:
             collection_id = await sharedCollectionManager.get_collection_id(
-                interaction.user.id,
+                await UserManager.uid(interaction),
                 collection_name,
             )
             if collection_id is None:
                 raise ValueError("Collection not found")
+            if user.bot:
+                raise ValueError("Bots can't join shared collections")
             invite = await sharedCollectionManager.invite(
                 collection_id,
-                interaction.user.id,
-                user.id,
+                await UserManager.uid(interaction),
+                # Creates a users row if the invitee has never used the bot
+                await UserManager.resolve_discord_user(user),
             )
             await interaction.followup.send(f"Invitation sent to {user.mention}.")
             try:
@@ -145,7 +149,7 @@ class SharedCollections(commands.Cog):
         await interaction.response.defer()
         try:
             collection_id = await sharedCollectionManager.get_collection_id(
-                interaction.user.id,
+                await UserManager.uid(interaction),
                 collection_name,
             )
             if collection_id is None:
@@ -153,7 +157,7 @@ class SharedCollections(commands.Cog):
 
             media_info = self.media_title_cache.get(media_title)
             if media_info:
-                result = await sharedCollectionManager.add_item(collection_id, interaction.user.id, media_info["id"])
+                result = await sharedCollectionManager.add_item(collection_id, await UserManager.uid(interaction), media_info["id"])
 
                 embed = discord.Embed(
                     title="Added to Shared Collection",
@@ -162,7 +166,7 @@ class SharedCollections(commands.Cog):
                 )
                 await interaction.followup.send(embed=embed)
 
-                await self.notify_new_item(interaction.user, result)
+                await self.notify_new_item(interaction, result)
                 return
 
             # Not cached locally - search TMDB and let the user pick, same as Movies' add flow
@@ -188,6 +192,7 @@ class SharedCollections(commands.Cog):
                     media_type.value,
                     collection_id,
                     collection_name,
+                    await UserManager.uid(interaction),
                     interaction.user.id,
                 )
                 await interaction.followup.send(embed=embed, view=view)
@@ -199,7 +204,7 @@ class SharedCollections(commands.Cog):
             if not media_data:
                 raise ValueError(f"Failed to fetch details for `{media_title}`")
 
-            result = await sharedCollectionManager.add_item(collection_id, interaction.user.id, media_data.id)  # type: ignore
+            result = await sharedCollectionManager.add_item(collection_id, await UserManager.uid(interaction), media_data.id)  # type: ignore
 
             embed = discord.Embed(
                 title="Added to Shared Collection",
@@ -208,7 +213,7 @@ class SharedCollections(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
 
-            await self.notify_new_item(interaction.user, result)
+            await self.notify_new_item(interaction, result)
         except (PermissionError, ValueError) as error:
             await interaction.followup.send(str(error), ephemeral=True)
         except Exception as error:
@@ -221,7 +226,7 @@ class SharedCollections(commands.Cog):
         await interaction.response.defer(thinking=True)
         try:
             collection_id = await sharedCollectionManager.get_collection_id(
-                interaction.user.id,
+                await UserManager.uid(interaction),
                 collection_name,
             )
             if collection_id is None:
@@ -229,7 +234,7 @@ class SharedCollections(commands.Cog):
                 return
             collection = await sharedCollectionManager.get_collection(
                 collection_id,
-                interaction.user.id,
+                await UserManager.uid(interaction),
             )
             if not collection:
                 await interaction.followup.send(
@@ -278,13 +283,13 @@ class SharedCollections(commands.Cog):
         await interaction.response.defer()
         try:
             collection_id = await sharedCollectionManager.get_collection_id(
-                interaction.user.id,
+                await UserManager.uid(interaction),
                 collection_name,
             )
             if collection_id is None:
                 raise ValueError("Collection not found")
 
-            collection = await sharedCollectionManager.get_collection(collection_id, interaction.user.id)
+            collection = await sharedCollectionManager.get_collection(collection_id, await UserManager.uid(interaction))
             if not collection:
                 raise ValueError("You are not a member of that collection")
 
@@ -298,7 +303,7 @@ class SharedCollections(commands.Cog):
             progress = await sharedCollectionManager.mark_watched(
                 collection_id,
                 media_item["media_id"],
-                interaction.user.id,
+                await UserManager.uid(interaction),
                 everyone,
             )
 
@@ -315,27 +320,29 @@ class SharedCollections(commands.Cog):
             )
             await interaction.followup.send(embed=embed)
 
-            await self.notify_members(interaction.user, progress)
+            await self.notify_members(interaction, progress)
         except (PermissionError, ValueError) as error:
             await interaction.followup.send(str(error), ephemeral=True)
         except Exception as error:
             handler.error_handle(error, context=f"shared_watched({collection_name}, {media_title})")
             await interaction.followup.send("Error: Could not update watch status.", ephemeral=True)
 
-    async def notify_new_item(self, actor: discord.abc.User, result: dict):
+    async def notify_new_item(self, interaction: discord.Interaction, result: dict):
         """DM the other members as soon as new media is added, so they see it instantly."""
-        others = [member_id for member_id in result["member_ids"] if member_id != actor.id]
+        actor_id = await UserManager.uid(interaction)
+        others = [member_id for member_id in result["member_ids"] if member_id != actor_id]
         if not others:
             return
         message = (
-            f"{actor.mention} added **{result['title']}** ({_media_type_label(result['media_type'])}) "
+            f"{interaction.user.mention} added **{result['title']}** ({_media_type_label(result['media_type'])}) "
             f"to **{result['collection_name']}**!"
         )
         await self._dm_members(others, message)
 
-    async def notify_members(self, actor: discord.abc.User, progress: dict):
+    async def notify_members(self, interaction: discord.Interaction, progress: dict):
         """DM the other members when everyone has watched, or when only one person has watched so far."""
-        others = [member_id for member_id in progress["member_ids"] if member_id != actor.id]
+        actor_id = await UserManager.uid(interaction)
+        others = [member_id for member_id in progress["member_ids"] if member_id != actor_id]
         if not others:
             return
 
@@ -346,7 +353,7 @@ class SharedCollections(commands.Cog):
             )
         elif progress["watched_count"] == 1:
             message = (
-                f"{actor.mention} just watched **{progress['title']}** in "
+                f"{interaction.user.mention} just watched **{progress['title']}** in "
                 f"**{progress['collection_name']}**. You're still catching up!"
             )
         else:
@@ -355,9 +362,11 @@ class SharedCollections(commands.Cog):
         await self._dm_members(others, message)
 
     async def _dm_members(self, member_ids: list[int], message: str):
-        for member_id in member_ids:
+        """member_ids are users.id; members without a Discord account (app-only) are skipped."""
+        discord_ids = await UserManager.get_discord_ids(member_ids)
+        for discord_id in discord_ids.values():
             try:
-                user = await self.client.fetch_user(member_id)
+                user = await self.client.fetch_user(discord_id)
                 await user.send(message)
             except discord.HTTPException:
                 pass
@@ -378,7 +387,7 @@ class SharedCollections(commands.Cog):
         """Return collections the current user belongs to."""
         try:
             collections = await sharedCollectionManager.get_user_collections(
-                interaction.user.id,
+                await UserManager.uid(interaction),
             )
             search = current.casefold()
             return [
@@ -425,11 +434,11 @@ class SharedCollections(commands.Cog):
             if not collection_name:
                 return []
             collection_id = await sharedCollectionManager.get_collection_id(
-                interaction.user.id, collection_name
+                await UserManager.uid(interaction), collection_name
             )
             if collection_id is None:
                 return []
-            collection = await sharedCollectionManager.get_collection(collection_id, interaction.user.id)
+            collection = await sharedCollectionManager.get_collection(collection_id, await UserManager.uid(interaction))
             if not collection:
                 return []
 

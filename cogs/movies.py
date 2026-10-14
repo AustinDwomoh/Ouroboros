@@ -7,6 +7,7 @@ import discord,typing,asyncio
 from discord import app_commands
 from discord.ext import commands
 from dbmanager.MovieManager import MovieManager
+from dbmanager import UserManager
 from views.movieView import MediaSelectionView, create_selection_embed, WatchHistoryPaginationView
 from constants import MediaType
 
@@ -53,7 +54,7 @@ class Movies(commands.Cog):
         if not movieManager.send_incomplete_media_reminders_loop.is_running():
             movieManager.send_incomplete_media_reminders_loop.start(self.client)
         if not movieManager.send_upcoming_episode_reminders_loop.is_running():
-            movieManager.send_upcoming_episode_reminders_loop.start(self.client) 
+           movieManager.send_upcoming_episode_reminders_loop.start(self.client) 
 
     @app_commands.command(name="add_movie", description="Add a movie to your watched list or watchlist")
     @app_commands.describe(
@@ -79,7 +80,7 @@ class Movies(commands.Cog):
         try:
          
             await interaction.response.defer(thinking=True)
-            data = await movieManager.get_user_watch_history(interaction.user.id)
+            data = await movieManager.get_user_watch_history(await UserManager.uid(interaction))
 
             if not data:
                 await interaction.followup.send(
@@ -147,7 +148,7 @@ class Movies(commands.Cog):
                 view = MediaSelectionView(
                     media_options, 
                     "tv", 
-                    interaction.user.id, 
+                    await UserManager.uid(interaction), 
                     title,
                     season=season,
                     episode=episode,
@@ -162,7 +163,7 @@ class Movies(commands.Cog):
                 else:
                     tmbd_id = media['id']
 
-                media_data = await movieManager.add_or_update_user_series( interaction.user.id,  title, season=season, episode=episode, tmdb_id=tmbd_id, watchlist=watchlist
+                media_data = await movieManager.add_or_update_user_series( await UserManager.uid(interaction),  title, season=season, episode=episode, tmdb_id=tmbd_id, watchlist=watchlist
                     )
                 if not media_data:
                     await interaction.followup.send("Failed to save series")
@@ -216,7 +217,7 @@ class Movies(commands.Cog):
                 return
             if len(media_options) > 1:
                 embed = create_selection_embed(media_options, "movie", title)
-                view = MediaSelectionView(media_options, "movie", interaction.user.id, title, watchlist=watchlist)
+                view = MediaSelectionView(media_options, "movie", await UserManager.uid(interaction), title, watchlist=watchlist)
                 await interaction.followup.send(embed=embed, view=view)
                 return
             else:
@@ -226,7 +227,7 @@ class Movies(commands.Cog):
                 else:
                     tmdb_id = media['id']
 
-                media_data = await movieManager.add_or_update_user_movie(interaction.user.id, title, tmdb_id=tmdb_id, watchlist=watchlist)
+                media_data = await movieManager.add_or_update_user_movie(await UserManager.uid(interaction), title, tmdb_id=tmdb_id, watchlist=watchlist)
 
                 if media_data is not None:
                     status_text = "added to watchlist" if watchlist else "marked as watched"
@@ -262,7 +263,7 @@ class Movies(commands.Cog):
         await interaction.response.defer(thinking=True)
 
         try:
-            watchlist_items = await movieManager.get_watchlist(interaction.user.id)
+            watchlist_items = await movieManager.get_watchlist(await UserManager.uid(interaction))
             
             if not watchlist_items:
                 await interaction.followup.send(
@@ -314,7 +315,7 @@ class Movies(commands.Cog):
         await interaction.response.defer()
         
         try:
-            incomplete_media = await movieManager.check_user_completion(interaction.user.id)
+            incomplete_media = await movieManager.check_user_completion(await UserManager.uid(interaction))
            
           
             if not incomplete_media:
@@ -379,7 +380,7 @@ class Movies(commands.Cog):
     async def check_upcoming(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
         try:
-            reminders = await movieManager.upcoming_reminders(interaction.user.id)
+            reminders = await movieManager.upcoming_reminders(await UserManager.uid(interaction))
             if not reminders:
                 await interaction.followup.send(
                     "No upcoming episodes found in your watchlist!"
@@ -445,7 +446,7 @@ class Movies(commands.Cog):
                 )
                 #we shoudlnt even get here
                 return
-            success = await movieManager.delete_user_media(interaction.user.id, media_id["id"])
+            success = await movieManager.delete_user_media(await UserManager.uid(interaction), media_id["id"])
             
             if success:
                 await interaction.followup.send(
@@ -478,7 +479,7 @@ class Movies(commands.Cog):
         
         try:
             
-            results = await movieManager.fetch_user_media(interaction.user.id, self.movie_title_cache.get(title))
+            results = await movieManager.fetch_user_media(await UserManager.uid(interaction), self.movie_title_cache.get(title))
             
             if not results:
                 await interaction.followup.send( f"No results found for: `{title}`" )

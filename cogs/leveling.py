@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from dbmanager import LevelinManager
+from dbmanager import LevelinManager, UserManager
 from handle import handler
 from views.LeaderboardPage import LeaderboardPaginationView
 from io import BytesIO
@@ -19,6 +19,8 @@ class Levelling(commands.Cog):
                 return  # Ignore DMs
             guild_id = message.guild.id
             user_id = message.author.id
+            # levels.user_id references users(discord_id); make sure the row exists (cached, keeps the real username)
+            await UserManager.resolve_discord_user(message.author)
             # Fetch the user's XP and level, or initialize them
             xp, level = await LevelinManager.get_user_level(guild_id, user_id)
             if not xp or not level:

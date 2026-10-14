@@ -338,6 +338,28 @@ class SharedCollectionManager:
             )
         return [dict(row) for row in rows]
 
+    async def get_pending_invites(self, user_id: int) -> list[dict[str, Any]]:
+        """Unexpired pending invites addressed to a user, newest first."""
+        conn = await Rimiru.shion()
+        return await conn.select(
+            table=(
+                "shared_collection_invites AS invite "
+                "JOIN shared_collections AS collection ON collection.id = invite.collection_id "
+                "JOIN users AS inviter ON inviter.id = invite.inviter_id"
+            ),
+            columns=[
+                "invite.id", "invite.collection_id", "collection.name AS collection_name",
+                "collection.collection_type", "invite.inviter_id",
+                "inviter.username AS inviter_username", "invite.expires_at",
+            ],
+            raw_where=(
+                "invite.invitee_id = $1 AND invite.status = 'pending' "
+                "AND (invite.expires_at IS NULL OR invite.expires_at > now())"
+            ),
+            raw_params=[user_id],
+            order_by="invite.id DESC",
+        )
+
     async def get_collection_id(self, user_id: int, name: str) -> int | None:
         """Resolve a collection name to its ID for a member."""
         collections = await self.get_user_collections(user_id)

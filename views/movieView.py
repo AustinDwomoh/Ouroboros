@@ -6,6 +6,7 @@ import discord
 from handle import handler
 from dbmanager.MovieManager import MovieManager
 from dbmanager.SharedCollectionManager import sharedCollectionManager
+from dbmanager import UserManager
 from constants import MediaType
 movieManager = MovieManager()
 from models import UserMedia
@@ -254,12 +255,13 @@ class SharedMediaSelectionView(discord.ui.View):
     """View that displays media options when adding unrecognized media to a shared collection."""
 
     def __init__(self, media_options: list, media_type: str, collection_id: int,
-                 collection_name: str, user_id: int):
+                 collection_name: str, user_id: int, discord_id: int):
         super().__init__(timeout=180)
         self.media_type = media_type
         self.collection_id = collection_id
         self.collection_name = collection_name
-        self.user_id = user_id
+        self.user_id = user_id  # users.id, for DB calls
+        self.discord_id = discord_id  # for the session check and mentions
         self.selected_media = None
 
         # Create select menu
@@ -296,7 +298,7 @@ class SharedMediaSelectionView(discord.ui.View):
 
     async def select_callback(self, interaction: discord.Interaction):
         """Handle when user selects a media option."""
-        if interaction.user.id != self.user_id:
+        if interaction.user.id != self.discord_id:
             await interaction.response.send_message(
                 "This is not your session!", ephemeral=True
             )
@@ -370,12 +372,14 @@ class SharedMediaSelectionView(discord.ui.View):
             return
 
         message = (
-            f"<@{self.user_id}> added **{result['title']}** ({_media_type_label(result['media_type'])}) "
+            f"<@{self.discord_id}> added **{result['title']}** ({_media_type_label(result['media_type'])}) "
             f"to **{result['collection_name']}**!"
         )
-        for member_id in others:
+        # member_ids are users.id; app-only members have no Discord account to DM
+        discord_ids = await UserManager.get_discord_ids(others)
+        for discord_id in discord_ids.values():
             try:
-                user = await interaction.client.fetch_user(member_id)
+                user = await interaction.client.fetch_user(discord_id)
                 await user.send(message)
             except discord.HTTPException:
                 pass

@@ -339,8 +339,17 @@ class MovieManager:
     # ============================================================================ #
 
     
+    async def _active_media_users(self) -> list[dict]:
+        """users.id + discord_id of users with active media. Google-only users can't be DMed, so they're skipped."""
+        conn = await Rimiru.shion()
+        return await conn.select(
+            table="user_media um JOIN users u ON u.id = um.user_id",
+            columns=["DISTINCT um.user_id", "u.discord_id"],
+            raw_where="um.status IN ('watchlist','watching') AND u.discord_id IS NOT NULL",
+        )
+
     async def send_reminder_to_user(self, client, user_id: int, reminders: List[Series], semaphore: Semaphore):
-        """Send episode reminders to a single user with rate limiting"""
+        """Send episode reminders to a single user with rate limiting. user_id is the Discord ID."""
         async with semaphore:  # Limit concurrent sends
             try:
                 user = await client.fetch_user(user_id)
@@ -379,7 +388,7 @@ class MovieManager:
                 handler.error_handle(e, context=f"send_reminder_to_{user_id}")
 
     async def send_incomplete_reminder_to_user(self, client, user_id: int, incomplete: list[UserMedia], semaphore: Semaphore):
-        """Send incomplete media reminders to a single user"""
+        """Send incomplete media reminders to a single user. user_id is the Discord ID."""
         async with semaphore:
             try:
                 user = await client.fetch_user(user_id)
@@ -437,17 +446,13 @@ class MovieManager:
         conn = await Rimiru.shion()
         try:
             # Get all users with active media
-            rows = await conn.select(
-                table="user_media",
-                columns=["DISTINCT user_id"],
-                raw_where="status IN ('watchlist','watching')"
-            )
+            rows = await self._active_media_users()
 
             if not rows:
                 handler.log_task(context="REMINDERS", message="No users to check", level="Skip")
                 return
 
-            # Fetch reminders for all users
+            # Fetch reminders for all users (keyed by Discord ID for sending)
             user_reminders = []
             for row in rows:
                 user_id = row["user_id"]
@@ -461,7 +466,7 @@ class MovieManager:
                     reminders = [Series.from_db(dict(r)) for r in reminders]
 
                     if reminders:
-                        user_reminders.append((user_id, reminders))
+                        user_reminders.append((row["discord_id"], reminders))
                 except Exception as e:
                     handler.error_handle(e, context=f"fetch_reminders_{user_id}")
                     continue  
@@ -503,28 +508,22 @@ class MovieManager:
 
     async def send_incomplete_media_reminders(self, client):
         """Send reminders about incomplete media - PARALLEL VERSION"""
-        conn = await Rimiru.shion()
-
         try:
             # Get all users who have incomplete media
-            rows = await conn.select(
-                table="user_media",
-                columns=["DISTINCT user_id"],
-                raw_where="status IN ('watchlist','watching')"
-            )
+            rows = await self._active_media_users()
 
             if not rows:
                 print("[REMINDERS] No users to check for incomplete media")
                 return
 
-            # Fetch incomplete media for all users
+            # Fetch incomplete media for all users (keyed by Discord ID for sending)
             user_incomplete = []
             for row in rows:
                 user_id = row["user_id"]
                 try:
                     incomplete = await self.check_user_completion(user_id)
                     if incomplete:
-                        user_incomplete.append((user_id, incomplete))
+                        user_incomplete.append((row["discord_id"], incomplete))
                 except Exception as e:
                     handler.error_handle(e, context=f"check_completion_{user_id}")
                     continue

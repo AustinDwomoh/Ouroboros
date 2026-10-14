@@ -29,7 +29,7 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             set -euo pipefail
-
+            sudo systemctl restart ouroboros-callback
             cd ~/Ouroboros
 
             # Activate virtualenv
