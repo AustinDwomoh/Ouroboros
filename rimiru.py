@@ -299,7 +299,7 @@ class Rimiru:
             DO UPDATE SET
                 email = EXCLUDED.email,
                 updated_at = now()
-            RETURNING id, username;
+            RETURNING id, username, discord_id;
         """
 
         async with self.pool.acquire() as conn:

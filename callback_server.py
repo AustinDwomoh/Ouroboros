@@ -7,6 +7,7 @@ import dataclasses
 from datetime import date, datetime
 from enum import Enum as StdEnum
 from typing import Any, Literal, Optional
+import httpx
 import uvicorn
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -32,6 +33,11 @@ movieManager = MovieManager()
 API_KEY = os.getenv("API_KEY")
 # Comma-separated OAuth client IDs of the Expo app (web, iOS, Android); a token's `aud` must be one of them
 GOOGLE_CLIENT_IDS = {c.strip() for c in os.getenv("GOOGLE_CLIENT_IDS", "").split(",") if c.strip()}
+# The bot's Discord application, used for the app's "Link Discord" OAuth flow. Read directly (not the
+# BOT_MODE-aware settings.CLIENT_ID) so the id always matches CLIENT_SECRET; any app sees the same user ids.
+DISCORD_CLIENT_ID = os.getenv("CLIENT_ID")
+DISCORD_CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+DISCORD_API = "https://discord.com/api/v10"
 
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -193,6 +199,12 @@ async def run_shared(coro):
 # ============================================================================ #
 #                                 REQUEST BODIES                               #
 # ============================================================================ #
+class LinkDiscordBody(BaseModel):
+    code: str
+    code_verifier: str
+    redirect_uri: str
+
+
 class AddMovieBody(BaseModel):
     title: str
     tmdb_id: Optional[int] = None
@@ -261,7 +273,54 @@ async def auth_google(caller: Caller = Depends(require_auth)):
     email = claims.get("email")
     username = claims.get("name") or (email.split("@")[0] if email else None) or "user"
     user = await UserManager.get_or_create_google_user(claims["sub"], email, username)
-    return {"user_id": user["id"], "username": user["username"]}
+    return {"user_id": user["id"], "username": user["username"], "discord_linked": user["discord_id"] is not None}
+
+
+async def _discord_identity(body: LinkDiscordBody) -> dict:
+    """Redeem the app's OAuth code (PKCE) for the Discord user it was issued to."""
+    if not DISCORD_CLIENT_ID or not DISCORD_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="CLIENT_ID / CLIENT_SECRET are not configured on the server")
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            token = await http.post(
+                f"{DISCORD_API}/oauth2/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": body.code,
+                    "redirect_uri": body.redirect_uri,
+                    "code_verifier": body.code_verifier,
+                },
+                auth=(DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET),
+            )
+            if token.status_code != 200:
+                raise HTTPException(status_code=400, detail="Discord rejected the authorization code")
+            me = await http.get(
+                f"{DISCORD_API}/users/@me",
+                headers={"Authorization": f"Bearer {token.json()['access_token']}"},
+            )
+            me.raise_for_status()
+    except httpx.HTTPError:
+        raise HTTPException(status_code=503, detail="Could not reach Discord")
+    return me.json()
+
+
+@app.post("/api/auth/discord/link")
+async def link_discord(body: LinkDiscordBody, me: int | None = Depends(current_user_id)):
+    """
+    Link the caller's Discord account to their Google login. If the bot already knows that
+    Discord user, the two accounts are merged and the returned user_id replaces the old one.
+    """
+    if me is None:
+        raise HTTPException(status_code=400, detail="Send a Google ID token as Authorization: Bearer")
+    discord_user = await _discord_identity(body)
+    try:
+        user = await UserManager.link_discord(me, int(discord_user["id"]))
+    except UserManager.LinkConflict as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        handler.error_handle(e, context="media api: link discord")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    return {"user_id": user["id"], "username": user["username"], "discord_linked": True}
 
 
 @app.get("/api/media/search")
