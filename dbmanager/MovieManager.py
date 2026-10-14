@@ -202,10 +202,10 @@ class MovieManager:
             else:
                 fn = "get_series_by_title"
             row = await conn.call_function(fn=fn, params=[title], fetch_type=FetchType.FETCHROW)
-
+           
             if not row:
                 return None
-            row = row[0]
+           
             return Series.from_db(row) if media_type == "tv" else Movie.from_db(row)
         except Exception as e:
             handler.error_handle(e, context="get_cached_media")

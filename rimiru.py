@@ -147,62 +147,41 @@ class Rimiru:
     # ----------------------------------------------------
     # UPSERT
     # ----------------------------------------------------
-    async def upsert(
-        self,
-        table: str,
-        data: dict,
-        conflict_column: str,
-    ) -> dict | None:
+    async def upsert(self, table: str, data: dict, conflict_column: str ):
+        """Insert or update a record based on conflict column
+            To use this method, provide the following
+            its important you know the unique constraint of the table you are upserting to.  The conflict_column parameter should be set to that unique constraint column.
+            
+                parameters:
+                    :param table: Table name
+                    :param data: Dictionary of column-value pairs
+                    :param conflict_column: Column name to check for conflicts
+            """
+        try:
+            columns = list(data.keys())
+            values = [
+                json.dumps(v) if isinstance(v, (dict, list)) else v
+                for v in data.values()
+            ]
 
-        if not data:
-            raise ValueError("data cannot be empty")
+            placeholders = ", ".join(f"${i+1}" for i in range(len(values)))
+            cols = ", ".join(columns)
+            update_cols = ", ".join(f"{k} = EXCLUDED.{k}" for k in columns if k != conflict_column)
 
-        if conflict_column not in data:
-            raise ValueError(
-                f"{conflict_column!r} must exist in data"
-            )
+            sql = f"""
+                INSERT INTO {table} ({cols}) 
+                VALUES ({placeholders})
+                ON CONFLICT ({conflict_column}) 
+                DO UPDATE SET {update_cols}
+                RETURNING *;
+            """
 
-        columns = list(data.keys())
-
-        values = [
-            json.dumps(value)
-            if isinstance(value, (dict, list))
-            else value
-            for value in data.values()
-        ]
-
-        placeholders = ", ".join(
-            f"${i}" for i in range(1, len(values) + 1)
-        )
-
-        cols = ", ".join(columns)
-
-        update_columns = [
-            column
-            for column in columns
-            if column != conflict_column
-        ]
-
-        if update_columns:
-            update_clause = ", ".join(
-                f"{column} = EXCLUDED.{column}"
-                for column in update_columns
-            )
-            conflict_action = f"DO UPDATE SET {update_clause}"
-        else:
-            conflict_action = "DO NOTHING"
-
-        sql = f"""
-            INSERT INTO {table} ({cols})
-            VALUES ({placeholders})
-            ON CONFLICT ({conflict_column})
-            {conflict_action}
-            RETURNING *;
-        """
-
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow(sql, *values)
-            return dict(row) if row else None
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(sql, *values) 
+                return dict(row) if row else None
+        except Exception as e:
+            print(f"Error during upsert into {table}: {e}")
+            raise
 
     # ----------------------------------------------------
     # DELETE
