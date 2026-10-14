@@ -302,15 +302,7 @@ class SharedCollectionManager:
                 watched_count = sum(1 for member in members if member["status"] == "watched")
                 completed = watched_count == total_count
 
-                if completed:
-                    await connection.execute(
-                        """
-                        DELETE FROM shared_collection_items
-                        WHERE collection_id = $1 AND media_id = $2
-                        """,
-                        collection_id,
-                        media_id,
-                    )
+                
 
         return {
             "title": title,
