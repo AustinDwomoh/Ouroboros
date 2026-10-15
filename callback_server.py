@@ -11,7 +11,7 @@ import httpx
 import uvicorn
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Security,Query
+from fastapi import Depends, FastAPI, HTTPException, Request, Security,Query
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 from google.auth.exceptions import TransportError
@@ -49,7 +49,7 @@ _verified_tokens: dict[str, dict] = {}
 
 @dataclasses.dataclass
 class Caller:
-    kind: Literal["bot", "app"]
+    kind: Literal["bot", "app", "public"]
     google: dict | None = None  # verified Google ID token claims (app callers only)
 
 
@@ -61,11 +61,18 @@ def _verify_google_token(token: str) -> dict:
     return claims
 
 
+# Routes anyone may call without credentials. They must never return user data.
+PUBLIC_PATHS = {"/api/live", "/api/media/recent"}
+
+
 async def require_auth(
+    request: Request,
     x_api_key: str | None = Security(api_key_header),
     bearer: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
 ) -> Caller:
     """The bot authenticates with the shared X-API-Key; the app with a Google ID token (Authorization: Bearer)."""
+    if request.url.path in PUBLIC_PATHS:
+        return Caller(kind="public")
     if x_api_key:
         if not API_KEY:
             raise HTTPException(status_code=500, detail="API_KEY is not configured on the server")
@@ -129,10 +136,10 @@ app = FastAPI(title="Ouroboros Media API", dependencies=[Depends(require_auth)])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "http://localhost:8081",
-    "http://127.0.0.1:8081",
     "https://cyan.austindwomoh.xyz",
-],
+    "http://localhost:8081",
+    "http://localhost:4173",   # npm run preview:site
+    ],
     allow_methods=["*"],
     allow_headers=["*"],           # must cover X-API-Key and Content-Type
     allow_credentials=False,
@@ -322,6 +329,20 @@ async def link_discord(body: LinkDiscordBody, me: int | None = Depends(current_u
         handler.error_handle(e, context="media api: link discord")
         raise HTTPException(status_code=500, detail="Internal server error")
     return {"user_id": user["id"], "username": user["username"], "discord_linked": True}
+
+
+# Public: the login screen's slideshow. Titles and posters only, cached so it can't hammer the DB.
+_recent_cache: tuple[float, list[dict]] = (0.0, [])
+
+
+@app.get("/api/media/recent")
+async def recent_media():
+    global _recent_cache
+    cached_at, items = _recent_cache
+    if time.time() - cached_at > 300:
+        items = await movieManager.fetch_recent_media(limit=10)
+        _recent_cache = (time.time(), items)
+    return items
 
 
 @app.get("/api/media/search")

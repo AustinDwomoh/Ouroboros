@@ -109,6 +109,36 @@ class MovieManager:
             handler.error_handle(e, context="fetch_media_names")
             return {}
 
+    async def fetch_recent_media(self, limit: int = 10) -> list[dict]:
+        """Titles with the most recent user activity, newest first. No user info: this backs a public endpoint."""
+        conn = await Rimiru.shion()
+        try:
+            async with conn.pool.acquire() as connection:
+                rows = await connection.fetch(
+                    """
+                    SELECT m.id, m.title, m.media_type, m.poster_path
+                    FROM user_media um
+                    JOIN media m ON m.id = um.media_id
+                    WHERE m.poster_path IS NOT NULL
+                    GROUP BY m.id
+                    ORDER BY MAX(um.last_updated) DESC NULLS LAST
+                    LIMIT $1
+                    """,
+                    limit,
+                )
+            return [
+                {
+                    "id": r["id"],
+                    "title": r["title"],
+                    "media_type": r["media_type"],
+                    "poster_url": f"https://image.tmdb.org/t/p/w780{r['poster_path']}",
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            handler.error_handle(e, context="fetch_recent_media")
+            return []
+
     async def get_watchlist(self, user_id: int,):
         """Fetch a user's watchlist entries.
         returns list of dicts with media details.
