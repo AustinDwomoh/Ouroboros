@@ -362,6 +362,93 @@ class MovieManager:
             return None
 
 
+    async def get_media_page(self, media_type: str, tmdb_id: int) -> tuple[Movie | Series, dict] | None:
+        """
+        Everything the app's detail page shows, in one TMDB request: the usual Movie/Series plus
+        genres, runtime, rating, cast, trailer and recommendations (see _page_extras).
+        Separate from get_media_details, which the bot's add flows rely on and which stays lean.
+        """
+        try:
+            appended = "credits,videos,recommendations"
+            url = f"{MOVIE_BASE_URL}/{media_type}/{tmdb_id}?api_key={MOVIE_API_KEY}&append_to_response={appended}"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    data = await resp.json()
+
+            if data.get("status_code") == 34 or not (data.get("title") or data.get("name")):
+                return None
+
+            media = Series.from_api(data) if media_type == "tv" else Movie.from_api(data)
+            return media, self._page_extras(media_type, data)
+        except Exception as e:
+            handler.error_handle(e, context=f"get_media_page({media_type}, {tmdb_id})")
+            return None
+
+    @staticmethod
+    def _page_extras(media_type: str, data: dict) -> dict:
+        """The detail-page fields TMDB returns that Movie/Series don't keep."""
+        image = "https://image.tmdb.org/t/p"
+
+        # Series report a list of typical episode lengths; the first is the usual one.
+        runtime = data.get("runtime")
+        if media_type == "tv":
+            runtimes = data.get("episode_run_time") or []
+            # Often empty on TMDB; the latest episode's own length is the next best guess.
+            runtime = runtimes[0] if runtimes else (data.get("last_episode_to_air") or {}).get("runtime")
+
+        cast = [
+            {
+                "id": c.get("id"),
+                "name": c.get("name"),
+                "character": c.get("character") or None,
+                "profile_url": f"{image}/w185{c['profile_path']}" if c.get("profile_path") else None,
+            }
+            for c in (data.get("credits") or {}).get("cast", [])[:15]
+        ]
+
+        # Movies credit a director; series credit their creators.
+        if media_type == "tv":
+            creators = [c.get("name") for c in data.get("created_by") or [] if c.get("name")]
+        else:
+            creators = [
+                c.get("name") for c in (data.get("credits") or {}).get("crew", [])
+                if c.get("job") == "Director" and c.get("name")
+            ]
+
+        # Prefer an official YouTube trailer, then any trailer, then a teaser.
+        videos = [v for v in (data.get("videos") or {}).get("results", []) if v.get("site") == "YouTube" and v.get("key")]
+        def video_rank(v: dict) -> tuple:
+            return (v.get("type") != "Trailer", not v.get("official"), v.get("type") != "Teaser")
+        trailer = min(videos, key=video_rank) if videos else None
+        if trailer and trailer.get("type") not in ("Trailer", "Teaser"):
+            trailer = None
+
+        recommendations = [
+            {
+                "tmdb_id": r.get("id"),
+                "media_type": "tv" if media_type == "tv" else "movie",
+                "title": r.get("title") or r.get("name"),
+                "poster_url": f"{image}/w342{r['poster_path']}" if r.get("poster_path") else None,
+                "year": (r.get("release_date") or r.get("first_air_date") or "")[:4] or None,
+            }
+            for r in (data.get("recommendations") or {}).get("results", [])[:12]
+            if r.get("id") and (r.get("title") or r.get("name"))
+        ]
+
+        vote_average = data.get("vote_average")
+        return {
+            "genres": [g.get("name") for g in data.get("genres") or [] if g.get("name")],
+            "runtime": runtime,
+            "tagline": data.get("tagline") or None,
+            "original_language": data.get("original_language"),
+            "vote_average": round(vote_average, 1) if vote_average else None,
+            "vote_count": data.get("vote_count"),
+            "creators": creators,
+            "cast": cast,
+            "trailer": {"key": trailer["key"], "name": trailer.get("name")} if trailer else None,
+            "recommendations": recommendations,
+        }
+
 
 
     # ============================================================================ #

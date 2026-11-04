@@ -356,13 +356,32 @@ async def media_names():
     return await movieManager.fetch_media_names()
 
 
+# Detail pages, keyed by (media type, tmdb id). In memory, so a restart empties it; entries expire
+# after a day so ratings, next episodes and the like stay reasonably fresh.
+DETAILS_TTL = 24 * 60 * 60
+DETAILS_MAX = 500
+_details_cache: dict[tuple[str, int], tuple[float, dict]] = {}
+
+
 @app.get("/api/media/{media_type}/{tmdb_id}")
 async def media_details(media_type: str, tmdb_id: int):
+    """Movie/Series plus the detail-page extras (genres, cast, trailer, recommendations...)."""
     mt = parse_media_type(media_type)
-    media = await movieManager.get_media_details(mt.value, tmdb_id)
-    if not media:
+    key = (mt.value, tmdb_id)
+    cached = _details_cache.get(key)
+    if cached and time.time() - cached[0] < DETAILS_TTL:
+        return cached[1]
+
+    page = await movieManager.get_media_page(mt.value, tmdb_id)
+    if not page:
         raise HTTPException(status_code=404, detail="Media not found on TMDB")
-    return to_json(media)
+    media, extras = page
+    body = {**to_json(media), **extras}
+
+    if len(_details_cache) >= DETAILS_MAX:
+        del _details_cache[min(_details_cache, key=lambda k: _details_cache[k][0])]
+    _details_cache[key] = (time.time(), body)
+    return body
 
 
 @app.post("/api/media/refresh", dependencies=[Depends(require_bot)])
