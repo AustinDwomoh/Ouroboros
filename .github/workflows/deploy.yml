@@ -29,21 +29,39 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             set -euo pipefail
-            sudo systemctl restart ouroboros-callback
             cd ~/Ouroboros
 
             # Activate virtualenv
             source ouroboros/bin/activate
 
-            # Pull latest code
+            # Pull latest code, keeping the old commit to see what changed
+            OLD=$(git rev-parse HEAD)
             git pull origin main
+            CHANGED=$(git diff --name-only "$OLD" HEAD)
+            echo "Changed files:"; echo "${CHANGED:-  (none)}"
 
-            # Install/upgrade dependencies
-            pip install --upgrade -r requirements.txt
+            # Install/upgrade dependencies only when they changed
+            if echo "$CHANGED" | grep -qx 'requirements.txt'; then
+              pip install --upgrade -r requirements.txt
+            fi
 
-            # Restart bot with PM2
-            pm2 restart main.py --update-env
-            pm2 save  # persist across reboots
+            # Restart only what the push touched, so the bot isn't bounced for API-only changes.
+            # Docs and workflow files restart nothing.
+            RELEVANT=$(echo "$CHANGED" | grep -vE '(^\.github/|\.md$|^$)' || true)
+            API_ONLY='^callback_server\.py$'
+            BOT_ONLY='^(cogs/|views/|cmds/|client\.py$|main\.py$)'
+
+            if [ -n "$RELEVANT" ] && echo "$RELEVANT" | grep -qvE "$BOT_ONLY"; then
+              sudo systemctl restart ouroboros-callback
+              echo "Restarted API"
+            fi
+            if [ -n "$RELEVANT" ] && echo "$RELEVANT" | grep -qvE "$API_ONLY"; then
+              pm2 restart main.py --update-env
+              pm2 save  # persist across reboots
+              echo "Restarted bot"
+            else
+              echo "Bot unchanged, not restarted"
+            fi
 
       # Step 3: Notify Discord on failure
       - name: Notify Discord on failure

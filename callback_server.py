@@ -4,6 +4,9 @@ import time
 import asyncio
 import secrets
 import dataclasses
+import csv
+import io
+import re
 from datetime import date, datetime
 from enum import Enum as StdEnum
 from typing import Any, Literal, Optional
@@ -12,6 +15,7 @@ import uvicorn
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Security,Query
+from fastapi.responses import Response
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 from google.auth.exceptions import TransportError
@@ -62,7 +66,7 @@ def _verify_google_token(token: str) -> dict:
 
 
 # Routes anyone may call without credentials. They must never return user data.
-PUBLIC_PATHS = {"/api/live", "/api/media/recent"}
+PUBLIC_PATHS = {"/api/live", "/api/media/recent", "/api/testers"}
 
 
 async def require_auth(
@@ -149,6 +153,8 @@ app.add_middleware(
 async def startup():
     global connect_db
     connect_db = await Rimiru.shion()
+    async with connect_db.pool.acquire() as connection:
+        await connection.execute(TESTERS_TABLE)
 
 
 @app.on_event("shutdown")
@@ -207,6 +213,12 @@ async def run_shared(coro):
 # ============================================================================ #
 #                                 REQUEST BODIES                               #
 # ============================================================================ #
+class TesterSignupBody(BaseModel):
+    email: str
+    name: Optional[str] = None
+    website: Optional[str] = None  # honeypot: hidden on the form, so only bots fill it in
+
+
 class LinkDiscordBody(BaseModel):
     code: str
     code_verifier: str
@@ -343,6 +355,81 @@ async def recent_media():
         items = await movieManager.fetch_recent_media(limit=10)
         _recent_cache = (time.time(), items)
     return items
+
+
+# ============================================================================ #
+#                                 BETA TESTERS                                 #
+# ============================================================================ #
+# The landing page's /testers/ form posts here. Emails are only used to add people to the
+# Google Play testing list; GET /api/testers.csv (bot key) exports them for Play Console's upload.
+TESTERS_TABLE = """
+CREATE TABLE IF NOT EXISTS testers (
+    id SERIAL PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    name TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+)
+"""
+TESTERS_WEBHOOK = os.getenv("TESTERS_WEBHOOK")  # optional Discord webhook, pinged on each new signup
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_signup_hits: dict[str, list[float]] = {}  # ip -> recent signup times, for a simple rate limit
+
+
+def _rate_limited(ip: str, limit: int = 5, window: float = 3600) -> bool:
+    now = time.time()
+    hits = [t for t in _signup_hits.get(ip, []) if now - t < window]
+    if len(_signup_hits) > 5000:
+        _signup_hits.clear()
+    _signup_hits[ip] = hits + [now]
+    return len(hits) >= limit
+
+
+@app.post("/api/testers")
+async def tester_signup(body: TesterSignupBody, request: Request):
+    if body.website:  # bot filled the honeypot; pretend it worked
+        return {"ok": True}
+    ip = request.client.host if request.client else "unknown"
+    if _rate_limited(ip):
+        raise HTTPException(status_code=429, detail="Too many signups from this network, try again later")
+
+    email = body.email.strip().lower()
+    if len(email) > 254 or not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=422, detail="That doesn't look like an email address")
+    name = (body.name or "").strip()[:100] or None
+
+    async with connect_db.pool.acquire() as connection:
+        inserted = await connection.fetchval(
+            "INSERT INTO testers (email, name) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING RETURNING id",
+            email,
+            name,
+        )
+    if inserted and TESTERS_WEBHOOK:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                await client.post(TESTERS_WEBHOOK, json={
+                    "content": f"New Cyan tester signup: {name or 'someone'} ({email})",
+                    "allowed_mentions": {"parse": []},  # a name like "@everyone" must not ping anyone
+                })
+        except httpx.HTTPError:
+            pass  # a failed ping must never fail the signup
+    # Same answer whether or not the email was already on the list, so the form can't be used to probe it.
+    return {"ok": True}
+
+
+@app.get("/api/testers.csv", dependencies=[Depends(require_bot)])
+async def testers_csv():
+    """One email per line, no header: the format Play Console's "Upload CSV file" expects."""
+    async with connect_db.pool.acquire() as connection:
+        rows = await connection.fetch("SELECT email FROM testers ORDER BY created_at")
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+    for r in rows:
+        writer.writerow([r["email"]])
+    return Response(
+        out.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="cyan-testers.csv"'},
+    )
 
 
 @app.get("/api/media/search")

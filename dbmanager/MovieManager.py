@@ -11,12 +11,13 @@ from rimiru import Rimiru
 from models import Series, Movie,UserMedia
 from constants import FetchType, MediaType
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List
 from asyncio import Semaphore
 from handle import handler
 from discord.ext import  tasks
 from settings import BOT_MODE
+import task_schedule
 # ============================================================================ #
 #                                   DB CALLS                                   #
 # ============================================================================ #
@@ -798,26 +799,40 @@ class MovieManager:
         except Exception as e:
             handler.error_handle(e, context="movie_background_updater")
     
-    @tasks.loop(hours=168 if BOT_MODE == "production" else 0.02)
+    # The reminder loops remember when they last ran (task_schedule), so restarting the bot,
+    # e.g. on every deploy, doesn't send everyone their reminders again.
+    UPCOMING_EVERY = timedelta(hours=168 if BOT_MODE == "production" else 0.02)  # weekly
+    INCOMPLETE_EVERY = timedelta(hours=672 if BOT_MODE == "production" else 0.02)  # 4 weeks
+
+    @tasks.loop(hours=UPCOMING_EVERY.total_seconds() / 3600)
     async def send_upcoming_episode_reminders_loop(self, client):
+        await client.wait_until_ready()
         try:
             await self.send_upcoming_episode_reminders(client)
         except asyncio.CancelledError:
             raise
         except Exception as e:
             handler.error_handle(e, context="upcoming_episode_loop")
-            await asyncio.sleep(300)
-    
-    @tasks.loop(hours=672 if BOT_MODE == "production" else 0.02)  # 4 weeks
+        await task_schedule.mark_ran("upcoming_episode_reminders")
+
+    @send_upcoming_episode_reminders_loop.before_loop
+    async def before_upcoming_episode_reminders(self):
+        await task_schedule.wait_until_due("upcoming_episode_reminders", self.UPCOMING_EVERY)
+
+    @tasks.loop(hours=INCOMPLETE_EVERY.total_seconds() / 3600)
     async def send_incomplete_media_reminders_loop(self, client):
-       
+        await client.wait_until_ready()
         try:
             await self.send_incomplete_media_reminders(client)
         except asyncio.CancelledError:
             raise
         except Exception as e:
             handler.error_handle(e, context="incomplete_media_loop")
-            await asyncio.sleep(300)
+        await task_schedule.mark_ran("incomplete_media_reminders")
+
+    @send_incomplete_media_reminders_loop.before_loop
+    async def before_incomplete_media_reminders(self):
+        await task_schedule.wait_until_due("incomplete_media_reminders", self.INCOMPLETE_EVERY)
 
 
     
