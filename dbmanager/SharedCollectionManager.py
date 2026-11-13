@@ -37,23 +37,21 @@ class SharedCollectionManager:
     # ------------------------------------------------------------------ #
     #                       collections and members                      #
     # ------------------------------------------------------------------ #
-    async def create_collection(self, owner_id: int, name: str, collection_type: str) -> dict:
-        if collection_type not in {"watchlist", "playlist"}:
-            raise ValueError("Invalid collection type")
-
+    async def create_collection(self, owner_id: int, name: str) -> dict:
+        if not name.strip():
+            raise ValueError("Give the list a name")
         await ensure_tables()
         conn = await Rimiru.shion()
         async with conn.pool.acquire() as connection:
             async with connection.transaction():
                 collection = await connection.fetchrow(
                     """
-                    INSERT INTO shared_collections (owner_id, name, collection_type)
-                    VALUES ($1, $2, $3)
-                    RETURNING id, name, collection_type
+                    INSERT INTO shared_collections (owner_id, name)
+                    VALUES ($1, $2)
+                    RETURNING id, name, color
                     """,
                     owner_id,
                     name.strip(),
-                    collection_type,
                 )
                 await connection.execute(
                     """
@@ -70,15 +68,12 @@ class SharedCollectionManager:
         collection_id: int,
         user_id: int,
         name: str | None = None,
-        emoji: str | None = None,
         color: str | None = None,
     ) -> dict:
-        """Owner or admin. Empty emoji/color clears them; None leaves them as they are."""
+        """Owner or admin. An empty color clears it; None leaves it as it is."""
         await ensure_tables()
         if name is not None and not name.strip():
             raise ValueError("The name can't be empty")
-        if emoji is not None and len(emoji) > 16:
-            raise ValueError("Pick a single emoji")
         if color is not None and color and not (len(color) in (4, 7) and color.startswith("#")):
             raise ValueError("Colour must look like #22aacc")
         conn = await Rimiru.shion()
@@ -94,14 +89,12 @@ class SharedCollectionManager:
                     """
                     UPDATE shared_collections
                     SET name = COALESCE($2, name),
-                        emoji = CASE WHEN $3::text IS NULL THEN emoji ELSE NULLIF($3, '') END,
-                        color = CASE WHEN $4::text IS NULL THEN color ELSE NULLIF($4, '') END
+                        color = CASE WHEN $3::text IS NULL THEN color ELSE NULLIF($3, '') END
                     WHERE id = $1
-                    RETURNING id, name, collection_type, emoji, color
+                    RETURNING id, name, color
                     """,
                     collection_id,
                     name.strip() if name is not None else None,
-                    emoji,
                     color,
                 )
                 if name is not None and name.strip() != old_name:
@@ -264,7 +257,7 @@ class SharedCollectionManager:
         async with conn.pool.acquire() as connection:
             row = await connection.fetchrow(
                 """
-                SELECT c.id, c.name, c.collection_type, c.emoji, c.color,
+                SELECT c.id, c.name, c.color,
                        (SELECT count(*) FROM shared_collection_members m WHERE m.collection_id = c.id) AS member_count,
                        (SELECT count(*) FROM shared_collection_items i WHERE i.collection_id = c.id) AS item_count
                 FROM shared_collections c WHERE c.invite_code = $1
@@ -279,7 +272,7 @@ class SharedCollectionManager:
         async with conn.pool.acquire() as connection:
             async with connection.transaction():
                 collection = await connection.fetchrow(
-                    "SELECT id, name, collection_type FROM shared_collections WHERE invite_code = $1",
+                    "SELECT id, name FROM shared_collections WHERE invite_code = $1",
                     _normalize_code(code),
                 )
                 if not collection:
@@ -363,6 +356,28 @@ class SharedCollectionManager:
                     target_user_id=new_owner,
                 )
         return {"left": True, "deleted": False, "new_owner_id": new_owner}
+
+    async def delete_collection(self, collection_id: int, user_id: int) -> dict:
+        """Owner only: delete the list for everyone. Members' personal lists are untouched."""
+        await ensure_tables()
+        conn = await Rimiru.shion()
+        async with conn.pool.acquire() as connection:
+            async with connection.transaction():
+                name = await connection.fetchval(
+                    "SELECT name FROM shared_collections WHERE id = $1 FOR UPDATE", collection_id
+                )
+                if name is None:
+                    raise ValueError("That list doesn't exist")
+                if await require_member(connection, collection_id, user_id) != "owner":
+                    raise PermissionError("Only the owner can delete the list")
+                members = await connection.fetch(
+                    "SELECT user_id FROM shared_collection_members WHERE collection_id = $1", collection_id
+                )
+                # Progress, votes, ratings, comments, activity and parties cascade.
+                for table in ("shared_collection_items", "shared_collection_invites", "shared_collection_members"):
+                    await connection.execute(f"DELETE FROM {table} WHERE collection_id = $1", collection_id)
+                await connection.execute("DELETE FROM shared_collections WHERE id = $1", collection_id)
+        return {"deleted": collection_id, "name": name, "member_ids": [m["user_id"] for m in members]}
 
     async def remove_member(self, collection_id: int, owner_id: int, member_id: int) -> dict:
         """Owner removes anyone; a co-owner removes plain members."""
@@ -506,8 +521,8 @@ class SharedCollectionManager:
         async with conn.pool.acquire() as connection:
             row = await connection.fetchrow(
                 """
-                SELECT collection.id, collection.name, collection.collection_type,
-                       collection.owner_id, collection.created_at, collection.emoji,
+                SELECT collection.id, collection.name,
+                       collection.owner_id, collection.created_at,
                        collection.color, member.role
                 FROM shared_collections AS collection
                 JOIN shared_collection_members AS member
@@ -828,8 +843,8 @@ class SharedCollectionManager:
         async with conn.pool.acquire() as connection:
             rows = await connection.fetch(
                 """
-                SELECT collection.id, collection.name, collection.collection_type,
-                       collection.emoji, collection.color, member.role,
+                SELECT collection.id, collection.name,
+                       collection.color, member.role,
                        (SELECT count(*) FROM shared_collection_members m
                         WHERE m.collection_id = collection.id) AS member_count
                 FROM shared_collections AS collection
@@ -853,7 +868,7 @@ class SharedCollectionManager:
             ),
             columns=[
                 "invite.id", "invite.collection_id", "collection.name AS collection_name",
-                "collection.collection_type", "invite.inviter_id",
+                "invite.inviter_id",
                 "inviter.username AS inviter_username", "invite.expires_at",
             ],
             raw_where=(

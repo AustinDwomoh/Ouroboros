@@ -89,24 +89,18 @@ class SharedCollections(commands.Cog):
     async def before_party_reminders(self):
         await self.client.wait_until_ready()
 
-    @app_commands.command(name="shared_create", description="Create a shared watchlist or playlist")
-    @app_commands.describe(name="Collection name", collection_type="Watchlist or playlist")
-    @app_commands.choices(collection_type=[
-        app_commands.Choice(name="Watchlist", value="watchlist"),
-        app_commands.Choice(name="Playlist", value="playlist"),
-    ])
+    @app_commands.command(name="shared_create", description="Create a shared list")
+    @app_commands.describe(name="List name")
     async def shared_create(
         self,
         interaction: discord.Interaction,
         name: str,
-        collection_type: app_commands.Choice[str],
     ):
         await interaction.response.defer()
         try:
             collection = await sharedCollectionManager.create_collection(
                 await UserManager.uid(interaction),
                 name,
-                collection_type.value,
             )
             await interaction.followup.send(
                 f"Created **{collection['name']}** with ID `{collection['id']}`."
@@ -270,7 +264,7 @@ class SharedCollections(commands.Cog):
                 return
 
             embed = discord.Embed(
-                title=f"{collection['name']} ({collection['collection_type']})",
+                title=collection["name"],
                 description=(
                     f"{len(collection['items'])} item(s) remaining"
                     if collection["items"]
@@ -361,7 +355,7 @@ class SharedCollections(commands.Cog):
             message = (
                 f"You're already in **{joined['name']}**."
                 if joined["already_member"]
-                else f"Joined **{joined['name']}** ({joined['collection_type']})."
+                else f"Joined **{joined['name']}**."
             )
             await interaction.followup.send(message, ephemeral=True)
         except (PermissionError, ValueError) as error:
@@ -482,7 +476,7 @@ class SharedCollections(commands.Cog):
             search = current.casefold()
             return [
                 app_commands.Choice(
-                    name=f"{collection['name']} ({collection['collection_type']})",
+                    name=collection["name"],
                     value=collection["name"],
                 )
                 for collection in collections

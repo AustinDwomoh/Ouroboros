@@ -278,7 +278,7 @@ class AddWatchlistBody(BaseModel):
 class CreateCollectionBody(BaseModel):
     owner_id: Optional[int] = None
     name: str
-    collection_type: Literal["watchlist", "playlist"]
+    collection_type: Optional[str] = None  # ignored; older app builds still send it
 
 
 class InviteBody(BaseModel):
@@ -322,7 +322,6 @@ class ActingUserBody(BaseModel):
 class UpdateCollectionBody(BaseModel):
     user_id: Optional[int] = None
     name: Optional[str] = None
-    emoji: Optional[str] = None  # "" clears
     color: Optional[str] = None  # "#22aacc"; "" clears
 
 
@@ -681,7 +680,7 @@ async def get_user_collections(user_id: int):
 async def create_collection(body: CreateCollectionBody, me: int | None = Depends(current_user_id)):
     owner_id = acting_user(me, body.owner_id, "owner_id")
     return to_json(await run_shared(
-        sharedCollectionManager.create_collection(owner_id, body.name, body.collection_type)
+        sharedCollectionManager.create_collection(owner_id, body.name)
     ))
 
 
@@ -877,11 +876,23 @@ async def dm_users(user_ids: list[int], message: str) -> None:
 
 @app.patch("/api/collections/{collection_id}")
 async def update_collection(collection_id: int, body: UpdateCollectionBody, me: int | None = Depends(current_user_id)):
-    """Rename, or set the list's emoji / colour. Owner or co-owner."""
+    """Rename, or set the list's colour. Owner or co-owner."""
     user_id = acting_user(me, body.user_id, "user_id")
     return to_json(await run_shared(sharedCollectionManager.update_collection(
-        collection_id, user_id, body.name, body.emoji, body.color
+        collection_id, user_id, body.name, body.color
     )))
+
+
+@app.delete("/api/collections/{collection_id}")
+async def delete_collection(collection_id: int, user_id: Optional[int] = None, me: int | None = Depends(current_user_id)):
+    """Owner only. Deletes the list for every member; personal lists are untouched."""
+    user_id = acting_user(me, user_id, "user_id")
+    result = await run_shared(sharedCollectionManager.delete_collection(collection_id, user_id))
+    asyncio.create_task(dm_users(
+        [m for m in result.pop("member_ids") if m != user_id],
+        f"The shared list **{result['name']}** was deleted by its owner.",
+    ))
+    return result
 
 
 @app.put("/api/collections/{collection_id}/members/{member_id}/role")

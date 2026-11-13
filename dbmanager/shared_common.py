@@ -17,8 +17,10 @@ CREATE TABLE IF NOT EXISTS shared_collection_progress (
     PRIMARY KEY (collection_id, media_id, user_id)
 );
 ALTER TABLE shared_collections ADD COLUMN IF NOT EXISTS invite_code VARCHAR(12) UNIQUE;
-ALTER TABLE shared_collections ADD COLUMN IF NOT EXISTS emoji VARCHAR(16);
+ALTER TABLE shared_collections DROP COLUMN IF EXISTS emoji;
 ALTER TABLE shared_collections ADD COLUMN IF NOT EXISTS color VARCHAR(9);
+-- Watchlist vs playlist meant nothing in practice; a shared list is just a list.
+ALTER TABLE shared_collections DROP COLUMN IF EXISTS collection_type;
 
 -- 'admin' = co-owner: owner powers except roles, and the list can't be taken from the owner.
 DO $$
