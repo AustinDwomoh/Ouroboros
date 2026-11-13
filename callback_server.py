@@ -551,6 +551,22 @@ async def get_user_media(user_id: int, media_id: int):
     return to_json(media)
 
 
+@app.get("/api/users/{user_id}/media/tmdb/{media_type}/{tmdb_id}", dependencies=[Depends(ensure_self)])
+async def get_user_media_by_tmdb(user_id: int, media_type: str, tmdb_id: int):
+    """The user's row for a TMDB title, for detail pages opened without a DB id (search,
+    recommendations). 404 when it isn't on their list, or nobody has added it yet."""
+    mt = parse_media_type(media_type)
+    async with connect_db.pool.acquire() as connection:
+        # Movie and TV ids are separate TMDB sequences, so the type is part of the match.
+        media_id = await connection.fetchval(
+            "SELECT id FROM media WHERE tmdb_id = $1 AND media_type = $2", tmdb_id, mt.table_name
+        )
+    media = await movieManager.fetch_user_media(user_id, {"id": media_id}) if media_id else None
+    if not media:
+        raise HTTPException(status_code=404, detail="Not on this user's list")
+    return to_json(media)
+
+
 @app.delete("/api/users/{user_id}/media/{media_id}", dependencies=[Depends(ensure_self)])
 async def delete_user_media(user_id: int, media_id: int):
     if not await movieManager.delete_user_media(user_id, media_id):
