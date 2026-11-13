@@ -2,11 +2,12 @@ import typing
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from handle import handler
 from dbmanager.MovieManager import MovieManager
 from dbmanager.SharedCollectionManager import sharedCollectionManager
+from dbmanager.SharedExtrasManager import sharedExtrasManager
 from dbmanager import UserManager
 from constants import MediaType
 from views.movieView import SharedMediaSelectionView, create_selection_embed
@@ -62,6 +63,31 @@ class SharedCollections(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.media_title_cache: dict[str, dict[str, int]] = {}  # {title: {"id": media_id, "tmdb_id": tmdb_id}}
+
+    async def cog_load(self):
+        self.party_reminders.start()
+
+    async def cog_unload(self):
+        self.party_reminders.cancel()
+
+    # Each party is reminded once (reminded_at), so running right after a restart is harmless.
+    @tasks.loop(minutes=5)
+    async def party_reminders(self):
+        try:
+            for party in await sharedExtrasManager.due_reminders():
+                when = int(party["starts_at"].timestamp())
+                note = f"\n> {party['note']}" if party["note"] else ""
+                await self._dm_members(
+                    party["user_ids"],
+                    f"⏰ Watch party for **{party['title']}** in **{party['collection_name']}** "
+                    f"starts <t:{when}:R> (<t:{when}:t>).{note}",
+                )
+        except Exception as error:
+            handler.error_handle(error, context="party_reminders")
+
+    @party_reminders.before_loop
+    async def before_party_reminders(self):
+        await self.client.wait_until_ready()
 
     @app_commands.command(name="shared_create", description="Create a shared watchlist or playlist")
     @app_commands.describe(name="Collection name", collection_type="Watchlist or playlist")
@@ -307,9 +333,8 @@ class SharedCollections(commands.Cog):
                 everyone,
             )
 
-            status_text = "removed from the collection" if progress["completed"] else "progress updated"
             embed = discord.Embed(
-                title=f"Watched {status_text.title()}",
+                title="Everyone Has Watched It" if progress["completed"] else "Marked Watched",
                 description=f"**{progress['title']}** in **{progress['collection_name']}**",
                 color=discord.Color.green() if progress["completed"] else discord.Color.blue(),
             )
@@ -326,6 +351,69 @@ class SharedCollections(commands.Cog):
         except Exception as error:
             handler.error_handle(error, context=f"shared_watched({collection_name}, {media_title})")
             await interaction.followup.send("Error: Could not update watch status.", ephemeral=True)
+
+    @app_commands.command(name="shared_join", description="Join a shared collection with an invite code")
+    @app_commands.describe(code="The code a member shared with you, e.g. 6QWY-W5UY")
+    async def shared_join(self, interaction: discord.Interaction, code: str):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            joined = await sharedCollectionManager.join_with_code(code, await UserManager.uid(interaction))
+            message = (
+                f"You're already in **{joined['name']}**."
+                if joined["already_member"]
+                else f"Joined **{joined['name']}** ({joined['collection_type']})."
+            )
+            await interaction.followup.send(message, ephemeral=True)
+        except (PermissionError, ValueError) as error:
+            await interaction.followup.send(str(error), ephemeral=True)
+        except Exception as error:
+            handler.error_handle(error, context="shared_join")
+            await interaction.followup.send("Error: Could not join the collection.", ephemeral=True)
+
+    @app_commands.command(name="shared_code", description="Get the invite code for a shared collection")
+    @app_commands.describe(collection_name="The shared collection to share")
+    async def shared_code(self, interaction: discord.Interaction, collection_name: str):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            uid = await UserManager.uid(interaction)
+            collection_id = await sharedCollectionManager.get_collection_id(uid, collection_name)
+            if collection_id is None:
+                raise ValueError("Collection not found")
+            code = await sharedCollectionManager.invite_code(collection_id, uid)
+            await interaction.followup.send(
+                f"Invite code for **{collection_name}**: `{code[:4]}-{code[4:]}`. "
+                "Friends can use `/shared_join` or Join on the app's Shared tab.",
+                ephemeral=True,
+            )
+        except (PermissionError, ValueError) as error:
+            await interaction.followup.send(str(error), ephemeral=True)
+        except Exception as error:
+            handler.error_handle(error, context=f"shared_code({collection_name})")
+            await interaction.followup.send("Error: Could not get the invite code.", ephemeral=True)
+
+    @app_commands.command(name="shared_leave", description="Leave a shared collection")
+    @app_commands.describe(collection_name="The shared collection to leave")
+    async def shared_leave(self, interaction: discord.Interaction, collection_name: str):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            collection_id = await sharedCollectionManager.get_collection_id(
+                await UserManager.uid(interaction),
+                collection_name,
+            )
+            if collection_id is None:
+                raise ValueError("Collection not found")
+            result = await sharedCollectionManager.leave(collection_id, await UserManager.uid(interaction))
+            message = f"You left **{collection_name}**."
+            if result["deleted"]:
+                message += " You were the last member, so it's been deleted."
+            elif result["new_owner_id"]:
+                message += " The longest-standing member is the owner now."
+            await interaction.followup.send(message, ephemeral=True)
+        except (PermissionError, ValueError) as error:
+            await interaction.followup.send(str(error), ephemeral=True)
+        except Exception as error:
+            handler.error_handle(error, context=f"shared_leave({collection_name})")
+            await interaction.followup.send("Error: Could not leave the collection.", ephemeral=True)
 
     async def notify_new_item(self, interaction: discord.Interaction, result: dict):
         """DM the other members as soon as new media is added, so they see it instantly."""
@@ -349,7 +437,7 @@ class SharedCollections(commands.Cog):
         if progress["completed"]:
             message = (
                 f"Everyone has now watched **{progress['title']}** in "
-                f"**{progress['collection_name']}** — it's been removed from the shared collection!"
+                f"**{progress['collection_name']}**!"
             )
         elif progress["watched_count"] == 1:
             message = (
@@ -379,6 +467,8 @@ class SharedCollections(commands.Cog):
     @shared_add.autocomplete("collection_name")
     @shared_list.autocomplete("collection_name")
     @shared_watched.autocomplete("collection_name")
+    @shared_leave.autocomplete("collection_name")
+    @shared_code.autocomplete("collection_name")
     async def collection_name_autocomplete(
         self,
         interaction: discord.Interaction,

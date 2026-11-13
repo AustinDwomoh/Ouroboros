@@ -7,6 +7,7 @@
 import discord
 
 from rimiru import Rimiru
+from dbmanager.SharedCollectionManager import PROGRESS_TABLE
 
 # {discord_id: users.id}. users.id never changes for a row, so entries only
 # need clearing when accounts are merged.
@@ -141,6 +142,28 @@ async def link_discord(user_id: int, discord_id: int) -> dict:
             """,
             G, D,
         )
+        # Shared-list extras follow the membership. Where both halves have a row for the same
+        # thing (progress, vote, rating, RSVP), D's wins.
+        await tx.execute(PROGRESS_TABLE)
+        for table, keys in (
+            ("shared_collection_progress", ("collection_id", "media_id")),
+            ("shared_collection_votes", ("collection_id", "media_id")),
+            ("shared_collection_ratings", ("collection_id", "media_id")),
+            ("shared_watch_party_rsvps", ("party_id",)),
+        ):
+            same = " AND ".join(f"d.{k} = g.{k}" for k in keys)
+            await tx.execute(
+                f"""
+                DELETE FROM {table} g
+                WHERE g.user_id = $1 AND EXISTS (SELECT 1 FROM {table} d WHERE d.user_id = $2 AND {same})
+                """,
+                G, D,
+            )
+            await tx.execute(f"UPDATE {table} SET user_id = $2 WHERE user_id = $1", G, D)
+        await tx.execute("UPDATE shared_collection_comments SET user_id = $2 WHERE user_id = $1", G, D)
+        await tx.execute("UPDATE shared_collection_activity SET user_id = $2 WHERE user_id = $1", G, D)
+        await tx.execute("UPDATE shared_collection_activity SET target_user_id = $2 WHERE target_user_id = $1", G, D)
+        await tx.execute("UPDATE shared_watch_parties SET created_by = $2 WHERE created_by = $1", G, D)
         await tx.execute("DELETE FROM shared_collection_members WHERE user_id = $1", G)
         await tx.execute("UPDATE shared_collections SET owner_id = $2 WHERE owner_id = $1", G, D)
         await tx.execute("UPDATE shared_collection_items SET added_by = $2 WHERE added_by = $1", G, D)
