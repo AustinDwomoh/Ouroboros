@@ -18,6 +18,40 @@ from handle import handler
 from discord.ext import  tasks
 from settings import BOT_MODE
 import task_schedule
+import json
+
+# ============================================================================ #
+#                                SERIES STATUS                                 #
+# ============================================================================ #
+# A series is 'watched' once the user's progress has reached the last aired episode of a show
+# that won't get more (TMDB status Ended/Canceled, or Released on a few odd entries). Caught up
+# on a show that's still airing, or partway through any show, is 'watching'. Watchlist rows and
+# rows without progress are left alone. $1 = media id, $2 = user id; NULL means all.
+SERIES_STATUS_SQL = """
+UPDATE user_media um
+SET status = calc.new_status
+FROM (
+    SELECT um2.user_id, um2.media_id,
+        CASE WHEN lower(m.status) IN ('ended', 'canceled', 'released')
+              AND (
+                  (um2.progress->>'season')::int > (s.last_episode_to_air->>'season_number')::int
+                  OR ((um2.progress->>'season')::int = (s.last_episode_to_air->>'season_number')::int
+                      AND (um2.progress->>'episode')::int >= (s.last_episode_to_air->>'episode_number')::int)
+              )
+            THEN 'watched' ELSE 'watching' END AS new_status
+    FROM user_media um2
+    JOIN media m ON m.id = um2.media_id
+    JOIN series s ON s.id = m.id
+    WHERE trim(um2.status) IN ('watching', 'watched')
+      AND um2.progress IS NOT NULL
+      AND s.last_episode_to_air IS NOT NULL
+      AND ($1::int IS NULL OR um2.media_id = $1)
+      AND ($2::int IS NULL OR um2.user_id = $2)
+) calc
+WHERE um.user_id = calc.user_id
+  AND um.media_id = calc.media_id
+  AND trim(um.status) IS DISTINCT FROM calc.new_status
+"""
 # ============================================================================ #
 #                                   DB CALLS                                   #
 # ============================================================================ #
@@ -53,32 +87,87 @@ class MovieManager:
             handler.error_handle(e, context=f"add_or_update_user_movie({title})")
 
     async def add_or_update_user_series(self, user_id: int, title: str, season=None, episode=None, tmdb_id:int=0, watchlist: bool=False ):
-        """Insert or update a movie watch record for a user."""
-    
+        """Record a series on the user's list.
+
+        watchlist=True: put it on the watchlist, unless they've already started it (then nothing
+        changes). Otherwise log (season, episode) as the last episode watched. The status follows
+        from that progress (see SERIES_STATUS_SQL): 'watched' once they've seen the last episode of
+        a show that has finished, else 'watching'. Missing season/episode keeps the saved progress.
+        """
         conn = await Rimiru.shion()
         try:
-            # 1. Look up or insert movie into movies table
-
             media_data = await self.get_cached_media(MediaType.SERIES.value, title)
             if media_data is None:
                 media_data = await self.cache_media(MediaType.SERIES.value, tmdb_id)
-              
             if media_data is None:
                 raise ValueError("Failed to fetch or cache movie data.")
-            # 2. Insert or update user_media record
-            row = await conn.upsert("user_media", data={
-                "user_id": user_id,
-                "media_id": media_data.id ,
-                "progress": {"season": season, "episode": episode} if season and episode else None,
-                "status": "watchlist" if watchlist else "watching"
-                }, conflict_column="user_id, media_id")
-            if row:
-                #the idea is if it actually inserted or updated we return the media data
-                #so we can give feedback to the user with the title/poster etc
-                return media_data
+
+            async with conn.pool.acquire() as connection:
+                if watchlist:
+                    await connection.execute(
+                        """
+                        INSERT INTO user_media (user_id, media_id, status) VALUES ($1, $2, 'watchlist')
+                        ON CONFLICT (user_id, media_id) DO NOTHING
+                        """,
+                        user_id, media_data.id,
+                    )
+                    return media_data
+
+                progress = self.normalize_progress(media_data, season, episode)
+                await connection.execute(
+                    """
+                    INSERT INTO user_media (user_id, media_id, status, progress)
+                    VALUES ($1, $2, 'watching', $3::jsonb)
+                    ON CONFLICT (user_id, media_id) DO UPDATE SET
+                        status = 'watching',
+                        progress = COALESCE(EXCLUDED.progress, user_media.progress)
+                    """,
+                    user_id, media_data.id, json.dumps(progress) if progress else None,
+                )
+            await self.refresh_series_statuses(media_id=media_data.id, user_id=user_id)
+            return media_data
         except Exception as e:
             handler.error_handle(e, context=f"add_or_update_series({title})")
             return None
+
+    @staticmethod
+    def normalize_progress(series, season, episode) -> dict | None:
+        """{season, episode} to save as the last episode watched, or None when not given.
+
+        Episode numbers past the end of a season roll over to the next one, so "log next episode"
+        after S1 E10 of a 10-episode season saves S2 E1. Past the final season it stops at the
+        last episode. Season 0 (specials) is never rolled into.
+        """
+        if not season or not episode:
+            return None
+        season, episode = int(season), int(episode)
+        seasons = getattr(series, "seasons", None)
+        if isinstance(seasons, str):
+            seasons = json.loads(seasons)
+        counts = {
+            s["season_number"]: s.get("episode_count") or 0
+            for s in seasons or []
+            if s.get("season_number")
+        }
+        count = counts.get(season)
+        if count and episode > count:
+            if counts.get(season + 1):
+                season, episode = season + 1, 1
+            else:
+                episode = count
+        return {"season": season, "episode": episode}
+
+    async def refresh_series_statuses(self, media_id: int | None = None, user_id: int | None = None) -> int:
+        """Recompute watching/watched for in-progress series rows. Returns how many changed.
+
+        No arguments: every row, to repair statuses in bulk. Called after an
+        episode is logged and after the updater refreshes a series from TMDB, so a show that ends,
+        or comes back with new episodes, moves its viewers to the right status.
+        """
+        conn = await Rimiru.shion()
+        async with conn.pool.acquire() as connection:
+            result = await connection.execute(SERIES_STATUS_SQL, media_id, user_id)
+        return int(result.split()[-1])  # "UPDATE <n>"
     
     async def add_to_watchlist(self, user_id: int, title: str, media_type:str,tmdb_id:int|None=None):
         """Add a media entry to a user's watchlist."""
@@ -93,9 +182,18 @@ class MovieManager:
                 media_data = await self.cache_media(media_type_obj.value, tmdb_id) 
             if media_data is None:
                 raise ValueError("Failed to fetch or cache movie data.")
-            row = await conn.upsert("user_media", data={"user_id": user_id, "media_id": media_data.id, "status": "watchlist"}, conflict_column="user_id, media_id")
-            if row:
-                return media_data
+            # Already on the list (watching or watched)? Leave it: watchlisting it again must not
+            # throw away where they are. "Move back to watchlist" for movies goes through
+            # add_or_update_user_movie instead.
+            async with conn.pool.acquire() as connection:
+                await connection.execute(
+                    """
+                    INSERT INTO user_media (user_id, media_id, status) VALUES ($1, $2, 'watchlist')
+                    ON CONFLICT (user_id, media_id) DO NOTHING
+                    """,
+                    user_id, media_data.id,
+                )
+            return media_data
         except Exception as e:
             handler.error_handle(e, context=f"add_to_watchlist({user_id}, {title})")
             return None
@@ -686,10 +784,12 @@ class MovieManager:
             # Update series_details table
             update_data = media_data.to_db_dict()
             update_data["id"] = series_id
-            await conn.upsert("series", 
-                             data=update_data, 
+            await conn.upsert("series",
+                             data=update_data,
                              conflict_column="id")
 
+            # The show may have ended (caught-up viewers are now done) or got new episodes.
+            await self.refresh_series_statuses(media_id=series_id)
             return True
         except Exception as e:
             handler.error_handle(e, context=f"update_series_details({series_id})")

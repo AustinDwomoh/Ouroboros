@@ -4,6 +4,7 @@ import time
 import asyncio
 import secrets
 import dataclasses
+import json
 import csv
 import io
 import re
@@ -498,7 +499,19 @@ async def add_series(user_id: int, body: AddSeriesBody):
     )
     if not media:
         raise HTTPException(status_code=400, detail="Failed to add series")
-    return to_json(media)
+    # What was actually saved: the episode may have rolled over into the next season, and the
+    # status may now be 'watched'.
+    async with connect_db.pool.acquire() as connection:
+        saved = await connection.fetchrow(
+            "SELECT progress, trim(status) AS status FROM user_media WHERE user_id = $1 AND media_id = $2",
+            user_id, media.id,
+        )
+    result = to_json(media)
+    if saved:
+        progress = saved["progress"]
+        result["progress"] = json.loads(progress) if isinstance(progress, str) else progress
+        result["user_status"] = saved["status"]
+    return result
 
 
 @app.post("/api/users/{user_id}/watchlist", dependencies=[Depends(ensure_self)])
